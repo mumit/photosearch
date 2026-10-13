@@ -45,14 +45,14 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&
 const fmt = d => { const [y, m, day] = d.split("-").map(Number); return new Date(y, m - 1, day).toLocaleDateString(undefined, { month:"long", day:"numeric" }); };
 
 // one flat list of slides: cover, then each chapter's card and photos, then an ending card
-const slides = [{ type:"card", html:`<div class="k">Year in review</div><h1>${esc(R.title)}</h1><p>${esc(R.intro)}</p><button id="go">▶ Play</button>` }];
+const slides = [{ type:"card", html:`<div class="k">${esc(R.kicker || "Year in review")}</div><h1>${esc(R.title)}</h1><p>${esc(R.intro)}</p><button id="go">▶ Play</button>` }];
 for (const c of R.chapters) {
   slides.push({ type:"card", html:`<div class="k">Chapter ${R.chapters.indexOf(c) + 1}</div><h2>${esc(c.title)}</h2>${c.text ? `<p>${esc(c.text)}</p>` : ""}` });
   for (const p of c.photos) slides.push({ type:"photo", ...p });
 }
 slides.push({ type:"card", html:`<h2>${esc(R.title)}</h2><p>${esc(R.outro || "That's a wrap.")}</p><button id="again">↺ Watch again</button>` });
 
-document.title = R.title + " · Year in Review";
+document.title = R.kind === "trip" ? R.title : R.title + " · Year in Review";
 const stage = document.getElementById("stage"), bars = document.getElementById("bars");
 bars.innerHTML = slides.slice(1).map(() => "<i><b></b></i>").join("");
 const els = slides.map(s => {

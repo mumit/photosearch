@@ -137,7 +137,7 @@ Open **http://localhost:8765**. It works while `index` is still running, and pic
 | **Time Machine** | Pick something that happens every year ("birthday cake", "christmas tree") and flip through the best match from each year. |
 | **Play** | *Guess the Year* and *Guess the Place*, 10 rounds each. Works on a phone, for passing around. |
 | **Photo Math** | Start from a photo or words, then add and take away ideas: *this photo + snow − summer*. |
-| **Year in Review** | A slideshow of each year's best, most varied moments, with chapters and captions. **⬇ Download** saves it as one HTML file (photos included) you can send to family. |
+| **Stories** | Every trip (found automatically from where photos were taken) and every year as a slideshow of its best, most varied moments, with chapters and captions. **⬇ Download** saves one as a single HTML file (photos included) you can send to family. |
 
 **✨ Smart search (optional).** With a [TypeSafe](https://typesafe.ai) API key, the search box fills in the
 filters from your description: *"Sam at the beach last summer, no selfies"* becomes person Sam, summer 2025,
@@ -186,18 +186,23 @@ claude mcp add --scope user photosearch -- uv run --directory "$PWD" python mcp_
 Then, in a new Claude Code session, ask things like *"find photos of Sam at the beach, no selfies, and make an
 album"*. Claude searches, **looks at the results** on a numbered contact sheet, drops the wrong ones, and only then
 answers or builds the album. Tools: `search_photos` (with `exclude`, people, place, date and kind filters),
-`similar_photos`, `best_per_year`, `view_photos`, `library_overview`, `year_highlights`, `save_year_review`,
+`similar_photos`, `best_per_year`, `view_photos`, `library_overview`, `list_stories`, `story_highlights`, `save_story`,
 `make_album` (adds only, never removes).
 
-### Year in review
+### Stories: trips and years
 
-Every year gets an automatic review (highlights by month, with places and people) the first time you open it. For a
-nicer one, ask Claude (with the MCP server set up) *"make a year in review for 2025"*. It looks through the year's
-highlights, keeps the best ~24 (skipping repeats, blurry shots and too many selfies), and writes chapters and
-captions. Captions stick to what's in the photo and the names tagged in Photos.
+A **trip** is a run of days when most photos were taken 75+ km from home (home is worked out per year, from where
+you take photos on the most days). Trips are named from Photos' place data (*Lisbon*, *Minneapolis & Saint Paul*) and
+need 20+ photos. `uv run python ps.py trips` lists them.
+
+Every trip and year gets an automatic story the first time you play it: highlights by day for a trip, by month for a
+year, captioned with who's in them. For a nicer one, ask Claude (with the MCP server set up) *"make a story of our
+Lisbon trip"* or *"make a year in review for 2025"*. It looks through the highlights and searches for anything
+missing (food, streets), keeps the best ~24 (skipping repeats, blurry shots and too many selfies), and writes
+chapters and captions. Captions stick to what's in the photo and the names tagged in Photos.
 
 ```bash
-uv run python ps.py review 2025 --export 2025.html
+uv run python ps.py review trip-2024-05-02 --export lisbon.html   # or a year: review 2025
 ```
 
 writes the slideshow as a single file you can AirDrop, email or put on a USB stick. It contains the photos, so share
@@ -224,8 +229,8 @@ that changes your library.** It never deletes anything.
 | `ps.py` | All the code: indexing, search, album export, web server |
 | `ui.html` | The web page served by `serve` |
 | `mcp_server.py` | MCP server so Claude can search, view and make albums |
-| `review.html` | The year-in-review slideshow player (also used for the one-file export) |
-| `data/reviews/` | Saved year-in-review picks and captions, one JSON file per year |
+| `review.html` | The story slideshow player (also used for the one-file export) |
+| `data/reviews/` | Saved story picks and captions, one JSON file per year (`2025.json`) or trip (`trip-2024-05-02.json`) |
 | `.env` | Optional `TYPESAFE_API_KEY` for ✨ smart search (git-ignored) |
 | `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector |
 | `data/thumbs/` | Small JPEG previews for the web page |
@@ -310,5 +315,5 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
 **Status:** full library indexed (16,975 items in 140 min on an M3 Pro; 42 skipped for lack of a local preview). Every web tab checked in headless
 Chrome. `album` / `make_album` have not been run yet. 1,042 photos carry a placeholder date (2002-01-01 00:00); they are treated as undated.
 
-**Ideas next:** smart albums you teach with a few examples; duplicate cleanup;
+**Ideas next:** a story editor (reorder, swap a photo for a similar one, edit captions); *on this day*; smart albums you teach with a few examples; duplicate cleanup;
 index the audio track of videos.

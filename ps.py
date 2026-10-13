@@ -5,12 +5,14 @@
   ps.py similar UUID [-k 24]                  photos that look like this one
   ps.py serve  [--port 8765]                  local web UI: search, galaxy, time machine, games, photo math
   ps.py album "Name" "query" [-k 50]          put the results into a Photos album
+  ps.py trips                                 trips, found from where photos were taken
+  ps.py review 2025|trip-2024-05-02 [--export F.html]   a year or a trip as a slideshow
 
 Nothing is downloaded from iCloud: with "Optimize Mac Storage" on we embed the
 local preview Photos keeps (the model only sees ~280 visual tokens anyway).
 """
-import argparse, functools, io, json, os, random, re, sqlite3, sys, time
-from collections import Counter
+import argparse, functools, io, json, math, os, random, re, sqlite3, sys, time, unicodedata
+from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -39,6 +41,8 @@ def db():
     for c in ("lat", "lon"):
         if c not in cols:
             con.execute(f"alter table photos add column {c} real")
+    if "geo" not in cols:
+        con.execute("alter table photos add column geo text")
     con.execute("create table if not exists meta(key text primary key, value text)")
     return con
 
@@ -134,16 +138,28 @@ def open_image(path):
     return im
 
 
+def geo(p):
+    """Structured place names, for naming trips. Photos' "city" can be a borough (Santa Maria Maior), its "area" the city."""
+    if not p.place:
+        return "{}"
+    n = p.place.names
+    first = lambda *xs: next((x[0] for x in xs if x), None)
+    g = dict(city=first(n.city), area=first(n.sub_administrative_area), state=first(n.state_province),
+             country=first(n.country), water=first(n.body_of_water, n.ocean, n.inland_water))
+    return json.dumps({k: v for k, v in g.items() if v}, ensure_ascii=False)
+
+
 def meta(p):
     """Everything we keep about a photo except its vector: cheap to recompute, so refreshed on every index run."""
     lat, lon = p.location or (None, None)
     return (p.date.isoformat(), "video" if p.ismovie else "photo", p.title or "",
             (p.place.name if p.place else "") or "",
             json.dumps(list(dict.fromkeys(x for x in p.persons if x != "_UNKNOWN_"))), json.dumps(p.albums),
-            json.dumps(p.labels), lat, lon)
+            json.dumps(p.labels), lat, lon, geo(p))
 
 
-META_COLS = "date, kind, title, place, persons, albums, labels, lat, lon"
+META_COLS = "date, kind, title, place, persons, albums, labels, lat, lon, geo"
+N_META = len(META_COLS.split(","))
 
 
 def cmd_index(a):
@@ -161,7 +177,7 @@ def cmd_index(a):
             con.execute("delete from photos where uuid=?", (u,))
             (THUMBS / f"{u}.jpg").unlink(missing_ok=True)
         keep = done & lib.keys()
-        con.executemany(f"update photos set ({META_COLS}) = ({','.join('?' * 9)}) where uuid=?",
+        con.executemany(f"update photos set ({META_COLS}) = ({','.join('?' * N_META)}) where uuid=?",
                         [meta(lib[u]) + (u,) for u in keep])
         con.commit()
         print(f"refreshed {len(keep)}, removed {len(gone)} deleted from the library")
@@ -183,7 +199,7 @@ def cmd_index(a):
         for (p, im, src), v in zip(batch, vecs):
             th = im.copy(); th.thumbnail((THUMB_PX, THUMB_PX))
             th.save(THUMBS / f"{p.uuid}.jpg", quality=80)
-            con.execute(f"insert or replace into photos (uuid, {META_COLS}, src, vec) values ({','.join('?' * 12)})",
+            con.execute(f"insert or replace into photos (uuid, {META_COLS}, src, vec) values ({','.join('?' * (N_META + 3))})",
                         (p.uuid, *meta(p), src, v.tobytes()))
         con.commit()
         n += len(batch); batch.clear()
@@ -493,20 +509,39 @@ def contact_sheet(con, uuids, cols=6, cell=200):
     return buf.getvalue()
 
 
-# ---------------------------------------------------------------- year in review
+# ---------------------------------------------------------------- stories: a year or a trip as a slideshow
 
 REVIEWS = DATA / "reviews"
 MONTHS = "January February March April May June July August September October November December".split()
+STORY_ID = re.compile(r"\d{4}|trip-\d{4}-\d{2}-\d{2}")  # "2025", or a trip by its first day
+AWAY_KM = 75   # the next city over, ~95 km away, is a trip
+TRIP_MIN = 20  # photos; fewer is a stopover or a ferry ride
 
 
-def year_highlights(con, year, n=40):
-    """A varied set of the year's best photos, in date order: candidates for a year in review.
+def day_after(d):
+    return (date.fromisoformat(d) + timedelta(days=1)).isoformat()
 
-    Greedy pick of the most interesting photo (family photos count a little extra), skipping near-duplicates of
-    anything already picked and spreading picks across events (runs of photos with no day-long gap)."""
+
+def date_range(start, end):
+    """ "August 10–18, 2026" """
+    a, b = date.fromisoformat(start), date.fromisoformat(end)
+    ma, mb = MONTHS[a.month - 1], MONTHS[b.month - 1]
+    if a == b:
+        return f"{ma} {a.day}, {a.year}"
+    if (a.year, a.month) == (b.year, b.month):
+        return f"{ma} {a.day}–{b.day}, {a.year}"
+    if a.year == b.year:
+        return f"{ma} {a.day} – {mb} {b.day}, {a.year}"
+    return f"{ma} {a.day}, {a.year} – {mb} {b.day}, {b.year}"
+
+
+def highlights(con, start, end, n=40):
+    """A varied set of the best photos taken from day start to day end (inclusive), in date order: candidates for a
+    review. Greedy pick of the most interesting photo (family photos count a little extra), skipping near-duplicates
+    of anything already picked and spreading picks across events (runs of photos with no day-long gap)."""
     uuids, M, pos = vectors(con)
     rows = [r for r in con.execute(f"select uuid, date, persons from photos where kind='photo' and date >= ? and date < ? "
-                                   f"and {DATED} order by date", (f"{year}-01-01", f"{year + 1}-01-01")) if r[0] in pos]
+                                   f"and {DATED} order by date", (start, day_after(end))) if r[0] in pos]
     if not rows:
         return []
     times = [datetime.fromisoformat(r[1]) for r in rows]
@@ -526,39 +561,167 @@ def year_highlights(con, year, n=40):
     return [dict(info[rows[i][0]], event=int(event[i])) for i in sorted(picked)]
 
 
+def cover(con, start, end):
+    """The most interesting photo between two days, for a story's card."""
+    uuids, M, pos = vectors(con)
+    rows = [r[0] for r in con.execute(f"select uuid from photos where kind='photo' and date >= ? and date < ? and {DATED}",
+                                      (start, day_after(end))) if r[0] in pos]
+    score = interest(con)
+    return max(rows, key=lambda u: score[pos[u]]) if rows else None
+
+
 def short_place(place):
     return (place or "").split(",")[0]
 
 
-def auto_review(con, year, n=30):
-    """A year in review without Claude: highlights grouped by month, captioned with who's in them."""
+def km(a, b):
+    """Great-circle distance between two (lat, lon) points."""
+    la, lb, dl = math.radians(a[0]), math.radians(b[0]), math.radians(b[1] - a[1])
+    return 6371 * math.acos(min(1.0, math.sin(la) * math.sin(lb) + math.cos(la) * math.cos(lb) * math.cos(dl)))
+
+
+def trip_name(geos):
+    """ "Minneapolis & Saint Paul"; the wider area when no one city dominates ("Lisbon", not its boroughs)."""
+    geos = [g for g in geos if g]
+    top = lambda k: Counter(g[k] for g in geos if k in g).most_common(2)
+    city, half = top("city"), len(geos) / 2
+    if city and city[0][1] >= half:
+        return " & ".join(c for c, n in city if n >= len(geos) / 5)
+    for t in (top("water"), top("area"), top("state"), top("country")):
+        if t and t[0][1] >= half:
+            return t[0][0]
+    return " & ".join(c for c, _ in city) or "Trip"
+
+
+def homes(rows):
+    """Home for each year: the ~10 km cell with the most days photographed within 30 km of it. Counting days, not
+    photos, and pooling nearby cells keeps a busy week away from outvoting a home spread across several cells."""
+    days = defaultdict(lambda: defaultdict(set))
+    for d, la, lo, *_ in rows:
+        if la is not None:
+            days[d[:4]][round(la, 1), round(lo, 1)].add(d[:10])
+    def best(cells):
+        return max(cells, key=lambda c: len(set().union(*(v for o, v in cells.items() if km(c, o) <= 30))))
+    return {y: best(cells) for y, cells in days.items()}
+
+
+def trips(con):
+    """Runs of days spent mostly AWAY_KM+ from home, newest first. Home is worked out per year, so moving house
+    doesn't make the new home a trip. A day without location in the middle stays inside the trip; a day
+    photographed at home ends it."""
+    rows = con.execute(f"select date, lat, lon, geo from photos where {DATED} order by date").fetchall()
+    home = homes(rows)
+    days = {}
+    for d, la, lo, g in rows:
+        e = days.setdefault(d[:10], dict(n=0, away=0, home=0, geo=[]))
+        e["n"] += 1
+        if la is not None and km(home[d[:4]], (la, lo)) > AWAY_KM:
+            e["away"] += 1; e["geo"].append(json.loads(g or "{}"))
+        elif la is not None:
+            e["home"] += 1
+    out, cur = [], None
+    for d, e in days.items():
+        if e["away"] > e["home"]:
+            if cur and (date.fromisoformat(d) - date.fromisoformat(cur["end"])).days <= 2:
+                cur["end"] = d
+            else:
+                cur = dict(start=d, end=d, geo=[]); out.append(cur)
+            cur["geo"] += e["geo"]
+        elif e["home"]:
+            cur = None
+    for t in out:
+        t["photos"] = sum(e["n"] for d, e in days.items() if t["start"] <= d <= t["end"])
+        t.update(id=f"trip-{t['start']}", name=trip_name(t.pop("geo")))
+    return [t for t in out if t["photos"] >= TRIP_MIN][::-1]
+
+
+def find_trip(con, rid):
+    t = next((t for t in trips(con) if t["id"] == rid), None)
+    if not t:
+        raise LookupError(f"no trip starting {rid.removeprefix('trip-')} (see `ps.py trips`)")
+    return t
+
+
+def story_span(con, rid):
+    """(first day, last day, fields every review of it carries) for a year or a trip. A trip with a saved review
+    keeps the days it was made with, even if new photos would now shift where the trip is detected."""
+    if not STORY_ID.fullmatch(rid):
+        raise LookupError(f"not a story id: {rid!r} (a year like 2025, or a trip like trip-2024-05-02)")
+    if rid.isdigit():
+        return f"{rid}-01-01", f"{rid}-12-31", dict(id=rid, kind="year", year=int(rid))
+    f = REVIEWS / f"{rid}.json"
+    t = json.loads(f.read_text()) if f.exists() else find_trip(con, rid)
+    return t["start"], t["end"], dict(id=rid, kind="trip", start=t["start"], end=t["end"])
+
+
+def auto_review(con, rid, n=30):
+    """A review without Claude: highlights grouped by month (a year) or by day (a trip), captioned with who's in them.
+    The place and date show under every photo already, so the caption is just the names."""
+    start, end, fields = story_span(con, rid)
+    trip = fields["kind"] == "trip"
     chapters = []
-    for h in year_highlights(con, year, n):
-        m = MONTHS[int(h["date"][5:7]) - 1]
-        if not chapters or chapters[-1]["month"] != m:
-            chapters.append(dict(month=m, photos=[]))
-        # the place and date are shown under every photo already, so the caption is just who's in it
+    for h in highlights(con, start, end, min(n, max(12, find_trip(con, rid)["photos"] // 10)) if trip else n):
+        key = h["date"] if trip else MONTHS[int(h["date"][5:7]) - 1]
+        if not chapters or chapters[-1]["key"] != key:
+            chapters.append(dict(key=key, photos=[], places=Counter()))
         chapters[-1]["photos"].append(dict(uuid=h["uuid"], caption=" & ".join(p.split()[0] for p in h["persons"][:3])))
+        chapters[-1]["places"][short_place(h["place"])] += bool(h["place"])
     for c in chapters:
-        c["title"] = c.pop("month")
-    return dict(year=year, title=str(year), intro=f"{sum(len(c['photos']) for c in chapters)} moments from {year}",
-                made_by="auto", chapters=chapters)
+        key, places = c.pop("key"), c.pop("places")
+        if trip:  # "Day 3 · Sintra"
+            place = [p for p, k in places.most_common(1) if k]
+            key = f"Day {(date.fromisoformat(key) - date.fromisoformat(start)).days + 1}" + "".join(f" · {p}" for p in place)
+        c["title"] = key
+    n = sum(len(c["photos"]) for c in chapters)
+    title = find_trip(con, rid)["name"] if trip else rid
+    intro = f"{date_range(start, end)} · {n} moments" if trip else f"{n} moments from {rid}"
+    return dict(fields, title=title, intro=intro, made_by="auto", chapters=chapters)
 
 
 def save_review(review):
     REVIEWS.mkdir(parents=True, exist_ok=True)
-    (REVIEWS / f"{review['year']}.json").write_text(json.dumps(review, indent=1, ensure_ascii=False))
+    (REVIEWS / f"{review['id']}.json").write_text(json.dumps(review, indent=1, ensure_ascii=False))
 
 
-def load_review(con, year, make=False):
-    f = REVIEWS / f"{year}.json"
+def load_review(con, rid, make=False):
+    f = REVIEWS / f"{rid}.json"
     if f.exists():
-        return json.loads(f.read_text())
+        r = json.loads(f.read_text())
+        return dict(r, id=rid, kind=r.get("kind", "year"))  # year reviews saved before trips existed
     if not make:
-        raise LookupError(f"no review for {year}")
-    r = auto_review(con, year)
+        raise LookupError(f"no review for {rid}")
+    r = auto_review(con, rid)
     save_review(r)
     return r
+
+
+def stories(con):
+    """Every trip and year, newest first: its saved review's title and author if it has one, else what was detected."""
+    made = {f.stem: json.loads(f.read_text()) for f in REVIEWS.glob("*.json")} if REVIEWS.exists() else {}
+    def story(rid, start, end, **x):
+        r = made.get(rid, {})
+        first = next((p["uuid"] for c in r.get("chapters", []) for p in c["photos"]), None)
+        return dict(x, id=rid, start=start, end=end, title=r.get("title", x.get("title")), made_by=r.get("made_by"),
+                    cover=first or cover(con, start, end))
+    found = {t["id"]: t for t in trips(con)}
+    for rid, r in made.items():  # a saved trip that new photos have since merged into another, or moved
+        if r.get("kind") == "trip" and rid not in found:
+            n = con.execute("select count(*) from photos where date >= ? and date < ?", (r["start"], day_after(r["end"])))
+            found[rid] = dict(r, photos=n.fetchone()[0], name=r["title"])
+    out = [story(t["id"], t["start"], t["end"], kind="trip", title=t["name"], photos=t["photos"])
+           for t in sorted(found.values(), key=lambda t: t["start"], reverse=True)]
+    years = con.execute(f"select substr(date,1,4) y, count(*) from photos where {DATED} group by y order by y desc")
+    return out + [story(y, f"{y}-01-01", f"{y}-12-31", kind="year", title=y, photos=n) for y, n in years.fetchall()]
+
+
+def slug(text):
+    return re.sub(r"[^a-z0-9]+", "-", unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()).strip("-")
+
+
+def export_name(review):
+    if review["kind"] == "year":
+        return f"year-in-review-{review['id']}.html"
+    return f"{slug(review['title']) or 'trip'}-{review['start'][:4]}.html"
 
 
 def render_review(con, review, embed=False):
@@ -567,20 +730,30 @@ def render_review(con, review, embed=False):
     info = photo_info(con, [p["uuid"] for c in review["chapters"] for p in c["photos"]])
     def src(u):
         return "data:image/jpeg;base64," + base64.b64encode(photo_jpeg(con, u)).decode() if embed else f"/photo/{u}.jpg"
-    data = dict(review, chapters=[dict(title=c["title"], text=c.get("text", ""),
-                                       photos=[dict(src=src(p["uuid"]), caption=p.get("caption", ""),
-                                                    date=info[p["uuid"]]["date"], place=short_place(info[p["uuid"]]["place"]))
-                                               for p in c["photos"] if p["uuid"] in info])
-                                  for c in review["chapters"]])
+    kicker = date_range(review["start"], review["end"]) if review.get("kind") == "trip" else "Year in review"
+    data = dict(review, kicker=kicker,
+                chapters=[dict(title=c["title"], text=c.get("text", ""),
+                               photos=[dict(src=src(p["uuid"]), caption=p.get("caption", ""),
+                                            date=info[p["uuid"]]["date"], place=short_place(info[p["uuid"]]["place"]))
+                                       for p in c["photos"] if p["uuid"] in info])
+                          for c in review["chapters"]])
     page = (HERE / "review.html").read_text()
     return page.replace("/*REVIEW*/null", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
+
+
+def cmd_trips(a):
+    con = db()
+    made = {f.stem: json.loads(f.read_text()).get("made_by") for f in REVIEWS.glob("*.json")} if REVIEWS.exists() else {}
+    for t in trips(con):
+        tag = {"claude": "  ✨ curated", "auto": "  (automatic review)"}.get(made.get(t["id"]), "")
+        print(f"{t['id']}  {date_range(t['start'], t['end']):30}  {t['photos']:5} photos  {t['name']}{tag}")
 
 
 def cmd_review(a):
     con = db()
     if a.auto:
-        save_review(auto_review(con, a.year))
-    r = load_review(con, a.year, make=True)
+        save_review(auto_review(con, a.story))
+    r = load_review(con, a.story, make=True)
     print(f"{r['title']}: {sum(len(c['photos']) for c in r['chapters'])} photos in {len(r['chapters'])} chapters "
           f"(made by {r['made_by']})")
     if a.export:
@@ -626,14 +799,7 @@ def cmd_serve(a):
             raise LookupError(q["uuid"])
         return info[q["uuid"]]
 
-    def api_reviews(q):
-        made = {int(f.stem): json.loads(f.read_text()) for f in REVIEWS.glob("*.json")} if REVIEWS.exists() else {}
-        years = con.execute(f"select cast(substr(date,1,4) as integer) y, count(*) from photos where {DATED} "
-                            "group by y order by y desc").fetchall()
-        return [dict(year=y, photos=n, title=made[y]["title"] if y in made else None,
-                     made_by=made[y]["made_by"] if y in made else None) for y, n in years]
-
-    api = {"/api/reviews": api_reviews, "/api/search": api_search, "/api/open": api_open, "/api/info": api_info, "/api/parse": api_parse,
+    api = {"/api/stories": lambda q: stories(con), "/api/search": api_search, "/api/open": api_open, "/api/info": api_info, "/api/parse": api_parse,
            "/api/galaxy": lambda q: galaxy(con),
            "/api/timeline": lambda q: timeline(con, q.get("q", ""), int(q.get("per", 1))),
            "/api/game": lambda q: game_round(con, q.get("mode", "year")),
@@ -658,11 +824,12 @@ def cmd_serve(a):
                     return self.send(f.read_bytes(), "image/jpeg") if f.exists() else self.send(b"", "text/plain", 404)
                 if u.path.startswith("/photo/"):
                     return self.send(photo_jpeg(con, name.removesuffix(".jpg")), "image/jpeg")
-                if u.path.startswith("/review/") and name.isdigit():
-                    page = render_review(con, load_review(con, int(name), make=True), embed="download" in q).encode()
+                if u.path.startswith("/review/") and STORY_ID.fullmatch(name):
+                    r = load_review(con, name, make=True)
+                    page = render_review(con, r, embed="download" in q).encode()
                     if "download" in q:  # one self-contained file to send to family
                         self.send_response(200); self.send_header("content-type", "text/html; charset=utf-8")
-                        self.send_header("content-disposition", f'attachment; filename="year-in-review-{name}.html"')
+                        self.send_header("content-disposition", f'attachment; filename="{export_name(r)}"')
                         self.send_header("content-length", str(len(page))); self.end_headers()
                         return self.wfile.write(page)
                     return self.send(page, "text/html; charset=utf-8")
@@ -699,8 +866,10 @@ def main():
     p = sub.add_parser("similar"); p.add_argument("uuid"); filters(p); p.set_defaults(fn=cmd_similar)
     p = sub.add_parser("album"); p.add_argument("name"); p.add_argument("query"); filters(p); p.set_defaults(fn=cmd_album)
     p = sub.add_parser("serve"); p.add_argument("--port", type=int, default=8765); p.set_defaults(fn=cmd_serve)
-    p = sub.add_parser("review", help="year in review: build (if needed) and optionally export as one HTML file")
-    p.add_argument("year", type=int); p.add_argument("--auto", action="store_true", help="rebuild the automatic version")
+    p = sub.add_parser("trips", help="trips, found from where photos were taken"); p.set_defaults(fn=cmd_trips)
+    p = sub.add_parser("review", help="a year or trip as a slideshow: build (if needed), optionally export as one file")
+    p.add_argument("story", help="a year (2025) or a trip id from `ps.py trips` (trip-2024-05-02)")
+    p.add_argument("--auto", action="store_true", help="rebuild the automatic version")
     p.add_argument("--export", metavar="FILE.html"); p.set_defaults(fn=cmd_review)
     a = ap.parse_args()
     if getattr(a, "vision_tokens", None):

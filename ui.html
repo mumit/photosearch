@@ -62,6 +62,15 @@
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; cursor:pointer; }
   .card h3 { margin:0 0 6px; font-size:20px; }
   .card p { margin:0; color:var(--mut); }
+
+  /* stories */
+  #stories .cards { max-width:none; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); }
+  #stories h3.sec { margin:28px 0 12px; font-size:15px; color:var(--mut); text-transform:uppercase; letter-spacing:.08em; }
+  .story { cursor:default; padding:0; overflow:hidden; }
+  .story img { display:block; width:100%; aspect-ratio:4/3; object-fit:cover; background:#000; }
+  .story .body { padding:12px 14px 14px; }
+  .story h3 { font-size:18px; }
+  .story .go { margin-top:8px; }
   #play-area { display:grid; grid-template-columns:minmax(0, 1.3fr) minmax(280px, 1fr); gap:16px; }
   @media (max-width: 800px) { #play-area { grid-template-columns:1fr; } }
   #play-photo { width:100%; max-height:70vh; object-fit:contain; background:#000; border-radius:12px; }
@@ -89,7 +98,7 @@
 <header>
   <nav id="tabs">
     <b>📷 Photosearch</b>
-    <a href="#search">Search</a><a href="#galaxy">Galaxy</a><a href="#time">Time Machine</a><a href="#play">Play</a><a href="#math">Photo Math</a><a href="#review">Year in Review</a>
+    <a href="#search">Search</a><a href="#galaxy">Galaxy</a><a href="#time">Time Machine</a><a href="#play">Play</a><a href="#math">Photo Math</a><a href="#stories">Stories</a>
   </nav>
   <div id="head-search">
     <form id="f">
@@ -150,12 +159,14 @@
 
   <section id="math"><div class="grid" id="mgrid"></div></section>
 
-  <section id="review"><div class="pad">
-    <h2 style="margin-top:0">Year in Review</h2>
-    <p class="status" style="max-width:640px">Each year as a slideshow of its best, most varied moments. Years without one get an
-      automatic version (by month, with places and people) the first time you open them. For a nicer one, ask Claude:
-      <i>“make a year in review for 2025”</i>. It looks through the highlights, picks the best, and writes chapters and captions.</p>
-    <div class="cards" id="years" style="max-width:none; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr))"></div>
+  <section id="stories"><div class="pad">
+    <h2 style="margin-top:0">Stories</h2>
+    <p class="status" style="max-width:680px">Each trip and each year as a slideshow of its best, most varied moments. Trips are
+      found from where photos were taken (a run of days 75+ km from home). Without a story yet, one is made automatically
+      (by day for trips, by month for years) the first time you play it. For a nicer one, ask Claude:
+      <i>“make a story of our Lisbon trip”</i>. It picks the best photos and writes chapters and captions.</p>
+    <h3 class="sec">Trips</h3><div class="cards" id="trips"></div>
+    <h3 class="sec">Years</h3><div class="cards" id="years"></div>
   </div></section>
 </main>
 
@@ -570,16 +581,32 @@ function loadLeaflet() {
   });
 }
 
-/* ---------- year in review ---------- */
-views.review = async () => {
-  const r = (await api("/api/reviews")).results;
-  $("years").innerHTML = r.map(y => `
-    <div class="card" style="cursor:default">
-      <h3>${y.year}</h3>
-      <p>${y.photos.toLocaleString()} photos${y.made_by ? ` · ${y.made_by === "claude" ? "✨ curated by Claude" : "automatic"}` : ""}</p>
-      <p style="margin-top:10px"><a href="/review/${y.year}" target="_blank">▶ ${y.made_by ? "Play" : "Make & play"}</a>
-        ${y.made_by ? ` · <a href="/review/${y.year}?download=1">⬇ Download</a>` : ""}</p>
-    </div>`).join("");
+/* ---------- stories ---------- */
+function dateRange(a, b) {
+  const d = x => { const [y, m, day] = x.split("-").map(Number); return new Date(y, m - 1, day); };
+  const [s, e] = [d(a), d(b)], md = { month:"short", day:"numeric" };
+  if (a === b) return s.toLocaleDateString(undefined, { ...md, year:"numeric" });
+  if (s.getFullYear() !== e.getFullYear())
+    return `${s.toLocaleDateString(undefined, { ...md, year:"numeric" })} – ${e.toLocaleDateString(undefined, { ...md, year:"numeric" })}`;
+  const end = s.getMonth() === e.getMonth() ? e.getDate() : e.toLocaleDateString(undefined, md);
+  return `${s.toLocaleDateString(undefined, md)}–${end}, ${e.getFullYear()}`;
+}
+function storyCard(x) {
+  const by = x.made_by ? ` · ${x.made_by === "claude" ? "✨ curated by Claude" : "automatic"}` : "";
+  return `<div class="card story">
+    ${x.cover ? `<a href="/review/${x.id}" target="_blank"><img loading="lazy" src="/thumb/${x.cover}.jpg" alt=""></a>` : ""}
+    <div class="body">
+      <h3>${esc(x.title)}</h3>
+      <p>${x.kind === "trip" ? dateRange(x.start, x.end) + " · " : ""}${x.photos.toLocaleString()} photos${by}</p>
+      <p class="go"><a href="/review/${x.id}" target="_blank">▶ ${x.made_by ? "Play" : "Make & play"}</a>
+        ${x.made_by ? ` · <a href="/review/${x.id}?download=1">⬇ Download</a>` : ""}</p>
+    </div></div>`;
+}
+views.stories = async () => {
+  const r = (await api("/api/stories")).results;
+  const trips = r.filter(x => x.kind === "trip");
+  $("trips").innerHTML = trips.map(storyCard).join("") || `<p class="status">No trips found yet: they need photos with locations.</p>`;
+  $("years").innerHTML = r.filter(x => x.kind === "year").map(storyCard).join("");
 };
 
 /* ---------- photo math ---------- */

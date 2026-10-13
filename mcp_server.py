@@ -107,12 +107,21 @@ class Chapter(TypedDict, total=False):
 
 
 @mcp.tool(annotations=READ)
-def year_highlights(year: int, count: int = 40) -> list:
-    """Candidates for a year in review: a varied set of the year's best photos (near-duplicates removed, spread
-    across events), in date order, as numbered contact sheets plus their dates, places and people."""
-    h = ps.year_highlights(con, year, min(count, 60))
+def list_stories() -> list[dict]:
+    """The trips (found from where photos were taken) and years that can be made into a slideshow, newest first,
+    with their ids, days, photo counts, and who made the current review (none yet, "auto" or "claude")."""
+    return [{k: v for k, v in s.items() if k != "cover" and v is not None} for s in ps.stories(con)]
+
+
+@mcp.tool(annotations=READ)
+def story_highlights(story: str, count: int = 40) -> list:
+    """Candidates for a story (a year like "2025", or a trip id from list_stories like "trip-2024-05-02"): a varied
+    set of its best photos (near-duplicates removed, spread across events), in date order, as numbered contact
+    sheets plus their dates, places and people."""
+    start, end, _ = ps.story_span(con, story)
+    h = ps.highlights(con, start, end, min(count, 60))
     if not h:
-        return [f"no photos indexed for {year}"]
+        return [f"no photos indexed for {story}"]
     out = [Image(data=ps.contact_sheet(con, [x["uuid"] for x in h[i:i + SHEET_MAX]], cell=CELL), format="jpeg")
            for i in range(0, len(h), SHEET_MAX)]
     key = [dict(n=n + 1, **{k: v for k, v in x.items() if k in ("uuid", "date", "place", "persons", "event") and v not in ("", [])})
@@ -121,20 +130,22 @@ def year_highlights(year: int, count: int = 40) -> list:
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True))
-def save_year_review(year: int, title: str, intro: str, chapters: list[Chapter], outro: str = "") -> str:
-    """Save a year in review and get the link to its slideshow. Pick ~20-30 photos from year_highlights (look at
-    them first: skip blurry shots, near-repeats, receipts and too many selfies), group them into 4-8 chapters in
-    date order with short titles, and give each photo a one-line caption. Captions should describe what's in the
-    photo, using only names from the photo's tagged people; don't invent events or feelings. Replaces any earlier
-    review for that year (the automatic one included)."""
+def save_story(story: str, title: str, intro: str, chapters: list[Chapter], outro: str = "") -> str:
+    """Save a story (a year or a trip) and get the link to its slideshow. Pick ~20-30 photos from story_highlights,
+    plus any you found with search_photos (look at them first: skip blurry shots, near-repeats, receipts and too
+    many selfies), group them into 4-8 chapters in date order with short titles (for a trip, usually by day or
+    place), and give each photo a one-line caption. Captions should describe what's in the photo, using only names
+    from the photo's tagged people; don't invent events or feelings. Replaces any earlier review of that story."""
+    _, _, fields = ps.story_span(con, story)
     known = ps.photo_info(con, [p["uuid"] for c in chapters for p in c.get("photos", [])])
     bad = [p["uuid"] for c in chapters for p in c.get("photos", []) if p["uuid"] not in known]
     if bad:
         raise ValueError(f"not in the index: {bad}")
-    ps.save_review(dict(year=year, title=title, intro=intro, outro=outro, made_by="claude", chapters=chapters))
+    ps.save_review(dict(fields, title=title, intro=intro, outro=outro, made_by="claude", chapters=chapters))
     n = sum(len(c.get("photos", [])) for c in chapters)
-    return (f"saved {n} photos in {len(chapters)} chapters. Slideshow: http://localhost:8765/review/{year} "
-            f"(needs `ps.py serve`). One-file copy to share: `uv run python ps.py review {year} --export {year}.html`")
+    return (f"saved {n} photos in {len(chapters)} chapters. Slideshow: http://localhost:8765/review/{story} "
+            f"(needs `ps.py serve`; also listed under Stories). One-file copy to share: "
+            f"`uv run python ps.py review {story} --export {story}.html`")
 
 
 if __name__ == "__main__":
