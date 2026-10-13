@@ -1,0 +1,14 @@
+[project]
+name = "photosearch"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.5.4",
+    "osxphotos>=0.77.2",
+    "pillow>=12.3.0",
+    "pillow-heif>=1.8.1",
+    "sentence-transformers>=6.1.0",
+    "torch>=2.14.1",
+    "torchvision>=0.29.1",
+    "transformers>=5.19.0",
+]

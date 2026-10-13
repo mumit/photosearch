@@ -1,0 +1,56 @@
+<!doctype html>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Photo Search</title>
+<style>
+  :root { --bg:#fafaf9; --fg:#1c1917; --mut:#78716c; --card:#fff; --line:#e7e5e4; --acc:#2563eb; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#141414; --fg:#f5f5f4; --mut:#a8a29e; --card:#1f1f1f; --line:#333; --acc:#60a5fa; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.4 -apple-system, system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+  header { position:sticky; top:0; z-index:1; background:var(--bg); padding:16px 20px 12px; border-bottom:1px solid var(--line); }
+  form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  input, select, button { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
+  #q { flex:1 1 320px; font-size:17px; }
+  button { background:var(--acc); color:#fff; border-color:var(--acc); cursor:pointer; }
+  .small { width:9.5em; }
+  #status { color:var(--mut); font-size:13px; margin-top:8px; min-height:1.2em; }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:10px; padding:16px 20px 40px; }
+  figure { margin:0; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  figure img { display:block; width:100%; aspect-ratio:1; object-fit:cover; cursor:zoom-in; }
+  figcaption { padding:6px 8px; font-size:12px; color:var(--mut); display:flex; justify-content:space-between; gap:6px; }
+  figcaption a { color:var(--acc); cursor:pointer; text-decoration:none; white-space:nowrap; }
+  .tag { background:var(--line); border-radius:4px; padding:0 4px; }
+</style>
+<header>
+  <form id="f">
+    <input id="q" placeholder="Describe a photo… e.g. “birthday cake with candles at night”" autofocus>
+    <input id="person" class="small" placeholder="person">
+    <input id="after" class="small" type="date" title="after">
+    <input id="before" class="small" type="date" title="before">
+    <select id="kind"><option value="">all</option><option>photo</option><option>video</option></select>
+    <button>Search</button>
+  </form>
+  <div id="status"></div>
+</header>
+<div id="grid"></div>
+<script>
+const $ = id => document.getElementById(id);
+async function run(params) {
+  for (const k of ["person","after","before","kind"]) if ($(k).value) params[k] = $(k).value;
+  $("status").textContent = "searching…";
+  const r = await (await fetch("/api/search?" + new URLSearchParams(params))).json();
+  $("status").textContent = `${r.results.length} results from ${r.total.toLocaleString()} indexed · ${r.ms} ms` +
+    (params.like ? " · showing photos similar to the one you picked" : "");
+  $("grid").innerHTML = r.results.map(x => `
+    <figure>
+      <img loading="lazy" src="/thumb/${x.uuid}.jpg" data-uuid="${x.uuid}" title="${x.place || ""} ${x.persons.join(", ")}">
+      <figcaption><span>${x.date}${x.kind === "video" ? ' <span class="tag">video</span>' : ""} · ${x.score.toFixed(2)}</span>
+        <a data-like="${x.uuid}">more like this</a></figcaption>
+    </figure>`).join("");
+  window.scrollTo(0, 0);
+}
+$("f").onsubmit = e => { e.preventDefault(); if ($("q").value.trim()) run({ q: $("q").value }); };
+$("grid").onclick = e => {
+  if (e.target.dataset.like) run({ like: e.target.dataset.like });
+  else if (e.target.dataset.uuid) fetch("/api/open?uuid=" + e.target.dataset.uuid);  // opens it in Photos
+};
+</script>
