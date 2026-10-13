@@ -200,7 +200,7 @@ function gridHTML(results) {
   return results.map((x, i) => `
     <figure>
       <img loading="lazy" src="/thumb/${x.uuid}.jpg" data-i="${i}" title="${esc(x.place)} ${esc(x.persons.join(", "))}">
-      <figcaption><span>${x.date}${x.kind === "video" ? ' <span class="tag">video</span>' : ""}</span><span>${x.score.toFixed(2)}</span></figcaption>
+      <figcaption><span>${x.undated ? "date unknown" : x.date}${x.kind === "video" ? ' <span class="tag">video</span>' : ""}</span><span>${x.score.toFixed(2)}</span></figcaption>
     </figure>`).join("");
 }
 function bindGrid(el, results) {
@@ -213,7 +213,7 @@ function lightbox(list, i) {
   lbList = list; lbAt = i;
   const x = list[i];
   $("lbimg").src = `/photo/${x.uuid}.jpg`;
-  $("lbinfo").innerHTML = `<div style="font-size:18px;color:#fff">${x.date}</div>
+  $("lbinfo").innerHTML = `<div style="font-size:18px;color:#fff">${x.undated ? "Date unknown" : x.date}</div>
     <div>${esc(x.place) || "<i>no place</i>"}</div><div>${esc(x.persons.join(", "))}</div>`;
   $("lb").classList.add("on");
 }
@@ -269,6 +269,7 @@ views.search = () => $("q").focus();
 /* ---------- galaxy ---------- */
 const G = { data: null, s: 1, ox: 0, oy: 0, hi: null, imgs: new Map(), vis: [], raf: 0 };
 const yearColor = (y, a = 1) => {
+  if (!y) return `rgba(150,150,160,${a * 0.6})`;  // undated
   const t = (y - G.y0) / Math.max(1, G.y1 - G.y0);
   return `hsla(${250 - 215 * t}, 85%, ${55 + 8 * t}%, ${a})`;
 };
@@ -282,7 +283,7 @@ views.galaxy = async () => {
   try {
     G.data = (await api("/api/galaxy")).results;
   } catch (e) { $("gstatus").textContent = "couldn't map: " + e.message; G.loading = false; return; }
-  G.y0 = Math.min(...G.data.year); G.y1 = Math.max(...G.data.year);
+  G.y0 = Math.min(...G.data.year.filter(Boolean)); G.y1 = Math.max(...G.data.year);
   $("gy0").textContent = G.y0; $("gy1").textContent = G.y1;
   $("ggrad").style.background = `linear-gradient(90deg, ${[0, .25, .5, .75, 1].map(t => yearColor(G.y0 + t * (G.y1 - G.y0))).join(",")})`;
   $("gstatus").textContent = `${G.data.uuids.length.toLocaleString()} photos · similar photos sit together · scroll to zoom · drag to pan · click a photo`;
@@ -375,7 +376,7 @@ cv.onpointermove = e => {
   if (!prev) {  // hover
     const i = G.data ? pick(e.offsetX, e.offsetY) : -1, tip = $("gtip");
     if (i < 0) { tip.style.display = "none"; return; }
-    tip.innerHTML = `<img src="/thumb/${G.data.uuids[i]}.jpg"><div style="padding:3px 2px 0">${G.data.year[i]}</div>`;
+    tip.innerHTML = `<img src="/thumb/${G.data.uuids[i]}.jpg"><div style="padding:3px 2px 0">${G.data.year[i] || "date unknown"}</div>`;
     tip.style.display = "block";
     tip.style.left = Math.min(e.offsetX + 14, G.w - 200) + "px"; tip.style.top = Math.min(e.offsetY + 14, G.h - 220) + "px";
     return;

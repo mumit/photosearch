@@ -53,6 +53,11 @@ def check_settings(con):
     con.commit()
 
 
+# Timestamps shared by 50+ photos aren't real dates: scans, or a camera whose clock was reset (here 1,042 photos
+# say 2002-01-01 00:00). Year-based features (time machine, games, year in review) leave these out.
+DATED = "date not in (select date from photos group by date having count(*) >= 50)"
+
+
 def load_matrix(con, where="", params=()):
     rows = con.execute(f"select uuid, vec from photos {where}", params).fetchall()
     if not rows:
@@ -237,10 +242,10 @@ def rank(con, qvec, k, **filters):
 
 
 def photo_info(con, uuids):
-    rows = con.execute(f"select uuid, date, kind, place, persons, lat, lon from photos where uuid in "
+    rows = con.execute(f"select uuid, date, kind, place, persons, lat, lon, not ({DATED}) from photos where uuid in "
                        f"({','.join('?' * len(uuids))})", list(uuids))
-    return {r[0]: dict(uuid=r[0], date=r[1][:10], kind=r[2], place=r[3], persons=json.loads(r[4]), lat=r[5], lon=r[6])
-            for r in rows}
+    return {r[0]: dict(uuid=r[0], date=r[1][:10], kind=r[2], place=r[3], persons=json.loads(r[4]), lat=r[5], lon=r[6],
+                       **({"undated": True} if r[7] else {})) for r in rows}
 
 
 def vec_of(con, uuid):
@@ -387,7 +392,7 @@ def galaxy(con):
     xy = np.clip((xy - lo) / (hi - lo), 0, 1)
     k = max(2, min(48, len(uuids) // 150))
     cl = KMeans(k, n_init=4, random_state=0).fit_predict(M)
-    rows = {r[0]: r[1:] for r in con.execute("select uuid, substr(date,1,4), labels from photos")}
+    rows = {r[0]: r[1:] for r in con.execute(f"select uuid, iif({DATED}, substr(date,1,4), 0), labels from photos")}
     docs = [set(json.loads(rows[u][1] or "[]")) for u in uuids]
     df = Counter(l for d in docs for l in d)
     regions = []
@@ -409,7 +414,7 @@ def timeline(con, query, per=1):
     """The best match for `query` in each year."""
     uuids, M, _ = vectors(con)
     s = M @ embed_query(query)
-    years = dict(con.execute("select uuid, substr(date,1,4) from photos"))
+    years = dict(con.execute(f"select uuid, substr(date,1,4) from photos where {DATED}"))
     best = {}
     for i in np.argsort(-s):
         y = years.get(uuids[i])
@@ -440,13 +445,13 @@ def game_round(con, mode="year"):
     """A random, reasonably interesting photo to guess the year or place of."""
     uuids, M, _ = vectors(con)
     score = interest(con)
-    where = "kind='photo'" + (" and lat is not null" if mode == "place" else "")
+    where = "kind='photo'" + (" and lat is not null" if mode == "place" else f" and {DATED}")
     ok = {r[0] for r in con.execute(f"select uuid from photos where {where}")}
     cand = [i for i in np.argsort(-score)[: max(20, len(uuids) * 2 // 5)] if uuids[i] in ok]
     if not cand:
         raise LookupError("no photos to play with yet")
     u = uuids[random.choice(cand)]
-    years = con.execute("select min(substr(date,1,4)), max(substr(date,1,4)) from photos").fetchone()
+    years = con.execute(f"select min(substr(date,1,4)), max(substr(date,1,4)) from photos where {DATED}").fetchone()
     return dict(photo_info(con, [u])[u], first=int(years[0]), last=int(years[1]))
 
 
@@ -500,8 +505,8 @@ def year_highlights(con, year, n=40):
     Greedy pick of the most interesting photo (family photos count a little extra), skipping near-duplicates of
     anything already picked and spreading picks across events (runs of photos with no day-long gap)."""
     uuids, M, pos = vectors(con)
-    rows = [r for r in con.execute("select uuid, date, persons from photos where kind='photo' and date >= ? and date < ? "
-                                   "order by date", (f"{year}-01-01", f"{year + 1}-01-01")) if r[0] in pos]
+    rows = [r for r in con.execute(f"select uuid, date, persons from photos where kind='photo' and date >= ? and date < ? "
+                                   f"and {DATED} order by date", (f"{year}-01-01", f"{year + 1}-01-01")) if r[0] in pos]
     if not rows:
         return []
     times = [datetime.fromisoformat(r[1]) for r in rows]
@@ -623,7 +628,8 @@ def cmd_serve(a):
 
     def api_reviews(q):
         made = {int(f.stem): json.loads(f.read_text()) for f in REVIEWS.glob("*.json")} if REVIEWS.exists() else {}
-        years = con.execute("select cast(substr(date,1,4) as integer) y, count(*) from photos group by y order by y desc").fetchall()
+        years = con.execute(f"select cast(substr(date,1,4) as integer) y, count(*) from photos where {DATED} "
+                            "group by y order by y desc").fetchall()
         return [dict(year=y, photos=n, title=made[y]["title"] if y in made else None,
                      made_by=made[y]["made_by"] if y in made else None) for y, n in years]
 
