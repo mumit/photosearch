@@ -9,8 +9,9 @@
 Nothing is downloaded from iCloud: with "Optimize Mac Storage" on we embed the
 local preview Photos keeps (the model only sees ~280 visual tokens anyway).
 """
-import argparse, functools, io, json, random, sqlite3, sys, time
+import argparse, functools, io, json, os, random, re, sqlite3, sys, time
 from collections import Counter
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -201,13 +202,16 @@ def cmd_index(a):
 
 # ---------------------------------------------------------------- search
 
-def filtered(con, person=None, after=None, before=None, kind=None, place=None):
-    """person: a name or a list of names (all must be in the photo); names and place match on substrings."""
+def filtered(con, person=None, after=None, before=None, kind=None, place=None, months=None):
+    """person: a name or a list of names (all must be in the photo); names and place match on substrings.
+    months: month numbers to keep, e.g. (6, 7, 8) for summer."""
     clauses, params = [], []
     for name in [person] if isinstance(person, str) else person or []:
         clauses.append("exists (select 1 from json_each(persons) where lower(value) like ?)"); params.append(f"%{name.lower()}%")
     if place:
         clauses.append("lower(place) like ?"); params.append(f"%{place.lower()}%")
+    if months:
+        clauses.append(f"cast(substr(date,6,2) as integer) in ({','.join('?' * len(months))})"); params.extend(months)
     if after:
         clauses.append("date >= ?"); params.append(after)
     if before:
@@ -249,13 +253,93 @@ def vec_of(con, uuid):
 EXCLUDE_W = 0.5  # how hard `exclude` pushes away; tested on "group photos at a party" minus "a selfie"
 
 def search(con, query, k=24, exclude=None, **f):
-    """exclude: something the photos should NOT show ("a selfie", "people"). The model is weak at negation inside
-    the query ("no selfies"), so it's subtracted from the query vector instead, as in photo_math."""
+    """exclude: what the photos should NOT show ("a selfie", or a list). The model is weak at negation inside the
+    query ("no selfies"), so each is subtracted from the query vector instead, as in photo_math."""
     q = embed_query(query)
+    for x in [exclude] if isinstance(exclude, str) else exclude or []:
+        q = q - EXCLUDE_W * embed_query(x)
     if exclude:
-        q = q - EXCLUDE_W * embed_query(exclude)
         q = (q / np.linalg.norm(q)).astype(np.float32)
     return rank(con, q, k, **f)
+
+
+# ---------------------------------------------------------------- smart search box (optional: TypeSafe Jev)
+
+JEV_URL = "https://api.typesafe.ai/v1/systemone"
+# Cut-offs picked on 20 labelled queries, then checked on 20 fresh ones (95/100 answers right).
+NO_PEOPLE_P, NO_SELFIES_P, CHOICE_P = 0.7, 0.85, 0.6
+SEASONS = {"spring": (3, 4, 5), "summer": (6, 7, 8), "autumn": (9, 10, 11), "winter": (12, 1, 2)}
+JEV_QUESTIONS = {
+    "kind": {"type": "choice", "instructions": "Does the user want photos, videos, or either?",
+             "criteria": {"photo": "explicitly asks for photos/pictures only", "video": "asks for videos, clips or footage",
+                          "either": "doesn't say"}},
+    "season": {"type": "choice", "instructions": "Which season of the year does the search mention?",
+               "criteria": {"none": "no season mentioned", "spring": "spring", "summer": "summer", "autumn": "fall or autumn",
+                            "winter": "winter"}},
+    "when": {"type": "choice", "instructions": "What time period does the search ask for?",
+             "criteria": {"any": "no time period", "this year": "this year", "last year": "last year",
+                          "a named year": "a specific year like 2019",
+                          "recent": "recently, lately, the last few weeks or months",
+                          "long ago": "years ago, when the kids were little, old photos"}},
+    "no_people": {"type": "noul", "instructions": "Does the user want photos WITHOUT people in them?"},
+    "no_selfies": {"type": "noul", "instructions": "Does the user want to EXCLUDE selfies?"},
+}
+
+
+def jev_key():
+    """TYPESAFE_API_KEY from the environment, or from a .env file next to ps.py."""
+    if os.environ.get("TYPESAFE_API_KEY"):
+        return os.environ["TYPESAFE_API_KEY"]
+    f = HERE / ".env"
+    for line in f.read_text().splitlines() if f.exists() else []:
+        if line.strip().startswith("TYPESAFE_API_KEY="):
+            return line.split("=", 1)[1].strip().strip("'\"")
+    return None
+
+
+@functools.lru_cache(maxsize=256)
+def ask_jev(text):
+    import urllib.request
+    req = urllib.request.Request(JEV_URL, method="POST", headers={"Authorization": f"Bearer {jev_key()}",
+                                                                  "Content-Type": "application/json"},
+                                 data=json.dumps(dict(model="jev-latest", state=text, questions=JEV_QUESTIONS)).encode())
+    with urllib.request.urlopen(req, timeout=4) as r:
+        return json.load(r)["answers"]
+
+
+def parse_query(con, text, today=None):
+    """Turn "Sam at the beach last summer, no selfies" into search filters. Names and years are found locally;
+    the rest is asked of Jev, which only ever sees the text with tagged names replaced by "someone"."""
+    today = today or date.today()
+    people = sorted({p for (j,) in con.execute("select persons from photos") for p in json.loads(j)}, key=len, reverse=True)
+    firsts = Counter(p.split()[0].lower() for p in people)
+    found, masked = [], text
+    for p in people:  # full names first, then unambiguous first names
+        for name in [p] + ([p.split()[0]] if " " in p and firsts[p.split()[0].lower()] == 1 else []):
+            pat = re.compile(rf"\b{re.escape(name)}\b", re.I)
+            if pat.search(masked):
+                masked = pat.sub("someone", masked); found.append(p); break
+    a = ask_jev(masked)
+    pick = lambda k: a[k]["choice"] if a[k].get("confidence", 1) >= CHOICE_P else None
+    f = dict(person=", ".join(found), kind="", after="", before="", season="", exclude="")
+    if pick("kind") in ("photo", "video"):
+        f["kind"] = pick("kind")
+    if pick("season") in SEASONS:
+        f["season"] = pick("season")
+    year = re.search(r"\b(19[5-9]\d|20\d\d)\b", text)
+    when = "a named year" if year else pick("when")
+    y = int(year.group(1)) if year else {"this year": today.year, "last year": today.year - 1}.get(when)
+    if y:
+        f["after"], f["before"] = f"{y}-01-01", f"{y + 1}-01-01"
+        if when == "this year":
+            f["before"] = ""
+    elif when == "recent":
+        f["after"] = (today - timedelta(days=120)).isoformat()
+    elif when == "long ago":
+        f["before"] = today.replace(year=today.year - 5).isoformat()
+    f["exclude"] = ", ".join(x for x, q, p in (("people", "no_people", NO_PEOPLE_P), ("a selfie", "no_selfies", NO_SELFIES_P))
+                             if a[q]["noul"] > p)
+    return f
 
 
 def similar(con, uuid, k=24, **f):
@@ -394,10 +478,23 @@ def cmd_serve(a):
     con = db()
     model()  # warm up before first request
 
+    split = lambda v: [x.strip() for x in (v or "").split(",") if x.strip()]
+
     def api_search(q):
-        f = dict(person=q.get("person"), after=q.get("after"), before=q.get("before"), kind=q.get("kind"))
+        f = dict(person=split(q.get("person")), after=q.get("after"), before=q.get("before"), kind=q.get("kind"),
+                 months=SEASONS.get(q.get("season")))
         k = int(q.get("k", 48))
-        return similar(con, q["like"], k, **f) if "like" in q else search(con, q.get("q", ""), k, q.get("exclude"), **f)
+        return similar(con, q["like"], k, **f) if "like" in q else search(con, q.get("q", ""), k, split(q.get("exclude")), **f)
+
+    def api_parse(q):  # the smart search box: {"enabled": False} when there's no Jev key
+        if not jev_key():
+            return dict(enabled=False)
+        if not q.get("q"):
+            return dict(enabled=True)
+        try:
+            return dict(enabled=True, filters=parse_query(con, q["q"]))
+        except Exception as ex:  # offline, bad key, rate limit: search still works without it
+            return dict(enabled=True, error=f"{ex.__class__.__name__}: {ex}")
 
     def api_open(q):  # reveal in Photos via AppleScript
         import subprocess
@@ -411,7 +508,7 @@ def cmd_serve(a):
             raise LookupError(q["uuid"])
         return info[q["uuid"]]
 
-    api = {"/api/search": api_search, "/api/open": api_open, "/api/info": api_info,
+    api = {"/api/search": api_search, "/api/open": api_open, "/api/info": api_info, "/api/parse": api_parse,
            "/api/galaxy": lambda q: galaxy(con),
            "/api/timeline": lambda q: timeline(con, q.get("q", ""), int(q.get("per", 1))),
            "/api/game": lambda q: game_round(con, q.get("mode", "year")),

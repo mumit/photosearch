@@ -19,6 +19,7 @@
   button { background:var(--acc); color:#fff; border-color:var(--acc); cursor:pointer; }
   button.ghost { background:var(--card); color:var(--fg); border-color:var(--line); }
   .small { width:9.5em; }
+  .auto { border-color:var(--acc); box-shadow:0 0 0 2px color-mix(in srgb, var(--acc) 25%, transparent); }
   .status { color:var(--mut); font-size:13px; margin-top:8px; min-height:1.2em; }
   .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
   .chips a { font-size:13px; padding:3px 10px; border:1px solid var(--line); border-radius:999px; color:var(--fg); cursor:pointer; text-decoration:none; }
@@ -94,10 +95,12 @@
     <form id="f">
       <input id="q" class="grow" placeholder="Describe a photo… e.g. “birthday cake with candles at night”">
       <input id="exclude" class="small" placeholder="without… e.g. selfies">
-      <input id="person" class="small" placeholder="person">
+      <input id="person" class="small" placeholder="people, comma-separated">
       <input id="after" class="small" type="date" title="after">
       <input id="before" class="small" type="date" title="before">
+      <select id="season" title="season"><option value="">any season</option><option>spring</option><option>summer</option><option>autumn</option><option>winter</option></select>
       <select id="kind"><option value="">all</option><option>photo</option><option>video</option></select>
+      <label id="smartbox" hidden title="Let Jev fill in the filters from your description"><input type="checkbox" id="smart" checked> ✨ smart</label>
       <button>Search</button>
     </form>
     <div class="status" id="status"></div>
@@ -220,13 +223,35 @@ addEventListener("keydown", e => {
 });
 
 /* ---------- search ---------- */
+/* smart search: Jev fills in the filter fields from the description; filled fields are highlighted and
+   cleared again on the next search, while anything typed by hand is left alone */
+const FIELDS = ["person", "after", "before", "season", "kind", "exclude"];
+const SMART = { enabled: false, auto: new Set() };
+api("/api/parse").then(r => { SMART.enabled = r.results.enabled; $("smartbox").hidden = !SMART.enabled; }).catch(() => {});
+FIELDS.forEach(k => $(k).addEventListener("input", () => { SMART.auto.delete(k); $(k).classList.remove("auto"); }));
+async function smartFill(q) {
+  for (const k of SMART.auto) { $(k).value = ""; $(k).classList.remove("auto"); }
+  SMART.auto.clear();
+  const r = (await api("/api/parse", { q })).results;
+  if (r.error) return "smart search unavailable (" + r.error + ")";
+  const got = [];
+  for (const [k, v] of Object.entries(r.filters || {}))
+    if (v && !$(k).value) { $(k).value = v; $(k).classList.add("auto"); SMART.auto.add(k); got.push(k === "exclude" ? "without " + v : v); }
+  return got.length ? "✨ " + got.join(" · ") : "";
+}
+
 async function runSearch(params) {
-  for (const k of ["person", "after", "before", "kind"]) if ($(k).value) params[k] = $(k).value;
+  let note = "";
+  if (params.q && SMART.enabled && $("smart").checked) {
+    $("status").textContent = "understanding…";
+    note = await smartFill(params.q).catch(e => "smart search unavailable (" + e.message + ")");
+  }
+  for (const k of FIELDS.slice(0, 5)) if ($(k).value) params[k] = $(k).value;
   if ($("exclude").value && params.q) params.exclude = $("exclude").value;
   $("status").textContent = "searching…";
   const r = await api("/api/search", params);
   $("status").textContent = `${r.results.length} results from ${r.total.toLocaleString()} indexed · ${r.ms} ms` +
-    (params.like ? " · showing photos similar to the one you picked" : "");
+    (params.like ? " · showing photos similar to the one you picked" : "") + (note ? " · " + note : "");
   bindGrid($("grid"), r.results);
   scrollTo(0, 0);
 }

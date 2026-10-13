@@ -138,6 +138,18 @@ Open **http://localhost:8765**. It works while `index` is still running, and pic
 | **Play** | *Guess the Year* and *Guess the Place*, 10 rounds each. Works on a phone, for passing around. |
 | **Photo Math** | Start from a photo or words, then add and take away ideas: *this photo + snow − summer*. |
 
+**✨ Smart search (optional).** With a [TypeSafe](https://typesafe.ai) API key, the search box fills in the
+filters from your description: *"Sam at the beach last summer, no selfies"* becomes person Sam, summer 2025,
+without selfies. The fields it fills are highlighted so you can see and fix what it understood; untick ✨ to turn
+it off. Put the key in a `.env` file next to `ps.py` (it's git-ignored):
+
+```
+TYPESAFE_API_KEY=...
+```
+
+Names and years are matched on your Mac. Only the description goes to TypeSafe's Jev model, with tagged names
+replaced by "someone"; no photos or library data are sent. Without a key, search works as before.
+
 Clicking any photo opens it large, with **More like this**, **Use in Photo Math** and **Open in Photos**
 (the first time, macOS asks whether your terminal may control Photos; click OK). ← → browse.
 
@@ -193,6 +205,7 @@ that changes your library.** It never deletes anything.
 | `ps.py` | All the code: indexing, search, album export, web server |
 | `ui.html` | The web page served by `serve` |
 | `mcp_server.py` | MCP server so Claude can search, view and make albums |
+| `.env` | Optional `TYPESAFE_API_KEY` for ✨ smart search (git-ignored) |
 | `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector |
 | `data/thumbs/` | Small JPEG previews for the web page |
 | `data/galaxy.json` | The Galaxy map layout (rebuilt automatically when the index grows by 10%) |
@@ -268,6 +281,10 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
   "wants no people" / "no selfies", but 12/20 photo-vs-video, 14/20 time period, 17/20 season, ~430 ms per query on CPU
   and ~1.5 GB. Not adopted: keyword rules beat it on the choice questions, and the explicit **without…** field covers
   negation for free. Through MCP, Claude does the parsing anyway.
+- Jev (TypeSafe's hosted System One model) on the same 20 queries: 19/20 photo-vs-video, 20/20 time period, 18/20
+  season, ~115 ms. Its yes/no answers needed higher cut-offs than 0.5 (0.7 for "no people", 0.85 for "no selfies");
+  on 20 fresh queries with those cut-offs it got 95/100. It powers the optional ✨ smart search. Choices under 60%
+  confidence are ignored.
 
 **Status:** full-library index in progress (M3 Pro: ~2 photos/s, ~2.5 h for 17k). Every web tab checked in headless
 Chrome on a partial index. `album` has not been run yet.
