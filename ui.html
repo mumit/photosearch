@@ -12,6 +12,12 @@
   nav b { margin-right:12px; white-space:nowrap; }
   nav a { padding:6px 12px; border-radius:999px; color:var(--mut); text-decoration:none; white-space:nowrap; }
   nav a.on { background:var(--fg); color:var(--bg); }
+  @media (max-width: 600px) {  /* phones: every tab in sight (wrapping) rather than a sideways scroll that hides some */
+    header { padding:10px 12px 8px; }
+    nav { flex-wrap:wrap; overflow:visible; gap:2px; }
+    nav b { margin-right:4px; } nav b span { display:none; }
+    nav a { padding:5px 10px; }
+  }
   form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0; }
   input, select, button { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
   input[type=range] { padding:0; border:0; background:none; }
@@ -97,7 +103,7 @@
 
 <header>
   <nav id="tabs">
-    <b>📷 Photosearch</b>
+    <b>📷<span> Photosearch</span></b>
     <a href="#search">Search</a><a href="#galaxy">Galaxy</a><a href="#time">Time Machine</a><a href="#play">Play</a><a href="#math">Photo Math</a><a href="#stories">Stories</a>
   </nav>
   <div id="head-search">
