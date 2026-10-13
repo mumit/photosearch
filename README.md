@@ -1,48 +1,232 @@
 # photosearch
 
-Semantic search over your Apple Photos library with Google's EmbeddingGemma 2, fully on-device.
+Search your Apple Photos library by describing what's in a picture ("kids on a red slide at sunset"),
+or find photos that look like one you pick. Everything runs on your Mac using Google's open
+[EmbeddingGemma 2](https://huggingface.co/google/embeddinggemma-2) model. No photos leave the machine.
+
+It works with iCloud Photos and **"Optimize Mac Storage"**: it uses the preview images Photos already keeps
+on disk, so nothing is downloaded from iCloud.
+
+---
+
+## 1. Requirements
+
+| | |
+|---|---|
+| **Mac** | Apple Silicon (M1 or later). Intel Macs work but are much slower (CPU only). |
+| **macOS** | A recent version with the Photos app and a Photos library (iCloud or local). |
+| **Memory** | 16 GB recommended; 8 GB works for small batches. |
+| **Disk** | About **3 GB** for software + model, plus about **30 KB per photo** for the index (about 500 MB for 17,000 photos). |
+| **Network** | Needed once, to download Python packages (about 1 GB) and the model (about 1.5 GB). Not needed after that. |
+
+### What gets installed
+
+| Component | What it is | Size | Where it goes |
+|---|---|---|---|
+| [uv](https://docs.astral.sh/uv/) | Python package/environment manager | ~40 MB | `~/.local/bin/uv` |
+| Python 3.12 | Installed automatically by uv if missing | ~60 MB | uv's own folder |
+| Python packages | PyTorch, sentence-transformers, transformers, osxphotos, Pillow, pillow-heif, NumPy | ~1 GB | `.venv/` in this repo (backed by `~/.cache/uv`) |
+| **Model: `google/embeddinggemma-2`** | Multimodal embedding model (text + images in one vector space). Apache 2.0, not gated, no account or token needed. Only the text and vision parts are loaded (440M of 740M parameters); the audio encoder is skipped. | ~1.5 GB | `~/.cache/huggingface/hub/` |
+
+No other models are needed. The repo doesn't use any API keys or cloud services.
+
+---
+
+## 2. Install
+
+### Step 1: Install uv
 
 ```bash
-uv run python ps.py index            # incremental; re-run any time to pick up new photos
-uv run python ps.py serve            # web UI at http://localhost:8765
-uv run python ps.py search "dog on a beach at sunset" --after 2022-01-01 --person Sam
-uv run python ps.py similar <uuid>
-uv run python ps.py album "Sunsets" "sunset over water" -k 60   # writes an album into Photos
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-- Reads the library with [osxphotos](https://github.com/RhetTbull/osxphotos) (read-only, except `album`).
-- Embeds the local preview Photos keeps for every item, so nothing is downloaded from iCloud.
-  Videos are indexed by their poster frame only.
-- Everything lives in `data/`: `index.sqlite` (metadata + 768-d float32 vectors, ~3 KB/photo)
-  and `thumbs/` (360 px JPEGs for the UI).
-- Search is brute-force cosine in NumPy; at ~17k items that's a few ms, so no vector DB is needed.
+(or, with Homebrew: `brew install uv`). Open a new Terminal window afterwards so `uv` is on your PATH, and check:
 
-## Status / findings (first Mac: M3, 16 GB)
+```bash
+uv --version
+```
 
-- Library: ~17k items (16.2k photos, 750 videos); 13.3k originals are iCloud-only, but **every item
-  has a local preview**, so indexing needs no downloads.
-- 300-photo trial indexed and stored fine (~3 KB vector + ~25 KB thumbnail per photo).
-- **Speed is the bottleneck.** Measured image embedding on the M3 GPU:
+### Step 2: Clone the repo
 
-  | setup | photos/s | 17k library |
-  |---|---|---|
-  | PyTorch MPS bf16, 280 vision tokens (default) | ~1.2 | ~4 h |
-  | PyTorch MPS bf16, **70 vision tokens** | ~4.6 | ~1 h |
-  | MLX `mlx-community/embeddinggemma-2-bf16` (mlx-vlm) | ~1.3 | ~4 h — no gain, dropped |
-  | CPU fp32 | ~0.3 | — |
+```bash
+git clone https://github.com/mumit/photosearch.git
+```
+```bash
+cd photosearch
+```
 
-  70-token vectors have mean cosine 0.95 to the 280-token ones; whether that hurts *ranking* on your
-  photos is untested. Google's 27 img/s is quoted for an M5 Pro, at 70 tokens.
-- Don't use float16 (model card: NaNs / silent degradation). bf16 on MPS is fine.
-- The "photo anchor" (pastel-labs on Hugging Face) is only useful for 1-/4-bit compressed vectors.
-  At this library size full float32 vectors are ~50 MB, so it isn't needed.
+### Step 3: Install Python and the packages
 
-## Next steps (on the M4)
+```bash
+uv sync
+```
 
-1. `uv sync`, then `uv run python ps.py index --limit 500` and compare speed at `--vision-tokens 280` vs `70`.
-   The index must use one budget throughout: delete `data/` before switching.
-2. Index everything, run `serve`, and compare 20–30 real queries against Photos' own search.
-3. Not yet exercised: `serve` (web UI), `search`/`similar` on real photos, `album`. Test these first.
-4. Then: video audio track, captions with a small VLM for hybrid search, MCP server.
+This creates `.venv/` with the exact versions pinned in `uv.lock`, and installs Python 3.12 first if you don't have it.
 
-Needs Full Disk Access for your terminal app if osxphotos can't open the library.
+### Step 4: Download the model (optional; otherwise it downloads on first run)
+
+```bash
+uv run hf download google/embeddinggemma-2
+```
+
+You may see a warning about "unauthenticated requests". That's harmless: the model is public.
+
+### Step 5: Let your terminal read the Photos library
+
+macOS protects the Photos library. If the next step fails with **"Operation not permitted"**, give your terminal
+app Full Disk Access:
+
+1. Open **System Settings → Privacy & Security → Full Disk Access**.
+2. Turn on the app you run commands from (Terminal, iTerm, VS Code, …). Use **+** to add it if it isn't listed.
+3. Quit and reopen that app.
+
+Check that it works. This prints your library path and how many items it has:
+
+```bash
+uv run python -c "import osxphotos; d = osxphotos.PhotosDB(); print(d.library_path, len(d.photos()))"
+```
+
+If you have more than one library, this shows the one Photos currently uses as the **System Photo Library**.
+To index a different one, pass `--library "/path/to/Other Library.photoslibrary"` to `index`.
+
+---
+
+## 3. Run
+
+### Build the index
+
+Start with a small trial to check speed on your Mac:
+
+```bash
+uv run python ps.py index --limit 500
+```
+
+It prints progress, photos per second and an estimated time remaining. Then index everything:
+
+```bash
+uv run python ps.py index
+```
+
+- Indexing is **incremental**: you can stop it (Ctrl-C) and re-run it later, and it continues where it left off.
+  Run it again any time to add new photos.
+- Newest photos are indexed first.
+- Expect the Mac to run warm while it works; it's using the GPU.
+
+**Speed vs. quality:** each image is given to the model as a number of "vision tokens" (default 280).
+`--vision-tokens 70` is about 4× faster at some cost in search quality:
+
+```bash
+uv run python ps.py index --vision-tokens 70
+```
+
+Use one setting for the whole index. To switch, delete the `data/` folder and re-index.
+
+### Search in the browser
+
+```bash
+uv run python ps.py serve
+```
+
+Open **http://localhost:8765**. Type a description and press Search. You can filter by person (names you've
+tagged in Photos), date range, or photo/video.
+
+- **more like this** under a result shows visually similar photos.
+- **Clicking a photo** shows it in the Photos app. The first time, macOS asks whether your terminal may control Photos; click OK.
+
+Stop the server with Ctrl-C.
+
+### Search from the command line
+
+```bash
+uv run python ps.py search "dog on a beach at sunset"
+```
+```bash
+uv run python ps.py search "birthday cake" --person Sam --after 2022-01-01 --before 2023-01-01 -k 50
+```
+```bash
+uv run python ps.py similar <uuid>
+```
+
+Each result line shows score, date, photo/video, the photo's ID (uuid), place and people.
+
+### Save results as a Photos album
+
+```bash
+uv run python ps.py album "Sunsets" "sunset over water" -k 60
+```
+
+This creates (or adds to) an album called "Sunsets" in Photos with the top 60 matches. **It's the only command
+that changes your library.** It never deletes anything.
+
+---
+
+## 4. Files and cleanup
+
+| Path | Contents |
+|---|---|
+| `ps.py` | All the code: indexing, search, album export, web server |
+| `ui.html` | The web page served by `serve` |
+| `data/index.sqlite` | One row per photo: date, place, people, albums, and its 768-number vector |
+| `data/thumbs/` | Small JPEG previews for the web page |
+
+`data/` holds previews of your photos, so treat it as private. It's in `.gitignore` and never committed.
+
+To remove everything:
+
+```bash
+rm -rf data .venv
+```
+```bash
+uv run hf cache rm model/google/embeddinggemma-2
+```
+
+(or delete `~/.cache/huggingface/hub/models--google--embeddinggemma-2`). `uv cache clean` frees the shared
+package cache, but it affects all uv projects on the Mac.
+
+---
+
+## 5. Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `Operation not permitted` / can't open library | Full Disk Access for your terminal (Step 5), then restart the terminal. |
+| `uv: command not found` | Open a new Terminal window after installing uv, or run `source ~/.zshrc`. |
+| Very slow (under 1 photo/s) | Check the Mac is Apple Silicon. Try `--vision-tokens 70`, and close other heavy apps. |
+| Out of memory | Lower the batch size: `index --batch 4`. |
+| Some photos "skipped" | They have no local preview yet (e.g. just synced). Re-run `index` later. |
+| Clicking a photo doesn't open Photos | Allow it in **System Settings → Privacy & Security → Automation**. |
+| Results look odd after changing `--vision-tokens` | The index mixes settings. Delete `data/` and re-index. |
+
+Don't switch the model to float16: it produces broken vectors (NaNs). The code uses bfloat16 on the GPU, which is safe.
+
+---
+
+## 6. How it works
+
+1. **osxphotos** reads the Photos database (dates, places, people, albums) and finds each item's largest
+   on-disk preview. For videos, that's the poster frame.
+2. **EmbeddingGemma 2** turns each preview into a 768-number vector, and turns your search text into a vector
+   in the same space (with the prefix `task: search result | query:`).
+3. Search ranks every photo by cosine similarity to the query vector. At this scale that's a few
+   milliseconds in NumPy, so no vector database is needed.
+
+---
+
+## Development notes
+
+Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 videos, 13.3k originals in iCloud only):
+
+| Setup | Photos/s | Full library |
+|---|---|---|
+| PyTorch MPS bf16, 280 vision tokens (default) | ~1.2 | ~4 h |
+| PyTorch MPS bf16, 70 vision tokens | ~4.6 | ~1 h |
+| MLX (`mlx-community/embeddinggemma-2-bf16` via mlx-vlm) | ~1.3 | ~4 h (no gain, dropped) |
+| CPU fp32 | ~0.3 | — |
+
+- 70-token vectors have mean cosine 0.95 to the 280-token ones. The effect on ranking quality is untested.
+- The "photo anchor" published by pastel-labs on Hugging Face only matters for 1- or 4-bit compressed vectors. It isn't needed at this size.
+
+**Status:** indexing is tested (300-photo trial). `serve`, `search`, `similar` and `album` have not been run against a real
+index yet.
+
+**Ideas next:** index the audio track of videos, add VLM captions for hybrid text search, and wrap the index as an MCP server so Claude can query it.
