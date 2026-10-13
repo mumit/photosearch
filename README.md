@@ -119,19 +119,29 @@ uv run python ps.py index
 uv run python ps.py index --vision-tokens 70
 ```
 
-Use one setting for the whole index. To switch, delete the `data/` folder and re-index.
+Use one setting for the whole index (it's recorded, and `index` refuses to mix). To switch, delete the `data/` folder and re-index.
+Each run also refreshes people, albums and places for photos already indexed, and drops photos you've deleted.
 
-### Search in the browser
+### Search and play in the browser
 
 ```bash
 uv run python ps.py serve
 ```
 
-Open **http://localhost:8765**. Type a description and press Search. You can filter by person (names you've
-tagged in Photos), date range, or photo/video.
+Open **http://localhost:8765**. It works while `index` is still running, and picks up new photos as they're added.
 
-- **more like this** under a result shows visually similar photos.
-- **Clicking a photo** shows it in the Photos app. The first time, macOS asks whether your terminal may control Photos; click OK.
+| Tab | What it does |
+|---|---|
+| **Search** | Describe a photo. Filter by person (names you've tagged in Photos), date range, or photo/video. |
+| **Galaxy** | Your whole library on one zoomable map, with similar photos next to each other and colored by year. Scroll to zoom, drag to pan, hover to peek. Type in *Light up…* to see where, say, "beach" lives. The first visit takes a minute to lay out the map. |
+| **Time Machine** | Pick something that happens every year ("birthday cake", "christmas tree") and flip through the best match from each year. |
+| **Play** | *Guess the Year* and *Guess the Place*, 10 rounds each. Works on a phone, for passing around. |
+| **Photo Math** | Start from a photo or words, then add and take away ideas: *this photo + snow − summer*. |
+
+Clicking any photo opens it large, with **More like this**, **Use in Photo Math** and **Open in Photos**
+(the first time, macOS asks whether your terminal may control Photos; click OK). ← → browse.
+
+*Guess the Place* loads its map from OpenStreetMap, so it needs internet; only map tiles are fetched, never your photos.
 
 Stop the server with Ctrl-C.
 
@@ -166,8 +176,9 @@ that changes your library.** It never deletes anything.
 |---|---|
 | `ps.py` | All the code: indexing, search, album export, web server |
 | `ui.html` | The web page served by `serve` |
-| `data/index.sqlite` | One row per photo: date, place, people, albums, and its 768-number vector |
+| `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector |
 | `data/thumbs/` | Small JPEG previews for the web page |
+| `data/galaxy.json` | The Galaxy map layout (rebuilt automatically when the index grows by 10%) |
 
 `data/` holds previews of your photos, so treat it as private. It's in `.gitignore` and never committed.
 
@@ -195,7 +206,8 @@ package cache, but it affects all uv projects on the Mac.
 | Out of memory | Lower the batch size: `index --batch 4`. |
 | Some photos "skipped" | They have no local preview yet (e.g. just synced). Re-run `index` later. |
 | Clicking a photo doesn't open Photos | Allow it in **System Settings → Privacy & Security → Automation**. |
-| Results look odd after changing `--vision-tokens` | The index mixes settings. Delete `data/` and re-index. |
+| `Could not get path to photo library database` | osxphotos couldn't work out the system library. It falls back to `~/Pictures/Photos Library.photoslibrary`; for another location pass `--library`. |
+| `index was built with vision_tokens=…` | The index remembers its settings so vectors don't get mixed. Use the same `--vision-tokens`, or delete `data/` and re-index. |
 
 Don't switch the model to float16: it produces broken vectors (NaNs). The code uses bfloat16 on the GPU, which is safe.
 
@@ -226,7 +238,14 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
 - 70-token vectors have mean cosine 0.95 to the 280-token ones. The effect on ranking quality is untested.
 - The "photo anchor" published by pastel-labs on Hugging Face only matters for 1- or 4-bit compressed vectors. It isn't needed at this size.
 
-**Status:** indexing is tested (300-photo trial). `serve`, `search`, `similar` and `album` have not been run against a real
-index yet.
+- Some photos (very dark, very plain) score fairly high for any query. A CSLS-style penalty using Apple's labels as a
+  query bank was tried on ~5k photos and made results worse (it boosted documents and handwriting), so search uses
+  plain cosine.
+- Galaxy uses UMAP (`min_dist=0.6`, so near-duplicates spread out instead of piling up) and k-means regions named by
+  the Apple labels that are most distinctive for each region.
 
-**Ideas next:** index the audio track of videos, add VLM captions for hybrid text search, and wrap the index as an MCP server so Claude can query it.
+**Status:** full-library index in progress (M3 Pro: ~2 photos/s, ~2.5 h for 17k). Every web tab checked in headless
+Chrome on a partial index. `album` has not been run yet.
+
+**Ideas next:** an MCP server so Claude can search (and look at) your photos; smart albums you teach with a few
+examples; duplicate cleanup; a year in review; index the audio track of videos.

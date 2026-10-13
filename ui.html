@@ -2,55 +2,566 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Photo Search</title>
 <style>
-  :root { --bg:#fafaf9; --fg:#1c1917; --mut:#78716c; --card:#fff; --line:#e7e5e4; --acc:#2563eb; color-scheme: light dark; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#141414; --fg:#f5f5f4; --mut:#a8a29e; --card:#1f1f1f; --line:#333; --acc:#60a5fa; } }
+  :root { --bg:#fafaf9; --fg:#1c1917; --mut:#78716c; --card:#fff; --line:#e7e5e4; --acc:#2563eb; --good:#16a34a; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#141414; --fg:#f5f5f4; --mut:#a8a29e; --card:#1f1f1f; --line:#333; --acc:#60a5fa; --good:#4ade80; } }
   * { box-sizing: border-box; }
-  body { margin:0; font:15px/1.4 -apple-system, system-ui, sans-serif; background:var(--bg); color:var(--fg); }
-  header { position:sticky; top:0; z-index:1; background:var(--bg); padding:16px 20px 12px; border-bottom:1px solid var(--line); }
-  form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  html, body { height:100%; }
+  body { margin:0; font:15px/1.4 -apple-system, system-ui, sans-serif; background:var(--bg); color:var(--fg); display:flex; flex-direction:column; }
+  header { position:sticky; top:0; z-index:5; background:var(--bg); padding:12px 20px 10px; border-bottom:1px solid var(--line); }
+  nav { display:flex; gap:4px; align-items:center; margin-bottom:10px; overflow-x:auto; }
+  nav b { margin-right:12px; white-space:nowrap; }
+  nav a { padding:6px 12px; border-radius:999px; color:var(--mut); text-decoration:none; white-space:nowrap; }
+  nav a.on { background:var(--fg); color:var(--bg); }
+  form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0; }
   input, select, button { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
-  #q { flex:1 1 320px; font-size:17px; }
+  input[type=range] { padding:0; border:0; background:none; }
+  .grow { flex:1 1 280px; font-size:17px; }
   button { background:var(--acc); color:#fff; border-color:var(--acc); cursor:pointer; }
+  button.ghost { background:var(--card); color:var(--fg); border-color:var(--line); }
   .small { width:9.5em; }
-  #status { color:var(--mut); font-size:13px; margin-top:8px; min-height:1.2em; }
-  #grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:10px; padding:16px 20px 40px; }
+  .status { color:var(--mut); font-size:13px; margin-top:8px; min-height:1.2em; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .chips a { font-size:13px; padding:3px 10px; border:1px solid var(--line); border-radius:999px; color:var(--fg); cursor:pointer; text-decoration:none; }
+  main { flex:1; min-height:0; }
+  section { display:none; height:100%; }
+  section.on { display:block; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:10px; padding:16px 20px 40px; }
   figure { margin:0; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
   figure img { display:block; width:100%; aspect-ratio:1; object-fit:cover; cursor:zoom-in; }
   figcaption { padding:6px 8px; font-size:12px; color:var(--mut); display:flex; justify-content:space-between; gap:6px; }
-  figcaption a { color:var(--acc); cursor:pointer; text-decoration:none; white-space:nowrap; }
   .tag { background:var(--line); border-radius:4px; padding:0 4px; }
+  .pad { padding:16px 20px; }
+
+  /* galaxy */
+  #galaxy { position:relative; overflow:hidden; }
+  #gcanvas { position:absolute; inset:0; width:100%; height:100%; cursor:grab; touch-action:none; background:#0b0b10; }
+  #gbar { position:absolute; top:12px; left:12px; right:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; pointer-events:none; }
+  #gbar > * { pointer-events:auto; }
+  #gbar input { background:rgba(20,20,28,.85); color:#fff; border-color:#333; }
+  #glegend { margin-left:auto; color:#ccc; font-size:12px; background:rgba(20,20,28,.85); padding:6px 10px; border-radius:8px; display:flex; gap:8px; align-items:center; }
+  #glegend i { display:inline-block; width:120px; height:8px; border-radius:4px; }
+  #gstatus { position:absolute; bottom:12px; left:12px; color:#aaa; font-size:12px; }
+  #gtip { position:absolute; pointer-events:none; display:none; background:#000; color:#ddd; border-radius:8px; padding:4px; font-size:12px; box-shadow:0 4px 20px #0008; }
+  #gtip img { display:block; width:180px; height:180px; object-fit:cover; border-radius:6px; }
+
+  /* time machine */
+  #stage { position:relative; display:flex; justify-content:center; align-items:center; height:min(62vh, 640px); background:#000; }
+  #stage img { max-width:100%; max-height:100%; transition:opacity .35s; cursor:zoom-in; }
+  #stage .year { position:absolute; left:24px; bottom:18px; font-size:64px; font-weight:800; color:#fff; text-shadow:0 2px 16px #000a; letter-spacing:-2px; }
+  #stage .meta { position:absolute; right:20px; bottom:22px; color:#ddd; font-size:13px; text-align:right; text-shadow:0 1px 6px #000; }
+  #strip { display:flex; gap:6px; overflow-x:auto; padding:10px 20px; }
+  #strip div { flex:0 0 auto; text-align:center; font-size:12px; color:var(--mut); cursor:pointer; }
+  #strip img { width:76px; height:76px; object-fit:cover; border-radius:6px; display:block; border:2px solid transparent; }
+  #strip .weak img { opacity:.35; }
+  #strip .cur img { border-color:var(--acc); }
+  #strip .cur { color:var(--fg); font-weight:600; }
+
+  /* games */
+  .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; max-width:760px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; cursor:pointer; }
+  .card h3 { margin:0 0 6px; font-size:20px; }
+  .card p { margin:0; color:var(--mut); }
+  #play-area { display:grid; grid-template-columns:minmax(0, 1.3fr) minmax(280px, 1fr); gap:16px; }
+  @media (max-width: 800px) { #play-area { grid-template-columns:1fr; } }
+  #play-photo { width:100%; max-height:70vh; object-fit:contain; background:#000; border-radius:12px; }
+  #guess { display:flex; flex-direction:column; gap:12px; }
+  #bigyear { font-size:56px; font-weight:800; letter-spacing:-2px; text-align:center; }
+  #map { height:min(52vh, 460px); border-radius:12px; }
+  .score { display:flex; justify-content:space-between; color:var(--mut); }
+  .reveal { font-size:18px; }
+  .reveal b { color:var(--good); }
+
+  /* math */
+  #mathbase { display:flex; gap:12px; align-items:center; }
+  #mathbase img { width:84px; height:84px; object-fit:cover; border-radius:8px; }
+  .op { font-size:22px; font-weight:700; color:var(--mut); }
+
+  /* lightbox */
+  #lb { position:fixed; inset:0; z-index:20; background:rgba(0,0,0,.9); display:none; align-items:center; justify-content:center; gap:20px; padding:20px; }
+  #lb.on { display:flex; }
+  #lb img { max-width:min(100%, 1100px); max-height:88vh; border-radius:6px; }
+  #lb aside { color:#ddd; width:240px; flex:0 0 240px; display:flex; flex-direction:column; gap:8px; }
+  #lb aside button { text-align:left; }
+  @media (max-width: 800px) { #lb { flex-direction:column; } #lb aside { width:100%; flex:none; } #lb img { max-height:60vh; } }
 </style>
+
 <header>
-  <form id="f">
-    <input id="q" placeholder="Describe a photo… e.g. “birthday cake with candles at night”" autofocus>
-    <input id="person" class="small" placeholder="person">
-    <input id="after" class="small" type="date" title="after">
-    <input id="before" class="small" type="date" title="before">
-    <select id="kind"><option value="">all</option><option>photo</option><option>video</option></select>
-    <button>Search</button>
-  </form>
-  <div id="status"></div>
+  <nav id="tabs">
+    <b>📷 Photosearch</b>
+    <a href="#search">Search</a><a href="#galaxy">Galaxy</a><a href="#time">Time Machine</a><a href="#play">Play</a><a href="#math">Photo Math</a>
+  </nav>
+  <div id="head-search">
+    <form id="f">
+      <input id="q" class="grow" placeholder="Describe a photo… e.g. “birthday cake with candles at night”">
+      <input id="person" class="small" placeholder="person">
+      <input id="after" class="small" type="date" title="after">
+      <input id="before" class="small" type="date" title="before">
+      <select id="kind"><option value="">all</option><option>photo</option><option>video</option></select>
+      <button>Search</button>
+    </form>
+    <div class="status" id="status"></div>
+  </div>
+  <div id="head-time" hidden>
+    <form id="tf">
+      <input id="tq" class="grow" placeholder="Something that happens every year… e.g. “birthday cake”">
+      <button>Go</button>
+      <button type="button" class="ghost" id="tplay">▶ Play</button>
+    </form>
+    <div class="chips" id="tchips"></div>
+    <div class="status" id="tstatus"></div>
+  </div>
+  <div id="head-math" hidden>
+    <form id="mf">
+      <div id="mathbase"></div>
+      <span class="op">+</span><input id="mplus" placeholder="add… e.g. snow" style="flex:1 1 140px">
+      <span class="op">−</span><input id="mminus" placeholder="take away… e.g. summer" style="flex:1 1 140px">
+      <label title="how hard to push">×<input id="mw" type="range" min="0" max="3" step="0.1" value="1"> <span id="mwv">1.0</span></label>
+      <button>Compute</button>
+    </form>
+    <div class="chips" id="mchips"></div>
+    <div class="status" id="mstatus"></div>
+  </div>
 </header>
-<div id="grid"></div>
+
+<main>
+  <section id="search"><div class="grid" id="grid"></div></section>
+
+  <section id="galaxy">
+    <canvas id="gcanvas"></canvas>
+    <div id="gbar">
+      <input id="gq" placeholder="Light up… e.g. beach" style="width:240px">
+      <button class="ghost" id="gclear" hidden>clear</button>
+      <div id="glegend"><span id="gy0"></span><i id="ggrad"></i><span id="gy1"></span></div>
+    </div>
+    <div id="gtip"></div>
+    <div id="gstatus">scroll to zoom · drag to pan · click a photo</div>
+  </section>
+
+  <section id="time">
+    <div id="stage"><img id="timg" alt=""><div class="year" id="tyear"></div><div class="meta" id="tmeta"></div></div>
+    <div id="strip"></div>
+  </section>
+
+  <section id="play"><div class="pad" id="playroot"></div></section>
+
+  <section id="math"><div class="grid" id="mgrid"></div></section>
+</main>
+
+<div id="lb">
+  <img id="lbimg" alt="">
+  <aside>
+    <div id="lbinfo"></div>
+    <button class="ghost" id="lblike">More like this</button>
+    <button class="ghost" id="lbmath">Use in Photo Math</button>
+    <button class="ghost" id="lbopen">Open in Photos</button>
+    <button class="ghost" id="lbclose">Close (Esc)</button>
+    <div class="status">← → to browse</div>
+  </aside>
+</div>
+
 <script>
 const $ = id => document.getElementById(id);
-async function run(params) {
-  for (const k of ["person","after","before","kind"]) if ($(k).value) params[k] = $(k).value;
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const api = async (path, params = {}) => {
+  const r = await (await fetch(path + "?" + new URLSearchParams(params))).json();
+  if (r.error) throw new Error(r.error);
+  return r;
+};
+const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+
+/* ---------- tabs ---------- */
+const views = {};
+function route() {
+  const tab = (location.hash || "#search").slice(1);
+  lbOff?.();
+  document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.hash === "#" + tab));
+  document.querySelectorAll("main section").forEach(s => s.classList.toggle("on", s.id === tab));
+  $("head-search").hidden = tab !== "search"; $("head-time").hidden = tab !== "time"; $("head-math").hidden = tab !== "math";
+  views[tab]?.();
+}
+addEventListener("hashchange", route);
+const go = tab => { if (location.hash !== "#" + tab) location.hash = tab; else route(); };
+
+/* ---------- shared: photo grid + lightbox ---------- */
+function gridHTML(results) {
+  return results.map((x, i) => `
+    <figure>
+      <img loading="lazy" src="/thumb/${x.uuid}.jpg" data-i="${i}" title="${esc(x.place)} ${esc(x.persons.join(", "))}">
+      <figcaption><span>${x.date}${x.kind === "video" ? ' <span class="tag">video</span>' : ""}</span><span>${x.score.toFixed(2)}</span></figcaption>
+    </figure>`).join("");
+}
+function bindGrid(el, results) {
+  el.innerHTML = gridHTML(results);
+  el.onclick = e => { if (e.target.dataset.i) lightbox(results, +e.target.dataset.i); };
+}
+
+let lbList = [], lbAt = 0;
+function lightbox(list, i) {
+  lbList = list; lbAt = i;
+  const x = list[i];
+  $("lbimg").src = `/photo/${x.uuid}.jpg`;
+  $("lbinfo").innerHTML = `<div style="font-size:18px;color:#fff">${x.date}</div>
+    <div>${esc(x.place) || "<i>no place</i>"}</div><div>${esc(x.persons.join(", "))}</div>`;
+  $("lb").classList.add("on");
+}
+const lbOff = () => $("lb").classList.remove("on");
+$("lbclose").onclick = lbOff;
+$("lb").onclick = e => { if (e.target.id === "lb") lbOff(); };
+$("lblike").onclick = () => { lbOff(); go("search"); runSearch({ like: lbList[lbAt].uuid }); };
+$("lbmath").onclick = () => { lbOff(); setMathBase(lbList[lbAt]); go("math"); };
+$("lbopen").onclick = () => fetch("/api/open?uuid=" + lbList[lbAt].uuid);
+addEventListener("keydown", e => {
+  if (!$("lb").classList.contains("on")) return;
+  if (e.key === "Escape") lbOff();
+  if (e.key === "ArrowRight" && lbAt < lbList.length - 1) lightbox(lbList, lbAt + 1);
+  if (e.key === "ArrowLeft" && lbAt > 0) lightbox(lbList, lbAt - 1);
+});
+
+/* ---------- search ---------- */
+async function runSearch(params) {
+  for (const k of ["person", "after", "before", "kind"]) if ($(k).value) params[k] = $(k).value;
   $("status").textContent = "searching…";
-  const r = await (await fetch("/api/search?" + new URLSearchParams(params))).json();
+  const r = await api("/api/search", params);
   $("status").textContent = `${r.results.length} results from ${r.total.toLocaleString()} indexed · ${r.ms} ms` +
     (params.like ? " · showing photos similar to the one you picked" : "");
-  $("grid").innerHTML = r.results.map(x => `
-    <figure>
-      <img loading="lazy" src="/thumb/${x.uuid}.jpg" data-uuid="${x.uuid}" title="${x.place || ""} ${x.persons.join(", ")}">
-      <figcaption><span>${x.date}${x.kind === "video" ? ' <span class="tag">video</span>' : ""} · ${x.score.toFixed(2)}</span>
-        <a data-like="${x.uuid}">more like this</a></figcaption>
-    </figure>`).join("");
-  window.scrollTo(0, 0);
+  bindGrid($("grid"), r.results);
+  scrollTo(0, 0);
 }
-$("f").onsubmit = e => { e.preventDefault(); if ($("q").value.trim()) run({ q: $("q").value }); };
-$("grid").onclick = e => {
-  if (e.target.dataset.like) run({ like: e.target.dataset.like });
-  else if (e.target.dataset.uuid) fetch("/api/open?uuid=" + e.target.dataset.uuid);  // opens it in Photos
+$("f").onsubmit = e => { e.preventDefault(); if ($("q").value.trim()) runSearch({ q: $("q").value }); };
+views.search = () => $("q").focus();
+
+/* ---------- galaxy ---------- */
+const G = { data: null, s: 1, ox: 0, oy: 0, hi: null, imgs: new Map(), vis: [], raf: 0 };
+const yearColor = (y, a = 1) => {
+  const t = (y - G.y0) / Math.max(1, G.y1 - G.y0);
+  return `hsla(${250 - 215 * t}, 85%, ${55 + 8 * t}%, ${a})`;
 };
+const cv = $("gcanvas"), cx = cv.getContext("2d");
+
+views.galaxy = async () => {
+  resizeGalaxy();
+  if (G.data || G.loading) return;
+  G.loading = true;
+  $("gstatus").textContent = "mapping your library… (the first time takes a minute)";
+  try {
+    G.data = (await api("/api/galaxy")).results;
+  } catch (e) { $("gstatus").textContent = "couldn't map: " + e.message; G.loading = false; return; }
+  G.y0 = Math.min(...G.data.year); G.y1 = Math.max(...G.data.year);
+  $("gy0").textContent = G.y0; $("gy1").textContent = G.y1;
+  $("ggrad").style.background = `linear-gradient(90deg, ${[0, .25, .5, .75, 1].map(t => yearColor(G.y0 + t * (G.y1 - G.y0))).join(",")})`;
+  $("gstatus").textContent = `${G.data.uuids.length.toLocaleString()} photos · similar photos sit together · scroll to zoom · drag to pan · click a photo`;
+  fitGalaxy();
+};
+function resizeGalaxy() {
+  const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1;
+  cv.width = r.width * d; cv.height = r.height * d; cx.setTransform(d, 0, 0, d, 0, 0);
+  G.w = r.width; G.h = r.height; draw();
+}
+function fitGalaxy() {
+  G.s0 = G.s = Math.min(G.w, G.h) * 0.88 / 1000;
+  G.ox = (G.w - 1000 * G.s) / 2; G.oy = (G.h - 1000 * G.s) / 2 + 16; draw();
+}
+addEventListener("resize", () => { if ($("galaxy").classList.contains("on")) resizeGalaxy(); });
+function draw() { if (!G.raf) G.raf = requestAnimationFrame(render); }
+function render() {
+  G.raf = 0;
+  cx.clearRect(0, 0, G.w, G.h);
+  const d = G.data; if (!d) return;
+  const n = d.uuids.length, zoom = G.s / G.s0;
+  const vis = [];
+  for (let i = 0; i < n; i++) {
+    const sx = d.x[i] * 1000 * G.s + G.ox, sy = d.y[i] * 1000 * G.s + G.oy;
+    if (sx > -60 && sx < G.w + 60 && sy > -60 && sy < G.h + 60) vis.push([i, sx, sy]);
+  }
+  const ts = Math.min(110, 4 * zoom);  // thumbnails grow as you zoom in
+  const thumbs = ts >= 12 && vis.length <= 1500;
+  G.vis = vis; G.ts = thumbs ? ts : 0;
+  const lit = G.hi;
+  for (const [i, sx, sy] of vis) {
+    const on = !lit || lit.has(d.uuids[i]);
+    if (thumbs) {
+      const im = thumb(d.uuids[i]);
+      cx.globalAlpha = on ? 1 : 0.12;
+      if (im.complete && im.naturalWidth) {
+        const r = Math.min(im.naturalWidth, im.naturalHeight);
+        cx.drawImage(im, (im.naturalWidth - r) / 2, (im.naturalHeight - r) / 2, r, r, sx - ts / 2, sy - ts / 2, ts, ts);
+      } else { cx.fillStyle = yearColor(d.year[i]); cx.fillRect(sx - ts / 2, sy - ts / 2, ts, ts); }
+    } else {
+      if (lit && on) continue;  // drawn on top below
+      cx.globalAlpha = 1;
+      cx.fillStyle = on ? yearColor(d.year[i], 0.85) : "rgba(120,120,140,.18)";
+      const r = Math.min(6, 2.2 * Math.sqrt(zoom));
+      cx.fillRect(sx - r / 2, sy - r / 2, r, r);
+    }
+  }
+  cx.globalAlpha = 1;
+  if (lit && !thumbs) {  // matches glow on top of the dimmed map
+    for (const [i, sx, sy] of vis) {
+      if (!lit.has(d.uuids[i])) continue;
+      cx.beginPath(); cx.arc(sx, sy, 4.5, 0, 7);
+      cx.fillStyle = yearColor(d.year[i]); cx.shadowColor = cx.fillStyle; cx.shadowBlur = 10; cx.fill();
+    }
+    cx.shadowBlur = 0;
+  }
+  if (zoom < 4 && !lit) {  // region names, biggest first, skipping any that would overlap one already drawn
+    cx.textAlign = "center"; cx.textBaseline = "middle";
+    const placed = [];
+    for (const g of [...d.regions].sort((a, b) => b.n - a.n)) {
+      if (!g.name) continue;
+      const sx = g.x * 1000 * G.s + G.ox, sy = g.y * 1000 * G.s + G.oy;
+      cx.font = `600 ${Math.round(11 + Math.min(6, g.n / 120))}px -apple-system, system-ui`;
+      const w = cx.measureText(g.name).width / 2 + 6, h = 11;
+      if (placed.some(([x, y, pw]) => Math.abs(x - sx) < w + pw && Math.abs(y - sy) < 2 * h)) continue;
+      placed.push([sx, sy, w]);
+      cx.lineWidth = 4; cx.strokeStyle = "rgba(0,0,0,.75)"; cx.strokeText(g.name, sx, sy);
+      cx.fillStyle = "rgba(255,255,255,.92)"; cx.fillText(g.name, sx, sy);
+    }
+  }
+}
+function thumb(u) {
+  let im = G.imgs.get(u);
+  if (!im) { im = new Image(); im.onload = draw; im.src = `/thumb/${u}.jpg`; G.imgs.set(u, im); }
+  return im;
+}
+function pick(mx, my) {
+  let best = -1, bd = Math.max(8, G.ts / 2) ** 2;
+  for (const [i, sx, sy] of G.vis) {
+    const dd = (sx - mx) ** 2 + (sy - my) ** 2;
+    if (dd < bd) { bd = dd; best = i; }
+  }
+  return best;
+}
+const pointers = new Map(); let dragged = false, pinch0 = 0;
+cv.onpointerdown = e => { cv.setPointerCapture(e.pointerId); pointers.set(e.pointerId, [e.offsetX, e.offsetY]); dragged = false;
+  if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); } };
+cv.onpointermove = e => {
+  const prev = pointers.get(e.pointerId);
+  if (!prev) {  // hover
+    const i = G.data ? pick(e.offsetX, e.offsetY) : -1, tip = $("gtip");
+    if (i < 0) { tip.style.display = "none"; return; }
+    tip.innerHTML = `<img src="/thumb/${G.data.uuids[i]}.jpg"><div style="padding:3px 2px 0">${G.data.year[i]}</div>`;
+    tip.style.display = "block";
+    tip.style.left = Math.min(e.offsetX + 14, G.w - 200) + "px"; tip.style.top = Math.min(e.offsetY + 14, G.h - 220) + "px";
+    return;
+  }
+  pointers.set(e.pointerId, [e.offsetX, e.offsetY]);
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()], dd = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    zoomAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, dd / pinch0); pinch0 = dd; dragged = true; return;
+  }
+  const dx = e.offsetX - prev[0], dy = e.offsetY - prev[1];
+  if (Math.abs(dx) + Math.abs(dy) > 2) dragged = true;
+  G.ox += dx; G.oy += dy; $("gtip").style.display = "none"; draw();
+};
+cv.onpointerup = e => {
+  pointers.delete(e.pointerId);
+  if (!dragged && G.data) {
+    const i = pick(e.offsetX, e.offsetY);
+    if (i >= 0) galaxyOpen(i);
+  }
+};
+cv.onpointerleave = () => { $("gtip").style.display = "none"; };
+function zoomAt(mx, my, f) {
+  const s = Math.max(G.s0 * 0.5, Math.min(G.s0 * 200, G.s * f)); f = s / G.s;
+  G.ox = mx - (mx - G.ox) * f; G.oy = my - (my - G.oy) * f; G.s = s; draw();
+}
+cv.onwheel = e => { e.preventDefault(); zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0022)); };
+cv.ondblclick = e => zoomAt(e.offsetX, e.offsetY, 2.5);
+async function galaxyOpen(i) {
+  lightbox([(await api("/api/info", { uuid: G.data.uuids[i] })).results], 0);
+}
+$("gq").onkeydown = async e => {
+  if (e.key !== "Enter") return;
+  const q = $("gq").value.trim(); if (!q) return clearHi();
+  const r = await api("/api/search", { q, k: 250 });
+  G.hi = new Set(r.results.map(x => x.uuid)); $("gclear").hidden = false;
+  $("gstatus").textContent = `lit: the 250 best matches for “${q}”`;
+  draw();
+};
+function clearHi() { G.hi = null; $("gq").value = ""; $("gclear").hidden = true; draw(); }
+$("gclear").onclick = clearHi;
+
+/* ---------- time machine ---------- */
+const T = { years: [], at: 0, timer: 0 };
+const T_PRESETS = ["birthday cake", "christmas tree", "beach", "snow", "first day of school", "family dinner",
+                   "halloween costume", "fireworks", "hiking in the mountains", "a selfie"];
+$("tchips").innerHTML = T_PRESETS.map(p => `<a>${p}</a>`).join("");
+$("tchips").onclick = e => { if (e.target.tagName === "A") { $("tq").value = e.target.textContent; runTime(); } };
+$("tf").onsubmit = e => { e.preventDefault(); runTime(); };
+views.time = () => { if (!T.years.length) $("tq").focus(); };
+async function runTime() {
+  const q = $("tq").value.trim(); if (!q) return;
+  stopPlay();
+  $("tstatus").textContent = "travelling…";
+  const r = await api("/api/timeline", { q });
+  const best = Math.max(...r.results.map(y => y.results[0].score));
+  T.years = r.results.map(y => ({ ...y.results[0], year: y.year, weak: y.results[0].score < best - 0.08 }));
+  $("tstatus").textContent = `${T.years.length} years · faded years are weak matches · ← → or ▶`;
+  $("strip").innerHTML = T.years.map((y, i) =>
+    `<div data-i="${i}" class="${y.weak ? "weak" : ""}"><img src="/thumb/${y.uuid}.jpg" data-i="${i}">${y.year}</div>`).join("");
+  showYear(T.years.findIndex(y => !y.weak));
+}
+function showYear(i) {
+  if (i < 0 || i >= T.years.length) return;
+  T.at = i; const y = T.years[i];
+  $("timg").style.opacity = 0;
+  setTimeout(() => { $("timg").src = `/photo/${y.uuid}.jpg`; }, 150);
+  $("tyear").textContent = y.year;
+  $("tmeta").innerHTML = `${y.date}<br>${esc(y.place)}<br>${esc(y.persons.join(", "))}`;
+  document.querySelectorAll("#strip > div").forEach((d, j) => d.classList.toggle("cur", j === i));
+  document.querySelector("#strip .cur")?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  const nx = T.years[i + 1]; if (nx) new Image().src = `/photo/${nx.uuid}.jpg`;  // preload
+}
+$("timg").onload = () => { $("timg").style.opacity = 1; };
+$("timg").onclick = () => lightbox(T.years, T.at);
+$("strip").onclick = e => { const i = e.target.closest("[data-i]")?.dataset.i; if (i != null) { stopPlay(); showYear(+i); } };
+function stopPlay() { clearInterval(T.timer); T.timer = 0; $("tplay").textContent = "▶ Play"; }
+$("tplay").onclick = () => {
+  if (T.timer) return stopPlay();
+  if (!T.years.length) return;
+  $("tplay").textContent = "❚❚ Pause";
+  const strong = () => T.years.map((y, i) => i).filter(i => !T.years[i].weak);
+  T.timer = setInterval(() => { const s = strong(); showYear(s[(s.indexOf(T.at) + 1) % s.length]); }, 1600);
+};
+addEventListener("keydown", e => {
+  if (!$("time").classList.contains("on") || $("lb").classList.contains("on") || e.target.tagName === "INPUT") return;
+  if (e.key === "ArrowRight") { stopPlay(); showYear(T.at + 1); }
+  if (e.key === "ArrowLeft") { stopPlay(); showYear(T.at - 1); }
+});
+
+/* ---------- games ---------- */
+const ROUNDS = 10;
+const P = { mode: null, round: 0, total: 0, cur: null, guess: null, map: null, layers: [] };
+views.play = () => { if (!P.mode) playMenu(); };
+function playMenu() {
+  P.mode = null;
+  const best = store.get("best", {});
+  $("playroot").innerHTML = `
+    <h2 style="margin-top:0">Play with your photos</h2>
+    <div class="cards">
+      <div class="card" data-mode="year"><h3>📅 Guess the Year</h3><p>A random photo. When was it taken?</p>
+        <p style="margin-top:8px">Best: ${best.year ?? "–"} / ${ROUNDS * 100}</p></div>
+      <div class="card" data-mode="place"><h3>📍 Guess the Place</h3><p>Drop a pin where you think it was taken.</p>
+        <p style="margin-top:8px">Best: ${best.place ?? "–"} / ${ROUNDS * 100}</p></div>
+    </div>
+    <p class="status">${ROUNDS} rounds · up to 100 points each · pass the device around for family game night</p>`;
+  $("playroot").querySelectorAll(".card").forEach(c => c.onclick = () => startGame(c.dataset.mode));
+}
+async function startGame(mode) {
+  P.mode = mode; P.round = 0; P.total = 0;
+  if (mode === "place") await loadLeaflet();
+  nextRound();
+}
+async function nextRound() {
+  if (P.round >= ROUNDS) return endGame();
+  P.round++; P.guess = null;
+  try { P.cur = (await api("/api/game", { mode: P.mode })).results; }
+  catch (e) { $("playroot").innerHTML = `<p>${esc(e.message)}</p>`; return; }
+  const c = P.cur;
+  $("playroot").innerHTML = `
+    <div class="score"><span>Round ${P.round} / ${ROUNDS}</span><span>Score <span id="total">${P.total}</span></span><a href="#play" id="quit">quit</a></div>
+    <div id="play-area" style="margin-top:10px">
+      <img id="play-photo" src="/photo/${c.uuid}.jpg" alt="">
+      <div id="guess">${P.mode === "year" ? `
+        <div id="bigyear">${Math.round((c.first + c.last) / 2)}</div>
+        <input type="range" id="yr" min="${c.first}" max="${c.last}" value="${Math.round((c.first + c.last) / 2)}">
+        <div class="score"><span>${c.first}</span><span>${c.last}</span></div>` : `
+        <div id="map"></div><div class="status">tap the map to drop your pin</div>`}
+        <button id="go">Guess</button>
+        <div class="reveal" id="reveal"></div>
+      </div>
+    </div>`;
+  $("quit").onclick = e => { e.preventDefault(); playMenu(); };
+  if (P.mode === "year") {
+    $("yr").oninput = () => { $("bigyear").textContent = $("yr").value; };
+  } else {
+    P.map = L.map("map", { worldCopyJump: true }).setView([20, 0], 1);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(P.map);
+    P.map.on("click", ev => {
+      if (P.revealed) return;
+      P.guess = ev.latlng; P.layers.forEach(l => l.remove());
+      P.layers = [L.circleMarker(ev.latlng, { radius: 8, color: "#2563eb" }).addTo(P.map)];
+    });
+  }
+  P.revealed = false;
+  $("go").onclick = reveal;
+}
+function km(a, b) {
+  const R = 6371, r = Math.PI / 180, dLat = (b[0] - a[0]) * r, dLon = (b[1] - a[1]) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function reveal() {
+  if (P.revealed) return nextRound();
+  const c = P.cur; let pts, msg;
+  if (P.mode === "year") {
+    const g = +$("yr").value, real = +c.date.slice(0, 4), off = Math.abs(g - real);
+    pts = Math.round(100 * Math.exp(-off / 2.5));
+    msg = off === 0 ? `Exactly ${real}!` : `It was <b>${real}</b> (${c.date}) — ${off} year${off > 1 ? "s" : ""} off.`;
+  } else {
+    if (!P.guess) return;
+    const d = km([P.guess.lat, P.guess.lng], [c.lat, c.lon]);
+    pts = Math.round(100 * Math.exp(-d / 600));
+    P.layers.push(L.marker([c.lat, c.lon]).addTo(P.map), L.polyline([P.guess, [c.lat, c.lon]], { dashArray: "6" }).addTo(P.map));
+    P.map.fitBounds(L.latLngBounds([P.guess, [c.lat, c.lon]]).pad(0.4));
+    msg = `${esc(c.place) || "Here"} — ${d < 1 ? "spot on" : Math.round(d).toLocaleString() + " km away"}.`;
+  }
+  P.total += pts; P.revealed = true;
+  $("reveal").innerHTML = `${msg}<br><b>+${pts}</b>${c.persons.length ? `<div class="status">${esc(c.persons.join(", "))}</div>` : ""}`;
+  $("go").textContent = P.round >= ROUNDS ? "See score" : "Next photo →";
+  $("total").textContent = P.total;
+}
+function endGame() {
+  const best = store.get("best", {}), was = best[P.mode] ?? 0;
+  if (P.total > was) { best[P.mode] = P.total; store.set("best", best); }
+  const mode = P.mode;
+  $("playroot").innerHTML = `<h2>${P.total} / ${ROUNDS * 100}</h2>
+    <p>${P.total > was ? "🎉 New best!" : `Best so far: ${was}`}</p>
+    <button id="again">Play again</button> <button class="ghost" id="menu">Other game</button>`;
+  $("again").onclick = () => startGame(mode);
+  $("menu").onclick = playMenu;
+}
+function loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  const css = document.createElement("link");
+  css.rel = "stylesheet"; css.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+  document.head.append(css);
+  return new Promise((ok, fail) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"; s.onload = ok; s.onerror = fail;
+    document.head.append(s);
+  });
+}
+
+/* ---------- photo math ---------- */
+const M = { base: null };
+const M_PRESETS = [["night", "day"], ["snow", "summer"], ["a painting", "a photograph"], ["crowded", "empty"],
+                   ["sunset", "midday"], ["rain", "sunshine"], ["", "people"], ["kids", "adults"]];
+$("mchips").innerHTML = M_PRESETS.map(([p, m], i) => `<a data-i="${i}">${p ? "+ " + p : ""} ${m ? "− " + m : ""}</a>`).join("");
+$("mchips").onclick = e => { const i = e.target.dataset.i; if (i == null) return;
+  [$("mplus").value, $("mminus").value] = M_PRESETS[i]; runMath(); };
+$("mw").oninput = () => { $("mwv").textContent = (+$("mw").value).toFixed(1); };
+function setMathBase(x) {
+  M.base = x;
+  $("mathbase").innerHTML = x ? `<img src="/thumb/${x.uuid}.jpg"><a href="#math" id="mclear" class="status">change</a>`
+                              : `<input id="mtext" placeholder="start from… e.g. a street" style="width:200px">`;
+  if (x) $("mclear").onclick = e => { e.preventDefault(); setMathBase(null); };
+}
+setMathBase(null);
+views.math = () => {
+  if (!M.base && !$("mgrid").innerHTML)
+    $("mstatus").textContent = "Start from a photo (open one anywhere → “Use in Photo Math”) or from words, then add and take away ideas.";
+};
+$("mf").onsubmit = e => { e.preventDefault(); runMath(); };
+async function runMath() {
+  const base = M.base ? M.base.uuid : $("mtext")?.value.trim();
+  if (!base) { $("mstatus").textContent = "pick a starting photo or type a starting point"; return; }
+  $("mstatus").textContent = "computing…";
+  const r = await api("/api/math", { base, plus: $("mplus").value, minus: $("mminus").value, w: $("mw").value });
+  $("mstatus").textContent = `${r.results.length} results · ${r.ms} ms`;
+  bindGrid($("mgrid"), r.results);
+}
+
+route();
 </script>
