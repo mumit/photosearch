@@ -132,7 +132,7 @@ Open **http://localhost:8765**. It works while `index` is still running, and pic
 
 | Tab | What it does |
 |---|---|
-| **Search** | Describe a photo. Filter by person (names you've tagged in Photos), date range, or photo/video. |
+| **Search** | Describe a photo. Put what you *don't* want in **without…** (e.g. "selfies"): the model is weak at "no …" inside the description. Filter by person (names you've tagged in Photos), date range, or photo/video. |
 | **Galaxy** | Your whole library on one zoomable map, with similar photos next to each other and colored by year. Scroll to zoom, drag to pan, hover to peek. Type in *Light up…* to see where, say, "beach" lives. The first visit takes a minute to lay out the map. |
 | **Time Machine** | Pick something that happens every year ("birthday cake", "christmas tree") and flip through the best match from each year. |
 | **Play** | *Guess the Year* and *Guess the Place*, 10 rounds each. Works on a phone, for passing around. |
@@ -154,10 +154,26 @@ uv run python ps.py search "dog on a beach at sunset"
 uv run python ps.py search "birthday cake" --person Sam --after 2022-01-01 --before 2023-01-01 -k 50
 ```
 ```bash
+uv run python ps.py search "group photos at a party" --exclude "a selfie" --place Portland
+```
+```bash
 uv run python ps.py similar <uuid>
 ```
 
 Each result line shows score, date, photo/video, the photo's ID (uuid), place and people.
+
+### Ask Claude about your photos (MCP)
+
+`mcp_server.py` exposes the index to Claude Code (or any MCP client). Register it once:
+
+```bash
+claude mcp add --scope user photosearch -- uv run --directory "$PWD" python mcp_server.py
+```
+
+Then, in a new Claude Code session, ask things like *"find photos of Sam at the beach, no selfies, and make an
+album"*. Claude searches, **looks at the results** on a numbered contact sheet, drops the wrong ones, and only then
+answers or builds the album. Tools: `search_photos` (with `exclude`, people, place, date and kind filters),
+`similar_photos`, `best_per_year`, `view_photos`, `library_overview`, `make_album` (adds only, never removes).
 
 ### Save results as a Photos album
 
@@ -176,6 +192,7 @@ that changes your library.** It never deletes anything.
 |---|---|
 | `ps.py` | All the code: indexing, search, album export, web server |
 | `ui.html` | The web page served by `serve` |
+| `mcp_server.py` | MCP server so Claude can search, view and make albums |
 | `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector |
 | `data/thumbs/` | Small JPEG previews for the web page |
 | `data/galaxy.json` | The Galaxy map layout (rebuilt automatically when the index grows by 10%) |
@@ -244,8 +261,16 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
 - Galaxy uses UMAP (`min_dist=0.6`, so near-duplicates spread out instead of piling up) and k-means regions named by
   the Apple labels that are most distinctive for each region.
 
+- Negation: `exclude` subtracts 0.5× the excluded text's vector from the query (as Photo Math does). On
+  "group photos at a party" minus "a selfie" it removed the selfies; for "no people" in landscapes the plain query
+  already worked.
+- Laya (open "System One" decision model) was trialled for parsing the search box on 20 labelled queries: 20/20 on
+  "wants no people" / "no selfies", but 12/20 photo-vs-video, 14/20 time period, 17/20 season, ~430 ms per query on CPU
+  and ~1.5 GB. Not adopted: keyword rules beat it on the choice questions, and the explicit **without…** field covers
+  negation for free. Through MCP, Claude does the parsing anyway.
+
 **Status:** full-library index in progress (M3 Pro: ~2 photos/s, ~2.5 h for 17k). Every web tab checked in headless
 Chrome on a partial index. `album` has not been run yet.
 
-**Ideas next:** an MCP server so Claude can search (and look at) your photos; smart albums you teach with a few
-examples; duplicate cleanup; a year in review; index the audio track of videos.
+**Ideas next:** a year in review curated by Claude; smart albums you teach with a few examples; duplicate cleanup;
+index the audio track of videos.

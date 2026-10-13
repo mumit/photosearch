@@ -93,6 +93,7 @@
   <div id="head-search">
     <form id="f">
       <input id="q" class="grow" placeholder="Describe a photo… e.g. “birthday cake with candles at night”">
+      <input id="exclude" class="small" placeholder="without… e.g. selfies">
       <input id="person" class="small" placeholder="person">
       <input id="after" class="small" type="date" title="after">
       <input id="before" class="small" type="date" title="before">
@@ -221,6 +222,7 @@ addEventListener("keydown", e => {
 /* ---------- search ---------- */
 async function runSearch(params) {
   for (const k of ["person", "after", "before", "kind"]) if ($(k).value) params[k] = $(k).value;
+  if ($("exclude").value && params.q) params.exclude = $("exclude").value;
   $("status").textContent = "searching…";
   const r = await api("/api/search", params);
   $("status").textContent = `${r.results.length} results from ${r.total.toLocaleString()} indexed · ${r.ms} ms` +

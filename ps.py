@@ -201,10 +201,13 @@ def cmd_index(a):
 
 # ---------------------------------------------------------------- search
 
-def filtered(con, person=None, after=None, before=None, kind=None):
+def filtered(con, person=None, after=None, before=None, kind=None, place=None):
+    """person: a name or a list of names (all must be in the photo); names and place match on substrings."""
     clauses, params = [], []
-    if person:
-        clauses.append("exists (select 1 from json_each(persons) where lower(value) like ?)"); params.append(f"%{person.lower()}%")
+    for name in [person] if isinstance(person, str) else person or []:
+        clauses.append("exists (select 1 from json_each(persons) where lower(value) like ?)"); params.append(f"%{name.lower()}%")
+    if place:
+        clauses.append("lower(place) like ?"); params.append(f"%{place.lower()}%")
     if after:
         clauses.append("date >= ?"); params.append(after)
     if before:
@@ -243,8 +246,16 @@ def vec_of(con, uuid):
     return np.frombuffer(row[0], np.float32)
 
 
-def search(con, query, k=24, **f):
-    return rank(con, embed_query(query), k, **f)
+EXCLUDE_W = 0.5  # how hard `exclude` pushes away; tested on "group photos at a party" minus "a selfie"
+
+def search(con, query, k=24, exclude=None, **f):
+    """exclude: something the photos should NOT show ("a selfie", "people"). The model is weak at negation inside
+    the query ("no selfies"), so it's subtracted from the query vector instead, as in photo_math."""
+    q = embed_query(query)
+    if exclude:
+        q = q - EXCLUDE_W * embed_query(exclude)
+        q = (q / np.linalg.norm(q)).astype(np.float32)
+    return rank(con, q, k, **f)
 
 
 def similar(con, uuid, k=24, **f):
@@ -258,10 +269,10 @@ def show(results):
 
 
 def fkw(a):
-    return dict(person=a.person, after=a.after, before=a.before, kind=a.kind)
+    return dict(person=a.person, after=a.after, before=a.before, kind=a.kind, place=a.place)
 
 
-def cmd_search(a): show(search(db(), a.query, a.k, **fkw(a)))
+def cmd_search(a): show(search(db(), a.query, a.k, a.exclude, **fkw(a)))
 def cmd_similar(a): show(similar(db(), a.uuid, a.k, **fkw(a)))
 
 
@@ -386,7 +397,7 @@ def cmd_serve(a):
     def api_search(q):
         f = dict(person=q.get("person"), after=q.get("after"), before=q.get("before"), kind=q.get("kind"))
         k = int(q.get("k", 48))
-        return similar(con, q["like"], k, **f) if "like" in q else search(con, q.get("q", ""), k, **f)
+        return similar(con, q["like"], k, **f) if "like" in q else search(con, q.get("q", ""), k, q.get("exclude"), **f)
 
     def api_open(q):  # reveal in Photos via AppleScript
         import subprocess
@@ -446,14 +457,15 @@ def main():
 
     def filters(p):
         p.add_argument("-k", type=int, default=24)
-        p.add_argument("--person"); p.add_argument("--after"); p.add_argument("--before")
+        p.add_argument("--person"); p.add_argument("--after"); p.add_argument("--before"); p.add_argument("--place")
         p.add_argument("--kind", choices=["photo", "video"])
 
     p = sub.add_parser("index"); p.add_argument("--limit", type=int); p.add_argument("--library")
     p.add_argument("--batch", type=int, default=16)
     p.add_argument("--vision-tokens", type=int, default=VISION_TOKENS,
                    help="per-image token budget; keep it the same for the whole index"); p.set_defaults(fn=cmd_index)
-    p = sub.add_parser("search"); p.add_argument("query"); filters(p); p.set_defaults(fn=cmd_search)
+    p = sub.add_parser("search"); p.add_argument("query"); p.add_argument("--exclude", help='e.g. "a selfie"')
+    filters(p); p.set_defaults(fn=cmd_search)
     p = sub.add_parser("similar"); p.add_argument("uuid"); filters(p); p.set_defaults(fn=cmd_similar)
     p = sub.add_parser("album"); p.add_argument("name"); p.add_argument("query"); filters(p); p.set_defaults(fn=cmd_album)
     p = sub.add_parser("serve"); p.add_argument("--port", type=int, default=8765); p.set_defaults(fn=cmd_serve)
