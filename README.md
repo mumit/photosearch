@@ -137,6 +137,7 @@ Open **http://localhost:8765**. It works while `index` is still running, and pic
 | **Time Machine** | Pick something that happens every year ("birthday cake", "christmas tree") and flip through the best match from each year. |
 | **Play** | *Guess the Year* and *Guess the Place*, 10 rounds each. Works on a phone, for passing around. |
 | **Photo Math** | Start from a photo or words, then add and take away ideas: *this photo + snow − summer*. |
+| **Year in Review** | A slideshow of each year's best, most varied moments, with chapters and captions. **⬇ Download** saves it as one HTML file (photos included) you can send to family. |
 
 **✨ Smart search (optional).** With a [TypeSafe](https://typesafe.ai) API key, the search box fills in the
 filters from your description: *"Sam at the beach last summer, no selfies"* becomes person Sam, summer 2025,
@@ -185,7 +186,25 @@ claude mcp add --scope user photosearch -- uv run --directory "$PWD" python mcp_
 Then, in a new Claude Code session, ask things like *"find photos of Sam at the beach, no selfies, and make an
 album"*. Claude searches, **looks at the results** on a numbered contact sheet, drops the wrong ones, and only then
 answers or builds the album. Tools: `search_photos` (with `exclude`, people, place, date and kind filters),
-`similar_photos`, `best_per_year`, `view_photos`, `library_overview`, `make_album` (adds only, never removes).
+`similar_photos`, `best_per_year`, `view_photos`, `library_overview`, `year_highlights`, `save_year_review`,
+`make_album` (adds only, never removes).
+
+### Year in review
+
+Every year gets an automatic review (highlights by month, with places and people) the first time you open it. For a
+nicer one, ask Claude (with the MCP server set up) *"make a year in review for 2025"*. It looks through the year's
+highlights, keeps the best ~24 (skipping repeats, blurry shots and too many selfies), and writes chapters and
+captions. Captions stick to what's in the photo and the names tagged in Photos.
+
+```bash
+uv run python ps.py review 2025 --export 2025.html
+```
+
+writes the slideshow as a single file you can AirDrop, email or put on a USB stick. It contains the photos, so share
+it only with people who should see them.
+
+Highlights are picked locally: the most interesting-looking photos (family photos count a little extra), with
+near-duplicates removed and picks spread across events (runs of photos without a day-long gap).
 
 ### Save results as a Photos album
 
@@ -205,6 +224,8 @@ that changes your library.** It never deletes anything.
 | `ps.py` | All the code: indexing, search, album export, web server |
 | `ui.html` | The web page served by `serve` |
 | `mcp_server.py` | MCP server so Claude can search, view and make albums |
+| `review.html` | The year-in-review slideshow player (also used for the one-file export) |
+| `data/reviews/` | Saved year-in-review picks and captions, one JSON file per year |
 | `.env` | Optional `TYPESAFE_API_KEY` for ✨ smart search (git-ignored) |
 | `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector |
 | `data/thumbs/` | Small JPEG previews for the web page |
@@ -289,5 +310,5 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
 **Status:** full-library index in progress (M3 Pro: ~2 photos/s, ~2.5 h for 17k). Every web tab checked in headless
 Chrome on a partial index. `album` has not been run yet.
 
-**Ideas next:** a year in review curated by Claude; smart albums you teach with a few examples; duplicate cleanup;
+**Ideas next:** smart albums you teach with a few examples; duplicate cleanup;
 index the audio track of videos.

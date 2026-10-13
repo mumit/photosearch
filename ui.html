@@ -89,7 +89,7 @@
 <header>
   <nav id="tabs">
     <b>📷 Photosearch</b>
-    <a href="#search">Search</a><a href="#galaxy">Galaxy</a><a href="#time">Time Machine</a><a href="#play">Play</a><a href="#math">Photo Math</a>
+    <a href="#search">Search</a><a href="#galaxy">Galaxy</a><a href="#time">Time Machine</a><a href="#play">Play</a><a href="#math">Photo Math</a><a href="#review">Year in Review</a>
   </nav>
   <div id="head-search">
     <form id="f">
@@ -149,6 +149,14 @@
   <section id="play"><div class="pad" id="playroot"></div></section>
 
   <section id="math"><div class="grid" id="mgrid"></div></section>
+
+  <section id="review"><div class="pad">
+    <h2 style="margin-top:0">Year in Review</h2>
+    <p class="status" style="max-width:640px">Each year as a slideshow of its best, most varied moments. Years without one get an
+      automatic version (by month, with places and people) the first time you open them. For a nicer one, ask Claude:
+      <i>“make a year in review for 2025”</i>. It looks through the highlights, picks the best, and writes chapters and captions.</p>
+    <div class="cards" id="years" style="max-width:none; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr))"></div>
+  </div></section>
 </main>
 
 <div id="lb">
@@ -560,6 +568,18 @@ function loadLeaflet() {
     document.head.append(s);
   });
 }
+
+/* ---------- year in review ---------- */
+views.review = async () => {
+  const r = (await api("/api/reviews")).results;
+  $("years").innerHTML = r.map(y => `
+    <div class="card" style="cursor:default">
+      <h3>${y.year}</h3>
+      <p>${y.photos.toLocaleString()} photos${y.made_by ? ` · ${y.made_by === "claude" ? "✨ curated by Claude" : "automatic"}` : ""}</p>
+      <p style="margin-top:10px"><a href="/review/${y.year}" target="_blank">▶ ${y.made_by ? "Play" : "Make & play"}</a>
+        ${y.made_by ? ` · <a href="/review/${y.year}?download=1">⬇ Download</a>` : ""}</p>
+    </div>`).join("");
+};
 
 /* ---------- photo math ---------- */
 const M = { base: null };

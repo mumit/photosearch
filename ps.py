@@ -11,7 +11,7 @@ local preview Photos keeps (the model only sees ~280 visual tokens anyway).
 """
 import argparse, functools, io, json, os, random, re, sqlite3, sys, time
 from collections import Counter
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -134,7 +134,7 @@ def meta(p):
     lat, lon = p.location or (None, None)
     return (p.date.isoformat(), "video" if p.ismovie else "photo", p.title or "",
             (p.place.name if p.place else "") or "",
-            json.dumps([x for x in p.persons if x != "_UNKNOWN_"]), json.dumps(p.albums),
+            json.dumps(list(dict.fromkeys(x for x in p.persons if x != "_UNKNOWN_"))), json.dumps(p.albums),
             json.dumps(p.labels), lat, lon)
 
 
@@ -470,6 +470,119 @@ def photo_jpeg(con, uuid):
     return buf.getvalue()
 
 
+def contact_sheet(con, uuids, cols=6, cell=200):
+    """One JPEG of numbered thumbnails (1..n in the order given), for Claude to look at many photos at once."""
+    from PIL import Image, ImageDraw, ImageFont
+    cols = min(cols, len(uuids)) or 1
+    sheet = Image.new("RGB", (cols * cell, -(-len(uuids) // cols) * cell), "white")
+    draw, font = ImageDraw.Draw(sheet), ImageFont.load_default(size=26)
+    for n, u in enumerate(uuids):
+        im = Image.open(THUMBS / f"{u}.jpg")
+        im.thumbnail((cell - 4, cell - 4))
+        x, y = n % cols * cell, n // cols * cell
+        sheet.paste(im, (x + (cell - im.width) // 2, y + (cell - im.height) // 2))
+        draw.rectangle((x + 2, y + 2, x + 40, y + 34), fill="black")
+        draw.text((x + 8, y + 4), str(n + 1), fill="white", font=font)
+    buf = io.BytesIO()
+    sheet.save(buf, "JPEG", quality=80)
+    return buf.getvalue()
+
+
+# ---------------------------------------------------------------- year in review
+
+REVIEWS = DATA / "reviews"
+MONTHS = "January February March April May June July August September October November December".split()
+
+
+def year_highlights(con, year, n=40):
+    """A varied set of the year's best photos, in date order: candidates for a year in review.
+
+    Greedy pick of the most interesting photo (family photos count a little extra), skipping near-duplicates of
+    anything already picked and spreading picks across events (runs of photos with no day-long gap)."""
+    uuids, M, pos = vectors(con)
+    rows = [r for r in con.execute("select uuid, date, persons from photos where kind='photo' and date >= ? and date < ? "
+                                   "order by date", (f"{year}-01-01", f"{year + 1}-01-01")) if r[0] in pos]
+    if not rows:
+        return []
+    times = [datetime.fromisoformat(r[1]) for r in rows]
+    event = np.cumsum([0] + [(b - a).total_seconds() > 86400 for a, b in zip(times, times[1:])])
+    V = M[[pos[r[0]] for r in rows]]
+    base = interest(con)[[pos[r[0]] for r in rows]] + 0.02 * np.array([min(len(json.loads(r[2])), 3) for r in rows])
+    picked, per_event, closest = [], np.zeros(event[-1] + 1), np.full(len(rows), -1.0)
+    for _ in range(min(n, len(rows))):
+        val = base - 0.3 * np.clip(closest, 0, None) - 0.04 * per_event[event]
+        val[closest > 0.9] = -np.inf  # near-duplicates of a pick (and the picks themselves)
+        i = int(np.argmax(val))
+        if val[i] == -np.inf:
+            break
+        picked.append(i); per_event[event[i]] += 1
+        closest = np.maximum(closest, V @ V[i])
+    info = photo_info(con, [rows[i][0] for i in picked])
+    return [dict(info[rows[i][0]], event=int(event[i])) for i in sorted(picked)]
+
+
+def short_place(place):
+    return (place or "").split(",")[0]
+
+
+def auto_review(con, year, n=30):
+    """A year in review without Claude: highlights grouped by month, captioned with who's in them."""
+    chapters = []
+    for h in year_highlights(con, year, n):
+        m = MONTHS[int(h["date"][5:7]) - 1]
+        if not chapters or chapters[-1]["month"] != m:
+            chapters.append(dict(month=m, photos=[]))
+        # the place and date are shown under every photo already, so the caption is just who's in it
+        chapters[-1]["photos"].append(dict(uuid=h["uuid"], caption=" & ".join(p.split()[0] for p in h["persons"][:3])))
+    for c in chapters:
+        c["title"] = c.pop("month")
+    return dict(year=year, title=str(year), intro=f"{sum(len(c['photos']) for c in chapters)} moments from {year}",
+                made_by="auto", chapters=chapters)
+
+
+def save_review(review):
+    REVIEWS.mkdir(parents=True, exist_ok=True)
+    (REVIEWS / f"{review['year']}.json").write_text(json.dumps(review, indent=1, ensure_ascii=False))
+
+
+def load_review(con, year, make=False):
+    f = REVIEWS / f"{year}.json"
+    if f.exists():
+        return json.loads(f.read_text())
+    if not make:
+        raise LookupError(f"no review for {year}")
+    r = auto_review(con, year)
+    save_review(r)
+    return r
+
+
+def render_review(con, review, embed=False):
+    """The slideshow page for a review. embed=True inlines every photo, making one file you can send to family."""
+    import base64
+    info = photo_info(con, [p["uuid"] for c in review["chapters"] for p in c["photos"]])
+    def src(u):
+        return "data:image/jpeg;base64," + base64.b64encode(photo_jpeg(con, u)).decode() if embed else f"/photo/{u}.jpg"
+    data = dict(review, chapters=[dict(title=c["title"], text=c.get("text", ""),
+                                       photos=[dict(src=src(p["uuid"]), caption=p.get("caption", ""),
+                                                    date=info[p["uuid"]]["date"], place=short_place(info[p["uuid"]]["place"]))
+                                               for p in c["photos"] if p["uuid"] in info])
+                                  for c in review["chapters"]])
+    page = (HERE / "review.html").read_text()
+    return page.replace("/*REVIEW*/null", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
+
+
+def cmd_review(a):
+    con = db()
+    if a.auto:
+        save_review(auto_review(con, a.year))
+    r = load_review(con, a.year, make=True)
+    print(f"{r['title']}: {sum(len(c['photos']) for c in r['chapters'])} photos in {len(r['chapters'])} chapters "
+          f"(made by {r['made_by']})")
+    if a.export:
+        Path(a.export).write_text(render_review(con, r, embed=True))
+        print(f"wrote {a.export} ({Path(a.export).stat().st_size / 1e6:.1f} MB): one file, opens in any browser")
+
+
 # ---------------------------------------------------------------- web UI
 
 def cmd_serve(a):
@@ -508,7 +621,13 @@ def cmd_serve(a):
             raise LookupError(q["uuid"])
         return info[q["uuid"]]
 
-    api = {"/api/search": api_search, "/api/open": api_open, "/api/info": api_info, "/api/parse": api_parse,
+    def api_reviews(q):
+        made = {int(f.stem): json.loads(f.read_text()) for f in REVIEWS.glob("*.json")} if REVIEWS.exists() else {}
+        years = con.execute("select cast(substr(date,1,4) as integer) y, count(*) from photos group by y order by y desc").fetchall()
+        return [dict(year=y, photos=n, title=made[y]["title"] if y in made else None,
+                     made_by=made[y]["made_by"] if y in made else None) for y, n in years]
+
+    api = {"/api/reviews": api_reviews, "/api/search": api_search, "/api/open": api_open, "/api/info": api_info, "/api/parse": api_parse,
            "/api/galaxy": lambda q: galaxy(con),
            "/api/timeline": lambda q: timeline(con, q.get("q", ""), int(q.get("per", 1))),
            "/api/game": lambda q: game_round(con, q.get("mode", "year")),
@@ -533,6 +652,14 @@ def cmd_serve(a):
                     return self.send(f.read_bytes(), "image/jpeg") if f.exists() else self.send(b"", "text/plain", 404)
                 if u.path.startswith("/photo/"):
                     return self.send(photo_jpeg(con, name.removesuffix(".jpg")), "image/jpeg")
+                if u.path.startswith("/review/") and name.isdigit():
+                    page = render_review(con, load_review(con, int(name), make=True), embed="download" in q).encode()
+                    if "download" in q:  # one self-contained file to send to family
+                        self.send_response(200); self.send_header("content-type", "text/html; charset=utf-8")
+                        self.send_header("content-disposition", f'attachment; filename="year-in-review-{name}.html"')
+                        self.send_header("content-length", str(len(page))); self.end_headers()
+                        return self.wfile.write(page)
+                    return self.send(page, "text/html; charset=utf-8")
                 if u.path in api:
                     t = time.time(); res = api[u.path](q)
                     total = con.execute("select count(*) from photos").fetchone()[0]
@@ -566,6 +693,9 @@ def main():
     p = sub.add_parser("similar"); p.add_argument("uuid"); filters(p); p.set_defaults(fn=cmd_similar)
     p = sub.add_parser("album"); p.add_argument("name"); p.add_argument("query"); filters(p); p.set_defaults(fn=cmd_album)
     p = sub.add_parser("serve"); p.add_argument("--port", type=int, default=8765); p.set_defaults(fn=cmd_serve)
+    p = sub.add_parser("review", help="year in review: build (if needed) and optionally export as one HTML file")
+    p.add_argument("year", type=int); p.add_argument("--auto", action="store_true", help="rebuild the automatic version")
+    p.add_argument("--export", metavar="FILE.html"); p.set_defaults(fn=cmd_review)
     a = ap.parse_args()
     if getattr(a, "vision_tokens", None):
         globals()["VISION_TOKENS"] = a.vision_tokens

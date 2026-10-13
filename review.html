@@ -1,0 +1,101 @@
+<!doctype html>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Year in Review</title>
+<style>
+  :root { --bg:#0c0c0e; --fg:#f5f5f4; --mut:#a8a29e; --acc:#fbbf24; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:16px/1.4 -apple-system, system-ui, sans-serif;
+               overflow:hidden; user-select:none; -webkit-user-select:none; }
+  #bars { position:fixed; top:10px; left:12px; right:12px; display:flex; gap:3px; z-index:3; }
+  #bars i { flex:1; height:3px; border-radius:2px; background:rgba(255,255,255,.25); overflow:hidden; }
+  #bars i b { display:block; height:100%; width:0; background:#fff; }
+  #bars i.done b { width:100%; }
+  #bars i.now b { animation:fill var(--dur) linear forwards; }
+  #bars.paused i.now b { animation-play-state:paused; }
+  @keyframes fill { to { width:100%; } }
+  .slide { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .6s; }
+  .slide.on { opacity:1; }
+  .photo img { width:100%; height:100%; object-fit:contain; }  /* scales up small previews too */
+  .photo.on img { animation:drift 7s ease-out forwards; }
+  @keyframes drift { from { transform:scale(1.0); } to { transform:scale(1.06); } }
+  .blur { position:absolute; inset:-40px; background-size:cover; background-position:center; filter:blur(40px) brightness(.45); }
+  .cap { position:absolute; left:0; right:0; bottom:0; padding:60px 28px 28px; background:linear-gradient(transparent, rgba(0,0,0,.75)); }
+  .cap .t { font-size:clamp(18px, 2.6vw, 28px); font-weight:600; text-shadow:0 1px 8px #000; max-width:900px; }
+  .cap .m { color:#d6d3d1; font-size:14px; margin-top:4px; }
+  .card { flex-direction:column; text-align:center; padding:24px; }
+  .card .k { color:var(--acc); letter-spacing:.2em; text-transform:uppercase; font-size:13px; font-weight:600; }
+  .card h1 { font-size:clamp(44px, 9vw, 120px); line-height:1; margin:.15em 0; letter-spacing:-.03em; }
+  .card h2 { font-size:clamp(32px, 6vw, 72px); line-height:1.05; margin:.2em 0; letter-spacing:-.02em; }
+  .card p { color:var(--mut); font-size:clamp(16px, 2.2vw, 22px); max-width:640px; margin:.4em auto 0; }
+  .card button { margin-top:32px; font:inherit; font-size:18px; padding:12px 28px; border-radius:999px; border:0; background:#fff; color:#000; cursor:pointer; }
+  #ctl { position:fixed; right:14px; bottom:14px; z-index:3; display:flex; gap:6px; opacity:.55; }
+  #ctl:hover { opacity:1; }
+  #ctl button { font:inherit; font-size:14px; background:rgba(0,0,0,.5); color:#fff; border:1px solid rgba(255,255,255,.25); border-radius:8px; padding:6px 10px; cursor:pointer; }
+  #hint { position:fixed; left:14px; bottom:16px; z-index:3; color:var(--mut); font-size:12px; opacity:.7; }
+  @media (max-width:600px) { .cap { padding:50px 18px 22px; } #hint { display:none; } }
+</style>
+<div id="bars"></div>
+<div id="stage"></div>
+<div id="ctl"><button id="pp" title="play / pause (space)">❚❚</button><button id="fs" title="full screen (f)">⛶</button></div>
+<div id="hint">tap right / left · space to pause</div>
+<script>
+const R = /*REVIEW*/null;
+const DUR = { photo: 5200, card: 3200 };
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const fmt = d => { const [y, m, day] = d.split("-").map(Number); return new Date(y, m - 1, day).toLocaleDateString(undefined, { month:"long", day:"numeric" }); };
+
+// one flat list of slides: cover, then each chapter's card and photos, then an ending card
+const slides = [{ type:"card", html:`<div class="k">Year in review</div><h1>${esc(R.title)}</h1><p>${esc(R.intro)}</p><button id="go">▶ Play</button>` }];
+for (const c of R.chapters) {
+  slides.push({ type:"card", html:`<div class="k">Chapter ${R.chapters.indexOf(c) + 1}</div><h2>${esc(c.title)}</h2>${c.text ? `<p>${esc(c.text)}</p>` : ""}` });
+  for (const p of c.photos) slides.push({ type:"photo", ...p });
+}
+slides.push({ type:"card", html:`<h2>${esc(R.title)}</h2><p>${esc(R.outro || "That's a wrap.")}</p><button id="again">↺ Watch again</button>` });
+
+document.title = R.title + " · Year in Review";
+const stage = document.getElementById("stage"), bars = document.getElementById("bars");
+bars.innerHTML = slides.slice(1).map(() => "<i><b></b></i>").join("");
+const els = slides.map(s => {
+  const d = document.createElement("div");
+  d.className = "slide " + s.type;
+  d.innerHTML = s.type === "photo"
+    ? `<div class="blur" style="background-image:url('${s.src}')"></div><img alt="" loading="lazy" src="${s.src}" style="position:relative">
+       <div class="cap"><div class="t">${esc(s.caption)}</div><div class="m">${fmt(s.date)}${s.place ? " · " + esc(s.place) : ""}</div></div>`
+    : s.html;
+  stage.append(d); return d;
+});
+
+let at = -1, timer = 0, playing = false;
+function show(i) {
+  if (i < 0 || i >= slides.length) return;
+  if (i > 0) document.getElementById("hint").hidden = true;  // it would sit on top of the captions
+  els[at]?.classList.remove("on");
+  at = i; els[at].classList.add("on");
+  const img = els[at + 1]?.querySelector("img"); if (img) img.loading = "eager";  // preload the next photo
+  [...bars.children].forEach((b, j) => { b.className = j < at - 1 ? "done" : j === at - 1 ? "now" : ""; });
+  const dur = DUR[slides[at].type];
+  bars.style.setProperty("--dur", dur + "ms");
+  clearTimeout(timer);
+  if (playing && at > 0 && at < slides.length - 1) timer = setTimeout(() => show(at + 1), dur);
+}
+function play(on) {
+  playing = on; bars.classList.toggle("paused", !on);
+  document.getElementById("pp").textContent = on ? "❚❚" : "▶";
+  show(at);
+}
+stage.onclick = e => {
+  if (e.target.id === "go") return play(true), show(1);
+  if (e.target.id === "again") return play(true), show(1);
+  if (at === 0) return;
+  e.clientX > innerWidth / 3 ? show(at + 1) : show(at - 1);
+};
+document.getElementById("pp").onclick = () => play(!playing);
+document.getElementById("fs").onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") show(at + 1);
+  if (e.key === "ArrowLeft") show(at - 1);
+  if (e.key === " ") { e.preventDefault(); at === 0 ? (play(true), show(1)) : play(!playing); }
+  if (e.key === "f") document.getElementById("fs").click();
+});
+show(0);
+</script>
