@@ -535,13 +535,21 @@ def date_range(start, end):
     return f"{ma} {a.day}, {a.year} – {mb} {b.day}, {b.year}"
 
 
-def highlights(con, start, end, n=40):
+def span_photos(con, start, end, home=None):
+    """(uuid, date, persons) of the indexed photos from day start to day end (inclusive), in time order. home: a
+    (lat, lon) whose photos to leave out, e.g. a trip's first morning at home; photos without a location stay."""
+    _, _, pos = vectors(con)
+    return [r[:3] for r in con.execute(f"select uuid, date, persons, lat, lon from photos where kind='photo' and date >= ? "
+                                       f"and date < ? and {DATED} order by date", (start, day_after(end)))
+            if r[0] in pos and not (home and r[3] is not None and km(home, (r[3], r[4])) <= AWAY_KM)]
+
+
+def highlights(con, start, end, n=40, home=None):
     """A varied set of the best photos taken from day start to day end (inclusive), in date order: candidates for a
-    review. Greedy pick of the most interesting photo (family photos count a little extra), skipping near-duplicates
+    review (home as in span_photos). Greedy pick of the most interesting photo (family photos count a little extra), skipping near-duplicates
     of anything already picked and spreading picks across events (runs of photos with no day-long gap)."""
     uuids, M, pos = vectors(con)
-    rows = [r for r in con.execute(f"select uuid, date, persons from photos where kind='photo' and date >= ? and date < ? "
-                                   f"and {DATED} order by date", (start, day_after(end))) if r[0] in pos]
+    rows = span_photos(con, start, end, home)
     if not rows:
         return []
     times = [datetime.fromisoformat(r[1]) for r in rows]
@@ -654,13 +662,25 @@ def story_span(con, rid):
     return t["start"], t["end"], dict(id=rid, kind="trip", start=t["start"], end=t["end"])
 
 
+def story_home(con, fields):
+    """Home in the year a trip started, so its highlights can skip photos taken there; None for a year."""
+    if fields["kind"] != "trip":
+        return None
+    return homes(con.execute("select date, lat, lon from photos where substr(date,1,4) = ?", (fields["start"][:4],)).fetchall()).get(fields["start"][:4])
+
+
+def story_highlights(con, rid, n=40):
+    start, end, fields = story_span(con, rid)
+    return highlights(con, start, end, n, story_home(con, fields))
+
+
 def auto_review(con, rid, n=30):
     """A review without Claude: highlights grouped by month (a year) or by day (a trip), captioned with who's in them.
     The place and date show under every photo already, so the caption is just the names."""
     start, end, fields = story_span(con, rid)
     trip = fields["kind"] == "trip"
     chapters = []
-    for h in highlights(con, start, end, min(n, max(12, find_trip(con, rid)["photos"] // 10)) if trip else n):
+    for h in story_highlights(con, rid, min(n, max(12, find_trip(con, rid)["photos"] // 10)) if trip else n):
         key = h["date"] if trip else MONTHS[int(h["date"][5:7]) - 1]
         if not chapters or chapters[-1]["key"] != key:
             chapters.append(dict(key=key, photos=[], places=Counter()))
@@ -701,7 +721,7 @@ def stories(con):
     def story(rid, start, end, **x):
         r = made.get(rid, {})
         first = next((p["uuid"] for c in r.get("chapters", []) for p in c["photos"]), None)
-        return dict(x, id=rid, start=start, end=end, title=r.get("title", x.get("title")), made_by=r.get("made_by"),
+        return dict(x, id=rid, start=start, end=end, title=r.get("title", x.get("title")), made_by=r.get("made_by"), edited=r.get("edited"),
                     cover=first or cover(con, start, end))
     found = {t["id"]: t for t in trips(con)}
     for rid, r in made.items():  # a saved trip that new photos have since merged into another, or moved
@@ -712,6 +732,60 @@ def stories(con):
            for t in sorted(found.values(), key=lambda t: t["start"], reverse=True)]
     years = con.execute(f"select substr(date,1,4) y, count(*) from photos where {DATED} group by y order by y desc")
     return out + [story(y, f"{y}-01-01", f"{y}-12-31", kind="year", title=y, photos=n) for y, n in years.fetchall()]
+
+
+def story_photos(con, uuids):
+    """photo_info plus the full timestamp (photo_info keeps just the day), so the editor can slot photos in by time."""
+    if not uuids:
+        return {}
+    info = photo_info(con, uuids)
+    for u, t in con.execute(f"select uuid, date from photos where uuid in ({','.join('?' * len(uuids))})", list(uuids)):
+        info[u]["taken"] = t
+    return info
+
+
+def story_for_editor(con, rid):
+    r = load_review(con, rid, make=True)
+    info = story_photos(con, [p["uuid"] for c in r["chapters"] for p in c["photos"]])
+    return dict(r, chapters=[dict(c, photos=[dict(info[p["uuid"]], caption=p.get("caption", ""))
+                                             for p in c["photos"] if p["uuid"] in info]) for c in r["chapters"]])
+
+
+def story_candidates(con, rid, q=None, like=None, k=48):
+    """Photos from a story's days to add or swap in: matches for q, look-alikes of like, else its highlights, topped
+    up with the rest of its photos in time order when there are few (a short trip has only a handful of highlights)."""
+    start, end, fields = story_span(con, rid)
+    f = dict(after=start, before=day_after(end), kind="photo")
+    if q or like:
+        res = search(con, q, k, **f) if q else similar(con, like, k, **f)
+    else:
+        home = story_home(con, fields)
+        res = highlights(con, start, end, k, home)
+        have = {r["uuid"] for r in res}
+        res += [dict(uuid=r[0]) for r in span_photos(con, start, end, home) if r[0] not in have][:k - len(res)]
+    info = story_photos(con, [r["uuid"] for r in res])
+    return [info[r["uuid"]] for r in res if r["uuid"] in info]
+
+
+def edit_review(con, body):
+    """Save a story edited in the web page. Its author becomes "you" if it was automatic; Claude's stays Claude's,
+    marked edited."""
+    rid = str(body.get("id", ""))
+    _, _, fields = story_span(con, rid)
+    old = load_review(con, rid, make=True)
+    text = lambda v, n: str(v or "").strip()[:n]
+    chapters = [dict(title=text(c.get("title"), 120) or "Untitled", text=text(c.get("text"), 500),
+                     photos=[dict(uuid=text(x.get("uuid"), 64), caption=text(x.get("caption"), 300)) for x in c.get("photos", [])])
+                for c in body.get("chapters", [])]
+    uuids = [x["uuid"] for c in chapters for x in c["photos"]]
+    bad = set(uuids) - photo_info(con, uuids).keys() if uuids else set()
+    if bad:
+        raise ValueError(f"not in the index: {sorted(bad)}")
+    made_by = "you" if old["made_by"] == "auto" else old["made_by"]
+    save_review(dict(fields, title=text(body.get("title"), 120) or old["title"], intro=text(body.get("intro"), 300),
+                     outro=text(body.get("outro"), 300), made_by=made_by, **({"edited": True} if made_by == "claude" else {}),
+                     chapters=chapters))
+    return dict(photos=len(uuids), chapters=len(chapters), made_by=made_by)
 
 
 def slug(text):
@@ -799,7 +873,9 @@ def cmd_serve(a):
             raise LookupError(q["uuid"])
         return info[q["uuid"]]
 
-    api = {"/api/stories": lambda q: stories(con), "/api/search": api_search, "/api/open": api_open, "/api/info": api_info, "/api/parse": api_parse,
+    api = {"/api/stories": lambda q: stories(con), "/api/story": lambda q: story_for_editor(con, q.get("id", "")),
+           "/api/story_photos": lambda q: story_candidates(con, q.get("id", ""), q.get("q"), q.get("like")),
+           "/api/search": api_search, "/api/open": api_open, "/api/info": api_info, "/api/parse": api_parse,
            "/api/galaxy": lambda q: galaxy(con),
            "/api/timeline": lambda q: timeline(con, q.get("q", ""), int(q.get("per", 1))),
            "/api/game": lambda q: game_round(con, q.get("mode", "year")),
@@ -841,6 +917,22 @@ def cmd_serve(a):
             except LookupError as ex:
                 return self.send(json.dumps(dict(error=str(ex))).encode(), "application/json", 404)
             self.send(b"not found", "text/plain", 404)
+
+        def do_POST(self):  # saving an edited story: the only request that writes
+            # Only this page may write. Other sites can't send JSON here without a CORS preflight, which we never
+            # answer; checking Host too stops DNS rebinding (a site whose name resolves to 127.0.0.1).
+            here = {f"localhost:{a.port}", f"127.0.0.1:{a.port}"}
+            origin = self.headers.get("origin")
+            if (self.headers.get("host") not in here or (origin and urlparse(origin).netloc not in here)
+                    or self.headers.get("content-type", "").split(";")[0].strip() != "application/json"):
+                return self.send(b"forbidden", "text/plain", 403)
+            if urlparse(self.path).path != "/api/story":
+                return self.send(b"not found", "text/plain", 404)
+            try:
+                res = edit_review(con, json.loads(self.rfile.read(int(self.headers.get("content-length") or 0))))
+            except (ValueError, LookupError, AttributeError, TypeError) as ex:
+                return self.send(json.dumps(dict(error=str(ex))).encode(), "application/json", 400)
+            self.send(json.dumps(dict(results=res)).encode(), "application/json")
 
     print(f"http://localhost:{a.port}")
     ThreadingHTTPServer(("127.0.0.1", a.port), H).serve_forever()

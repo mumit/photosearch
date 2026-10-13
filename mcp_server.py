@@ -118,8 +118,7 @@ def story_highlights(story: str, count: int = 40) -> list:
     """Candidates for a story (a year like "2025", or a trip id from list_stories like "trip-2024-05-02"): a varied
     set of its best photos (near-duplicates removed, spread across events), in date order, as numbered contact
     sheets plus their dates, places and people."""
-    start, end, _ = ps.story_span(con, story)
-    h = ps.highlights(con, start, end, min(count, 60))
+    h = ps.story_highlights(con, story, min(count, 60))
     if not h:
         return [f"no photos indexed for {story}"]
     out = [Image(data=ps.contact_sheet(con, [x["uuid"] for x in h[i:i + SHEET_MAX]], cell=CELL), format="jpeg")

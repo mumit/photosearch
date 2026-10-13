@@ -77,6 +77,45 @@
   .story .body { padding:12px 14px 14px; }
   .story h3 { font-size:18px; }
   .story .go { margin-top:8px; }
+
+  /* story editor */
+  #edit .pad { max-width:1100px; padding-bottom:80px; }
+  .edtop { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  .sp { flex:1; }
+  .btn { padding:8px 14px; border-radius:8px; background:var(--acc); color:#fff; text-decoration:none; }
+  #ed > input { display:block; width:100%; margin:6px 0; }
+  #edtitle { font-size:26px; font-weight:700; }
+  .ch { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin:16px 0; }
+  .chhead { display:flex; gap:6px; align-items:center; }
+  .chhead input { flex:1; min-width:0; font-weight:600; font-size:17px; }
+  .ch > input { width:100%; margin-top:6px; }
+  .tiny { padding:4px 9px; }
+  .strip { display:flex; gap:10px; overflow-x:auto; padding:10px 2px 4px; align-items:flex-start; min-height:120px; }
+  .strip figure { flex:0 0 160px; position:relative; cursor:grab; }
+  .strip figure img { cursor:grab; }
+  .strip figure.drag { opacity:.35; }
+  .strip figure.over { outline:3px solid var(--acc); }
+  .strip.over { outline:2px dashed var(--acc); border-radius:10px; }
+  .tools { position:absolute; top:6px; left:6px; right:6px; display:flex; gap:4px; opacity:0; transition:opacity .15s; }
+  .tools .sp { flex:1; }
+  .strip figure:hover .tools, .strip figure:focus-within .tools { opacity:1; }
+  @media (hover:none) { .tools { opacity:1; } }
+  .tools button { padding:2px 8px; font-size:13px; background:rgba(0,0,0,.65); border:0; color:#fff; border-radius:6px; }
+  .strip textarea { display:block; width:100%; border:0; border-top:1px solid var(--line); font:inherit; font-size:13px; line-height:1.3;
+                    resize:vertical; background:var(--card); color:var(--fg); padding:6px 8px; }
+  .strip small { display:block; padding:0 8px 6px; color:var(--mut); font-size:11px; }
+  .strip .add { flex:0 0 120px; align-self:stretch; border-style:dashed; background:var(--card); color:var(--mut); }
+  .strip .empty { color:var(--mut); font-size:13px; align-self:center; }
+  #edpick { position:fixed; top:0; right:0; bottom:0; width:min(440px, 100%); z-index:15; background:var(--bg); border-left:1px solid var(--line);
+            box-shadow:-8px 0 30px #0003; padding:14px; display:flex; flex-direction:column; gap:10px;
+            transform:translateX(105%); transition:transform .2s; }
+  #edpick.on { transform:none; }
+  #pickf input { flex:1; min-width:0; }
+  #pickgrid { overflow-y:auto; display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; align-content:start; }
+  #pickgrid figure { cursor:pointer; }
+  #pickgrid figure img { cursor:pointer; }
+  #pickgrid .used { opacity:.3; cursor:default; }
+  #pickgrid small { display:block; padding:3px 5px; font-size:11px; color:var(--mut); }
   #play-area { display:grid; grid-template-columns:minmax(0, 1.3fr) minmax(280px, 1fr); gap:16px; }
   @media (max-width: 800px) { #play-area { grid-template-columns:1fr; } }
   #play-photo { width:100%; max-height:70vh; object-fit:contain; background:#000; border-radius:12px; }
@@ -174,6 +213,27 @@
     <h3 class="sec">Trips</h3><div class="cards" id="trips"></div>
     <h3 class="sec">Years</h3><div class="cards" id="years"></div>
   </div></section>
+
+  <section id="edit"><div class="pad" id="ed">
+    <div class="edtop">
+      <a href="#stories">← Stories</a><span class="status" id="edstatus" style="margin:0"></span><span class="sp"></span>
+      <button class="ghost" id="edundo" disabled title="undo (⌘Z)">↶ Undo</button>
+      <a class="btn" id="edplay" target="_blank">▶ Play</a>
+    </div>
+    <input id="edtitle" data-f="title" placeholder="Title">
+    <input id="edintro" data-f="intro" placeholder="A line under the title">
+    <div id="edchapters"></div>
+    <button class="ghost" id="edaddch">+ Chapter</button>
+    <input id="edoutro" data-f="outro" placeholder="Last words, on the ending card" style="margin-top:16px">
+    <p class="status">Changes save as you go. Drag photos to reorder them or move them between chapters (or use ← →).
+      ↻ swaps a photo for a similar one from the same days.</p>
+  </div>
+  <aside id="edpick">
+    <div class="edtop" style="margin:0"><b id="pickt"></b><span class="sp"></span><button class="ghost tiny" id="pickclose">✕</button></div>
+    <form id="pickf"><input id="pickq" placeholder="search these days… e.g. tacos"><button>Find</button></form>
+    <div class="status" id="pickstatus" style="margin:0"></div>
+    <div id="pickgrid"></div>
+  </aside></section>
 </main>
 
 <div id="lb">
@@ -202,12 +262,13 @@ const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? 
 /* ---------- tabs ---------- */
 const views = {};
 function route() {
-  const tab = (location.hash || "#search").slice(1);
+  const [tab, arg] = (location.hash || "#search").slice(1).split("/");
   lbOff?.();
-  document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.hash === "#" + tab));
+  if (tab !== "edit") leaveEdit();
+  document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.hash === "#" + (tab === "edit" ? "stories" : tab)));
   document.querySelectorAll("main section").forEach(s => s.classList.toggle("on", s.id === tab));
   $("head-search").hidden = tab !== "search"; $("head-time").hidden = tab !== "time"; $("head-math").hidden = tab !== "math";
-  views[tab]?.();
+  views[tab]?.(arg && decodeURIComponent(arg));
 }
 addEventListener("hashchange", route);
 const go = tab => { if (location.hash !== "#" + tab) location.hash = tab; else route(); };
@@ -598,14 +659,15 @@ function dateRange(a, b) {
   return `${s.toLocaleDateString(undefined, md)}–${end}, ${e.getFullYear()}`;
 }
 function storyCard(x) {
-  const by = x.made_by ? ` · ${x.made_by === "claude" ? "✨ curated by Claude" : "automatic"}` : "";
+  const by = x.made_by ? " · " + ({ claude: "✨ curated by Claude", you: "✏️ edited by you" }[x.made_by] || "automatic")
+                         + (x.edited ? ", edited" : "") : "";
   return `<div class="card story">
     ${x.cover ? `<a href="/review/${x.id}" target="_blank"><img loading="lazy" src="/thumb/${x.cover}.jpg" alt=""></a>` : ""}
     <div class="body">
       <h3>${esc(x.title)}</h3>
       <p>${x.kind === "trip" ? dateRange(x.start, x.end) + " · " : ""}${x.photos.toLocaleString()} photos${by}</p>
       <p class="go"><a href="/review/${x.id}" target="_blank">▶ ${x.made_by ? "Play" : "Make & play"}</a>
-        ${x.made_by ? ` · <a href="/review/${x.id}?download=1">⬇ Download</a>` : ""}</p>
+        ${x.made_by ? ` · <a href="/review/${x.id}?download=1">⬇ Download</a>` : ""} · <a href="#edit/${x.id}">✏️ Edit</a></p>
     </div></div>`;
 }
 views.stories = async () => {
@@ -613,6 +675,191 @@ views.stories = async () => {
   const trips = r.filter(x => x.kind === "trip");
   $("trips").innerHTML = trips.map(storyCard).join("") || `<p class="status">No trips found yet: they need photos with locations.</p>`;
   $("years").innerHTML = r.filter(x => x.kind === "year").map(storyCard).join("");
+};
+
+/* ---------- story editor ---------- */
+// E.story is the story being edited; every change snapshots it for undo, re-renders, and saves after a pause.
+const E = { story: null, undo: [], timer: 0, typed: null, drag: null, pick: null, found: [] };
+const shortDate = d => { const [y, m, day] = d.split("-").map(Number); return new Date(y, m - 1, day).toLocaleDateString(undefined, { month:"short", day:"numeric" }); };
+const firstNames = p => (p.persons || []).slice(0, 3).map(n => n.split(" ")[0]).join(" & ");
+const used = () => new Set(E.story.chapters.flatMap(c => c.photos.map(p => p.uuid)));
+
+views.edit = async id => {
+  if (E.timer) await saveStory();
+  closePick();
+  $("edstatus").textContent = "loading…"; $("edchapters").innerHTML = "";
+  try { E.story = (await api("/api/story", { id })).results; }
+  catch (e) { $("edstatus").textContent = e.message; return; }
+  E.undo = []; renderEdit(); $("edstatus").textContent = "";
+};
+function leaveEdit() { closePick(); if (E.timer) saveStory(); }
+addEventListener("pagehide", () => { if (E.timer) saveStory(true); });
+
+function renderEdit() {
+  const s = E.story;
+  for (const f of ["title", "intro", "outro"]) $("ed" + f).value = s[f] || "";
+  $("edplay").href = `/review/${s.id}`;
+  $("edundo").disabled = !E.undo.length;
+  $("edchapters").innerHTML = s.chapters.map((c, ci) => `
+    <div class="ch" data-ch="${ci}">
+      <div class="chhead">
+        <input data-f="title" value="${esc(c.title)}" placeholder="Chapter title">
+        <button class="ghost tiny" data-a="up" title="move chapter up" ${ci ? "" : "disabled"}>↑</button>
+        <button class="ghost tiny" data-a="down" title="move chapter down" ${ci < s.chapters.length - 1 ? "" : "disabled"}>↓</button>
+        <button class="ghost tiny" data-a="drop" title="delete chapter and its photos (undo brings it back)">✕</button>
+      </div>
+      <input data-f="text" value="${esc(c.text || "")}" placeholder="A line for the chapter card (optional)">
+      <div class="strip">
+        ${c.photos.map((p, i) => `
+          <figure draggable="true" data-i="${i}">
+            <img src="/thumb/${p.uuid}.jpg" loading="lazy" alt="" draggable="false">
+            <div class="tools"><button data-a="left" title="earlier">←</button><span class="sp"></span>
+              <button data-a="swap" title="swap for a similar photo">↻</button><button data-a="del" title="remove">✕</button>
+              <span class="sp"></span><button data-a="right" title="later">→</button></div>
+            <textarea data-f="caption" rows="3" placeholder="caption">${esc(p.caption)}</textarea>
+            <small>${shortDate(p.date)}${p.place ? " · " + esc(p.place.split(",")[0]) : ""}</small>
+          </figure>`).join("") || `<span class="empty">No photos yet: drag some here, or add them →</span>`}
+        <button class="ghost add" data-a="add">+ Add photos</button>
+      </div>
+    </div>`).join("");
+}
+
+function snapshot() {
+  E.undo.push(JSON.stringify(E.story));
+  if (E.undo.length > 100) E.undo.shift();
+}
+function changed(rerender = true) {
+  if (rerender) renderEdit();
+  $("edundo").disabled = !E.undo.length;
+  $("edstatus").textContent = "editing…";
+  clearTimeout(E.timer); E.timer = setTimeout(saveStory, 700);
+}
+async function saveStory(leaving = false) {
+  clearTimeout(E.timer); E.timer = 0;
+  const s = E.story;
+  const body = { id: s.id, title: s.title, intro: s.intro || "", outro: s.outro || "",
+                 chapters: s.chapters.map(c => ({ title: c.title, text: c.text || "",
+                                                   photos: c.photos.map(p => ({ uuid: p.uuid, caption: p.caption || "" })) })) };
+  try {
+    const r = await fetch("/api/story", { method: "POST", headers: { "content-type": "application/json" },
+                                          body: JSON.stringify(body), keepalive: leaving });
+    const j = await r.json();
+    if (!r.ok || j.error) throw new Error(j.error || r.statusText);
+    if (location.hash.startsWith("#edit/" + s.id)) $("edstatus").textContent = "saved ✓";
+  } catch (e) { $("edstatus").textContent = "not saved: " + e.message; }
+}
+$("edundo").onclick = () => {
+  if (!E.undo.length) return;
+  E.story = JSON.parse(E.undo.pop()); E.typed = null; changed();
+};
+addEventListener("keydown", e => {  // ⌘Z / Ctrl-Z undoes story changes; inside a text box it stays the box's own undo
+  if (location.hash.startsWith("#edit/") && (e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey
+      && !/INPUT|TEXTAREA/.test(document.activeElement?.tagName)) { e.preventDefault(); $("edundo").click(); }
+});
+
+// typing: one undo step per field visit, and no re-render (it would steal the cursor)
+$("ed").addEventListener("focusin", e => { if (e.target.dataset.f) E.typed = null; });
+$("ed").addEventListener("input", e => {
+  const f = e.target.dataset.f; if (!f) return;
+  if (E.typed !== e.target) { snapshot(); E.typed = e.target; }
+  const ch = e.target.closest(".ch"), fig = e.target.closest("figure");
+  const c = ch && E.story.chapters[ch.dataset.ch];
+  if (fig) c.photos[fig.dataset.i].caption = e.target.value;
+  else if (c) c[f] = e.target.value;
+  else E.story[f] = e.target.value;
+  changed(false);
+});
+
+function movePhoto(from, to) {  // from/to: [chapter, index]; to's index is counted before removing
+  const [fc, fi] = from, [tc, ti] = to, src = E.story.chapters[fc].photos, dst = E.story.chapters[tc].photos;
+  const [p] = src.splice(fi, 1);
+  dst.splice(fc === tc && ti > fi ? ti - 1 : ti, 0, p);
+}
+$("edchapters").onclick = e => {
+  const b = e.target.closest("[data-a]"); if (!b) return;
+  const cs = E.story.chapters, ci = +b.closest(".ch").dataset.ch, c = cs[ci];
+  const i = b.closest("figure") ? +b.closest("figure").dataset.i : -1;
+  const a = b.dataset.a;
+  if (a === "add") return openPick("add", ci);
+  if (a === "swap") return openPick("swap", ci, i);
+  snapshot();
+  if (a === "del") c.photos.splice(i, 1);
+  if (a === "left") i > 0 ? movePhoto([ci, i], [ci, i - 1]) : ci > 0 && movePhoto([ci, i], [ci - 1, cs[ci - 1].photos.length]);
+  if (a === "right") i < c.photos.length - 1 ? movePhoto([ci, i], [ci, i + 2]) : ci < cs.length - 1 && movePhoto([ci, i], [ci + 1, 0]);
+  if (a === "up" || a === "down") { const j = a === "up" ? ci - 1 : ci + 1; [cs[ci], cs[j]] = [cs[j], cs[ci]]; }
+  if (a === "drop") cs.splice(ci, 1);
+  changed();
+};
+$("edaddch").onclick = () => { snapshot(); E.story.chapters.push({ title: "New chapter", text: "", photos: [] }); changed(); };
+
+// drag and drop: onto a photo puts it before that photo; onto the rest of a strip puts it at the end
+$("edchapters").addEventListener("dragstart", e => {
+  const fig = e.target.closest?.("figure"); if (!fig) return;
+  E.drag = [+fig.closest(".ch").dataset.ch, +fig.dataset.i];
+  e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", "");
+  fig.classList.add("drag");
+});
+$("edchapters").addEventListener("dragend", () => {
+  E.drag = null; document.querySelectorAll("#edchapters .drag, #edchapters .over").forEach(x => x.classList.remove("drag", "over"));
+});
+$("edchapters").addEventListener("dragover", e => {
+  if (!E.drag) return;
+  const strip = e.target.closest(".strip"); if (!strip) return;
+  e.preventDefault();
+  const fig = e.target.closest("figure");
+  document.querySelectorAll("#edchapters .over").forEach(x => x.classList.remove("over"));
+  (fig || strip).classList.add("over");
+});
+$("edchapters").addEventListener("drop", e => {
+  const strip = e.target.closest(".strip"); if (!E.drag || !strip) return;
+  e.preventDefault();
+  const tc = +strip.closest(".ch").dataset.ch, fig = e.target.closest("figure");
+  const to = [tc, fig ? +fig.dataset.i : E.story.chapters[tc].photos.length];
+  if (to[0] !== E.drag[0] || (to[1] !== E.drag[1] && to[1] !== E.drag[1] + 1)) { snapshot(); movePhoto(E.drag, to); changed(); }
+});
+
+// the picker: photos from the story's days, to add to a chapter or to swap in
+function openPick(mode, ci, i) {
+  E.pick = { mode, ci, i };
+  const c = E.story.chapters[ci];
+  $("pickt").textContent = mode === "swap" ? "Swap for a similar photo" : `Add to “${c.title}”`;
+  $("pickq").value = "";
+  $("edpick").classList.add("on");
+  loadPick(mode === "swap" ? { like: c.photos[i].uuid } : {});
+}
+function closePick() { $("edpick").classList.remove("on"); E.pick = null; }
+$("pickclose").onclick = closePick;
+$("pickf").onsubmit = e => {
+  e.preventDefault();
+  const q = $("pickq").value.trim(), p = E.pick;
+  loadPick(q ? { q } : p.mode === "swap" ? { like: E.story.chapters[p.ci].photos[p.i].uuid } : {});
+};
+async function loadPick(params) {
+  const what = params.q ? `matches for “${params.q}”` : params.like ? "look-alikes" : "photos";
+  $("pickstatus").textContent = `finding ${what} from these days…`; $("pickgrid").innerHTML = "";
+  try { E.found = (await api("/api/story_photos", { id: E.story.id, ...params })).results; }
+  catch (e) { $("pickstatus").textContent = e.message; return; }
+  renderPick(what);
+}
+function renderPick(what) {
+  const have = used();
+  $("pickstatus").textContent = E.found.length ? `${E.found.length} ${what} · dimmed ones are already in the story` : `no ${what}`;
+  $("pickgrid").innerHTML = E.found.map((p, k) => `<figure data-k="${k}" class="${have.has(p.uuid) ? "used" : ""}">
+    <img src="/thumb/${p.uuid}.jpg" loading="lazy" alt=""><small>${shortDate(p.date)}${p.place ? " · " + esc(p.place.split(",")[0]) : ""}</small></figure>`).join("");
+}
+$("pickgrid").onclick = e => {
+  const fig = e.target.closest("figure"); if (!fig || fig.classList.contains("used") || !E.pick) return;
+  const p = E.found[fig.dataset.k], { mode, ci, i } = E.pick, photos = E.story.chapters[ci].photos;
+  snapshot();
+  if (mode === "swap") {  // keep the caption: a look-alike is usually the same moment
+    photos[i] = { ...p, caption: photos[i].caption };
+    closePick();
+  } else {  // slot it in by time, and stay open to add more
+    const at = photos.findIndex(x => x.taken > p.taken);
+    photos.splice(at < 0 ? photos.length : at, 0, { ...p, caption: firstNames(p) });
+    fig.classList.add("used");
+  }
+  changed();
 };
 
 /* ---------- photo math ---------- */

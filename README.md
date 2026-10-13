@@ -199,7 +199,13 @@ Every trip and year gets an automatic story the first time you play it: highligh
 year, captioned with who's in them. For a nicer one, ask Claude (with the MCP server set up) *"make a story of our
 Lisbon trip"* or *"make a year in review for 2025"*. It looks through the highlights and searches for anything
 missing (food, streets), keeps the best ~24 (skipping repeats, blurry shots and too many selfies), and writes
-chapters and captions. Captions stick to what's in the photo and the names tagged in Photos.
+chapters and captions. Captions stick to what's in the photo and the names tagged in Photos. Trip stories leave out
+photos taken near home (the morning you left).
+
+**✏️ Edit** on a story's card opens the editor: drag photos to reorder them or move them between chapters, ↻ swap one
+for a look-alike from the same days, ✕ remove, **+ Add photos** (that story's highlights, or search within its days),
+and edit the title, chapter titles and captions. Changes save as you go, with undo (⌘Z). The page's save endpoint is
+the only one that writes, and it only accepts JSON from the page itself.
 
 ```bash
 uv run python ps.py review trip-2024-05-02 --export lisbon.html   # or a year: review 2025
@@ -315,5 +321,5 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
 **Status:** full library indexed (16,975 items in 140 min on an M3 Pro; 42 skipped for lack of a local preview). Every web tab checked in headless
 Chrome. `album` / `make_album` have not been run yet. 1,042 photos carry a placeholder date (2002-01-01 00:00); they are treated as undated.
 
-**Ideas next:** a story editor (reorder, swap a photo for a similar one, edit captions); *on this day*; smart albums you teach with a few examples; duplicate cleanup;
+**Ideas next:** *on this day*; smart albums you teach with a few examples; duplicate cleanup;
 index the audio track of videos.
