@@ -77,7 +77,9 @@ async function loadShelves() {
   $("asks").innerHTML = ASKS.map(a => `<a class="pill" href="#${searchHash(a, {}, new Set())}">${esc(a)}</a>`).join("");
   $("rediscover").innerHTML = skeleton(8); $("tripshelf").innerHTML = skeleton(6, .75); $("yearshelf").innerHTML = skeleton(8, 1);
   shuffle();
-  loadPeople().then(p => { $("peopleshelf").innerHTML = p.map(x => avatar(x)).join(""); }).catch(() => {});
+  loadPeople().then(p => {  // no one tagged (a new library, a demo): no shelf at all
+    $("peopleshelf").innerHTML = p.map(x => avatar(x)).join(""); $("peopleshelf").closest(".hsec").hidden = !p.length;
+  }).catch(() => {});
   showCal().catch(() => {});
   try {
     const s = await loadStories();
