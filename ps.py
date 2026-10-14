@@ -115,9 +115,12 @@ def model():
     return _model
 
 
+_model_lock = threading.Lock()  # the web server answers in parallel; torch on MPS crashes the process if two threads encode at once
+
 @functools.lru_cache(maxsize=512)
 def embed_query(text):
-    return model().encode([text], prompt_name="SearchQuery", normalize_embeddings=True)[0].astype(np.float32)
+    with _model_lock:
+        return model().encode([text], prompt_name="SearchQuery", normalize_embeddings=True)[0].astype(np.float32)
 
 
 # ---------------------------------------------------------------- indexing
@@ -507,6 +510,39 @@ def overview(con):
     return dict(people=people.most_common(80), places=places.most_common(120), years=sorted(years.items()))
 
 
+def world(con):
+    """Where the photos were taken, in ~1 km cells: position, count, the most interesting photo, the place's name."""
+    uuids, _, pos = vectors(con)
+    score = interest(con)
+    cells = {}
+    for u, la, lo, place, d in con.execute("select uuid, lat, lon, place, substr(date,1,10) from photos where lat is not null and lon is not null"):
+        if u not in pos:
+            continue
+        c = cells.setdefault((round(la, 2), round(lo, 2)), dict(lat=0.0, lon=0.0, n=0, best=-9, cover=None, names=Counter(), first=d, last=d))
+        c["lat"] += la; c["lon"] += lo; c["n"] += 1
+        if place:
+            c["names"][short_place(place)] += 1
+        c["first"], c["last"] = min(c["first"], d), max(c["last"], d)
+        if score[pos[u]] > c["best"]:
+            c.update(best=float(score[pos[u]]), cover=u)
+    return [dict(lat=round(c["lat"] / c["n"], 5), lon=round(c["lon"] / c["n"], 5), n=c["n"], cover=c["cover"],
+                 place=c["names"].most_common(1)[0][0] if c["names"] else "",
+                 first=c["first"], last=c["last"]) for c in cells.values()]
+
+
+def near(con, lat, lon, radius_km=2.0, k=60):
+    """The most interesting photos taken within radius_km of a point, best first."""
+    dlat = radius_km / 111; dlon = radius_km / (111 * max(0.1, math.cos(math.radians(lat))))
+    rows = con.execute("select uuid, lat, lon from photos where lat between ? and ? and lon between ? and ?",
+                       (lat - dlat, lat + dlat, lon - dlon, lon + dlon)).fetchall()
+    _, _, pos = vectors(con)
+    score = interest(con)
+    keep = [u for u, la, lo in rows if u in pos and km((lat, lon), (la, lo)) <= radius_km]
+    top = sorted(keep, key=lambda u: -score[pos[u]])[:k]
+    info = photo_info(con, top)
+    return dict(n=len(keep), photos=[info[u] for u in top])
+
+
 def game_round(con, mode="year"):
     """A random, reasonably interesting photo to guess the year or place of."""
     uuids, M, _ = vectors(con)
@@ -773,7 +809,7 @@ def highlights(con, start, end, n=40, home=None):
         picked.append(i); per_event[event[i]] += 1
         closest = np.maximum(closest, V @ V[i])
     info = photo_info(con, [rows[i][0] for i in picked])
-    return [dict(info[rows[i][0]], event=int(event[i])) for i in sorted(picked)]
+    return [dict(info[rows[i][0]], event=int(event[i]), interest=round(float(score[i]), 3)) for i in sorted(picked)]
 
 
 def cover(con, start, end):
@@ -1149,6 +1185,8 @@ def cmd_serve(a):
            "/api/search": api_search, "/api/open": api_open, "/api/info": api_info, "/api/parse": api_parse,
            "/api/galaxy": lambda q: galaxy(con), "/api/overview": lambda q: overview(con),
            "/api/rediscover": lambda q: rediscover(con, min(60, int(q.get("n", 24)))),
+           "/api/world": lambda q: world(con),
+           "/api/near": lambda q: near(con, float(q["lat"]), float(q["lon"]), min(500.0, float(q.get("km", 2))), min(120, int(q.get("k", 60)))),
            "/api/timeline": lambda q: timeline(con, q.get("q", ""), int(q.get("per", 1))),
            "/api/game": lambda q: game_round(con, q.get("mode", "year")),
            "/api/math": lambda q: photo_math(con, q["base"], q.get("plus", ""), q.get("minus", ""),

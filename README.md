@@ -141,12 +141,13 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 
 | Mode | What it does |
 |---|---|
-| **Home** | Opens on **On this day**: a slow slideshow of today's date in earlier years, which trip you were on (with a link to its story), and ‹ › to step through other days (`ps.py today` does the same in the terminal). Below it are shelves: *Rediscover* (random photos worth another look, ↻ to shuffle), your trips, ideas to search for, the other modes and your years. Photos that look like documents, screenshots or ID cards are left out. |
+| **Home** | Opens on **On this day**: a slow slideshow of today's date in earlier years, most striking first, which trip you were on (with a link to its story), and ‹ › to step through other days (`ps.py today` does the same in the terminal). Below it are shelves: *Rediscover* (random photos worth another look, ↻ to shuffle), your trips, ideas to search for, the other modes and your years. Photos that look like documents, screenshots or ID cards are left out. |
 | **Search** | Describe a photo. Results keep their shape, in rows like a photo book, sorted by best match or by date. Picking a person or place from the suggestions shows their most interesting photos. Put what you *don't* want in **without…** (e.g. "selfies"): the model is weak at "no …" inside the description. Every search has its own address, so back and forward work. |
+| **Map** | Everywhere you've been, each place as a pin showing its best photo and how many were taken there. Nearby places merge until you zoom in. Tap a pin for that place's best photos, or **▶ Slideshow** them. Map tiles come from OpenStreetMap (so it needs internet); your photos never leave the Mac. |
 | **Galaxy** | Your whole library on one zoomable map, with similar photos next to each other and colored by year. Scroll to zoom, drag to pan, hover to peek. Type in the search box to see where, say, "beach" lives. The first visit takes a minute to lay out the map. |
 | **Time Machine** | Pick something that happens every year ("birthday cake", "christmas tree") and flip through the best match from each year. ▶ or space plays them in turn. |
-| **Play** | *Guess the Year* and *Guess the Place*, 10 rounds each. Works on a phone, for passing around. |
-| **Math** | Start from a photo or words, then add and take away ideas: *this photo + snow − summer*. |
+| **Play** | *Guess the Year*, *Guess the Place* and *Which Came First?* (two photos: tap the older one). Play alone (10 rounds, best scores kept) or add players to pass the phone around: everyone gets 5 turns and the end shows who won. **Photo Math** lives here too: start from a photo or words, then add and take away ideas, *this photo + snow − summer*. |
+| **Photo frame** | `#frame`, or from Home: a slow, endless full-screen slideshow of your best photos with the time and date, for a spare iPad or TV. It keeps the screen awake. **▶ Slideshow** on any search, place or open photo plays just those. |
 | **Stories** | Every trip (found automatically from where photos were taken) and every year as a slideshow of its best, most varied moments, with chapters and captions. **⤓** saves one as a single HTML file (photos included) you can send to family; **✎** edits it. |
 
 **✨ Smart search (optional).** With a [TypeSafe](https://typesafe.ai) API key, the search box fills in the
@@ -165,7 +166,9 @@ Clicking any photo opens it large, on a blur of its own colours. Along the botto
 one to wander from photo to similar photo, with a trail of dots to go back. Names and the place are links to more
 of them; **📅 This day** shows the same date in other years; **∑ Math** starts Photo Math from it; **Open in Photos**
 shows it in the Photos app (the first time, macOS asks whether your terminal may control Photos; click OK).
-← → or a swipe browse; Esc or a swipe down closes.
+← → or a swipe browse; Esc or a swipe down closes. Press **?** anywhere for all the shortcuts.
+
+Search results come 48 at a time; **Show more** at the bottom fetches the next batch.
 
 *Guess the Place* loads its map from OpenStreetMap, so it needs internet; only map tiles are fetched, never your photos.
 
@@ -216,7 +219,8 @@ missing (food, streets), keeps the best ~24 (skipping repeats, blurry shots and 
 chapters and captions. Captions stick to what's in the photo and the names tagged in Photos. Trip stories leave out
 photos taken near home (the morning you left).
 
-**✏️ Edit** on a story's card opens the editor: drag photos to reorder them or move them between chapters, ↻ swap one
+**✎** on a story's card opens the editor: drag photos to reorder them or move them between chapters (on a phone or
+iPad, press and hold a photo first), ↻ swap one
 for a look-alike from the same days, ✕ remove, **+ Add photos** (that story's highlights, or search within its days),
 and edit the title, chapter titles and captions. Changes save as you go, with undo (⌘Z). The page's save endpoint is
 the only one that writes, and it only accepts JSON from the page itself.
