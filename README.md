@@ -389,3 +389,7 @@ placeholder date (2002-01-01 00:00); they are treated as undated. Tidy up finds 
 extras) on this library.
 
 **Ideas next:** index the audio track of videos; video previews on hover; a "use as portrait" choice for people pages.
+
+## License
+
+[MIT](LICENSE). The search model, [EmbeddingGemma 2](https://huggingface.co/google/embeddinggemma-2), is Google's, under Apache 2.0; it's downloaded separately, not part of this repo.
