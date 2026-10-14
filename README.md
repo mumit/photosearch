@@ -100,13 +100,13 @@ To index a different one, pass `--library "/path/to/Other Library.photoslibrary"
 Start with a small trial to check speed on your Mac:
 
 ```bash
-uv run python ps.py index --limit 500
+uv run photosearch index --limit 500
 ```
 
 It prints progress, photos per second and an estimated time remaining. Then index everything:
 
 ```bash
-uv run python ps.py index
+uv run photosearch index
 ```
 
 - Indexing is **incremental**: you can stop it (Ctrl-C) and re-run it later, and it continues where it left off.
@@ -118,7 +118,7 @@ uv run python ps.py index
 `--vision-tokens 70` is about 4× faster at some cost in search quality:
 
 ```bash
-uv run python ps.py index --vision-tokens 70
+uv run photosearch index --vision-tokens 70
 ```
 
 Use one setting for the whole index (it's recorded, and `index` refuses to mix). To switch, delete the `data/` folder and re-index.
@@ -129,7 +129,7 @@ Each run also refreshes people, albums and places for photos already indexed, an
 This doesn't need Claude. From the `photosearch` folder, in any terminal:
 
 ```bash
-uv run python ps.py serve
+uv run photosearch serve
 ```
 
 Open **http://localhost:8765**. It works while `index` is still running, and picks up new photos as they're added.
@@ -141,7 +141,7 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 
 | Mode | What it does |
 |---|---|
-| **Home** | Opens on **On this day**: a slow slideshow of today's date in earlier years, most striking first, which trip you were on (with a link to its story), and ‹ › to step through other days (`ps.py today` does the same in the terminal). Below it are shelves: *Rediscover* (random photos worth another look, ↻ to shuffle), the people you've tagged, your trips, ideas to search for, the other modes, *Day by day* (a calendar of the year, each day coloured by how many photos it has; hover for its best photo, click for the day) and your years. Photos that look like documents, screenshots or ID cards are left out. |
+| **Home** | Opens on **On this day**: a slow slideshow of today's date in earlier years, most striking first, which trip you were on (with a link to its story), and ‹ › to step through other days (`photosearch today` does the same in the terminal). Below it are shelves: *Rediscover* (random photos worth another look, ↻ to shuffle), the people you've tagged, your trips, ideas to search for, the other modes, *Day by day* (a calendar of the year, each day coloured by how many photos it has; hover for its best photo, click for the day) and your years. Photos that look like documents, screenshots or ID cards are left out. |
 | **Search** | Describe a photo. Results keep their shape, in rows like a photo book, sorted by best match or by date. Picking a person or place from the suggestions shows their most interesting photos. Put what you *don't* want in **without…** (e.g. "selfies"): the model is weak at "no …" inside the description. Every search has its own address, so back and forward work. |
 | **People** | A page per person tagged in Photos: their best photo from every year (**▶ through the years** plays them in turn), who they're most often photographed with, their places and favourite photos. Portraits are picked by the search model as the closest thing to a close-up of a face. Names anywhere (suggestions, the big photo view) lead here. |
 | **Map** | Everywhere you've been, each place as a pin showing its best photo and how many were taken there. It opens on home; chips along the bottom fly to the other regions (named like trips: "Lisbon", "Sintra & Cascais") or show everywhere. Nearby places merge until you zoom in. Tap a pin for that place's best photos, or **▶ Slideshow** them. Map tiles come from OpenStreetMap (so it needs internet); your photos never leave the Mac. |
@@ -156,7 +156,7 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 **✨ Smart search (optional).** With a [TypeSafe](https://typesafe.ai) API key, the search box fills in the
 filters from your description: *"Sam at the beach last summer, no selfies"* becomes person Sam, summer 2025,
 without selfies. The chips it adds are amber, so you can see and remove what it understood; untick ✨ in the filters
-to turn it off. Put the key in a `.env` file next to `ps.py` (it's git-ignored):
+to turn it off. Put the key in a `.env` file at the top of the checkout, next to `pyproject.toml` (it's git-ignored):
 
 ```
 TYPESAFE_API_KEY=...
@@ -180,13 +180,13 @@ Search results come 48 at a time; **Show more** at the bottom fetches the next b
 By default only this Mac can open the page. To let the family in from phones and iPads on the same Wi-Fi:
 
 ```bash
-uv run python ps.py serve --lan
+uv run photosearch serve --lan
 ```
 
 It prints an address like `http://192.168.4.112:8765` and a passcode like `maple-river-42` (kept in `data/lan.json`).
 On the Mac's page, the 📱 button shows a QR code: scan it with a phone camera and the phone is signed in. Or open the
 address and type the passcode. Each device stays signed in (a cookie) until you run
-`ps.py serve --lan --new-passcode`, which makes a new passcode and signs every device out. Five wrong guesses lock
+`photosearch serve --lan --new-passcode`, which makes a new passcode and signs every device out. Five wrong guesses lock
 a device out for a minute, then longer each time.
 
 In Safari, **Share → Add to Home Screen** keeps it as an app with its own icon, full screen. A spare iPad makes a
@@ -203,26 +203,26 @@ MCP features (asking about photos in chat, curated stories); everything in the w
 ### Search from the command line
 
 ```bash
-uv run python ps.py search "dog on a beach at sunset"
+uv run photosearch search "dog on a beach at sunset"
 ```
 ```bash
-uv run python ps.py search "birthday cake" --person Sam --after 2022-01-01 --before 2023-01-01 -k 50
+uv run photosearch search "birthday cake" --person Sam --after 2022-01-01 --before 2023-01-01 -k 50
 ```
 ```bash
-uv run python ps.py search "group photos at a party" --exclude "a selfie" --place Portland
+uv run photosearch search "group photos at a party" --exclude "a selfie" --place Portland
 ```
 ```bash
-uv run python ps.py similar <uuid>
+uv run photosearch similar <uuid>
 ```
 
 Each result line shows score, date, photo/video, the photo's ID (uuid), place and people.
 
 ### Ask Claude about your photos (MCP)
 
-`mcp_server.py` exposes the index to Claude Code (or any MCP client). Register it once:
+`photosearch-mcp` exposes the index to Claude Code (or any MCP client). Register it once:
 
 ```bash
-claude mcp add --scope user photosearch -- uv run --directory "$PWD" python mcp_server.py
+claude mcp add --scope user photosearch -- uv run --directory "$PWD" photosearch-mcp
 ```
 
 Then, in a new Claude Code session, ask things like *"find photos of Sam at the beach, no selfies, and make an
@@ -235,7 +235,7 @@ answers or builds the album. Tools: `search_photos` (with `exclude`, people, pla
 
 A **trip** is a run of days when most photos were taken 75+ km from home (home is worked out per year, from where
 you take photos on the most days). Trips are named from Photos' place data (*Lisbon*, *Minneapolis & Saint Paul*) and
-need 20+ photos. `uv run python ps.py trips` lists them.
+need 20+ photos. `uv run photosearch trips` lists them.
 
 Every trip and year gets an automatic story the first time you play it: highlights by day for a trip, by month for a
 year, captioned with who's in them. For a nicer one, ask Claude (with the MCP server set up) *"make a story of our
@@ -251,7 +251,7 @@ and edit the title, chapter titles and captions. Changes save as you go, with un
 the only one that writes, and it only accepts JSON from the page itself.
 
 ```bash
-uv run python ps.py review trip-2024-05-02 --export lisbon.html   # or a year: review 2025
+uv run photosearch review trip-2024-05-02 --export lisbon.html   # or a year: review 2025
 ```
 
 writes the slideshow as a single file you can AirDrop, email or put on a USB stick. It contains the photos, so share
@@ -263,7 +263,7 @@ near-duplicates removed and picks spread across events (runs of photos without a
 ### Save results as a Photos album
 
 ```bash
-uv run python ps.py album "Sunsets" "sunset over water" -k 60
+uv run photosearch album "Sunsets" "sunset over water" -k 60
 ```
 
 This creates (or adds to) an album called "Sunsets" in Photos with the top 60 matches. **It's the only command
@@ -280,8 +280,8 @@ the rest about 2048 px). That's plenty for the model and for the grid, but blurr
   version and swaps it in (about 1 s; longer if iCloud is slow).
 - **Stories** fetch theirs when you play one, save one, or Claude saves one; **⬇ Download** and `review --export`
   wait for any still missing, so the file you send is sharp (1600 px, ~0.5 MB a photo).
-- `uv run python ps.py fetch trip-2024-05-02` (or `2025`, or photo uuids) fetches ahead of time, e.g. before
-  showing a story offline. `uv run python ps.py thumbs` rebuilds thumbnails after changing their size.
+- `uv run photosearch fetch trip-2024-05-02` (or `2025`, or photo uuids) fetches ahead of time, e.g. before
+  showing a story offline. `uv run photosearch thumbs` rebuilds thumbnails after changing their size.
 
 Fetching uses Photos' own API (PhotoKit), in a separate process, and doesn't change the library. The first time,
 macOS may ask to let your terminal access Photos. To have everything sharp without fetching, turn on **Photos →
@@ -291,10 +291,9 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 
 | Path | Contents |
 |---|---|
-| `ps.py` | All the code: indexing, search, album export, web server |
-| `ui.html` | The web page served by `serve` |
-| `mcp_server.py` | MCP server so Claude can search, view and make albums |
-| `review.html` | The story slideshow player (also used for the one-file export) |
+| `src/photosearch/` | The code (see [Code layout](#code-layout)) |
+| `src/photosearch/web/` | The web page: `index.html`, `app.css`, one script per view in `js/`, and `review.html`, the story player (also used for the one-file export) |
+| `tests/` | The tests and the made-up library they run on (see [Tests](#tests)) |
 | `data/reviews/` | Saved story picks and captions, one JSON file per year (`2025.json`) or trip (`trip-2024-05-02.json`) |
 | `.env` | Optional `TYPESAFE_API_KEY` for ✨ smart search (git-ignored) |
 | `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector |
@@ -330,7 +329,7 @@ package cache, but it affects all uv projects on the Mac.
 | Very slow (under 1 photo/s) | Check the Mac is Apple Silicon. Try `--vision-tokens 70`, and close other heavy apps. |
 | Out of memory | Lower the batch size: `index --batch 4`. |
 | Some photos "skipped" | They have no local preview yet (e.g. just synced). Re-run `index` later. |
-| Opened photos stay blurry | The full-size fetch failed: offline, iCloud slow, or Photos access not allowed for your terminal (**System Settings → Privacy & Security → Photos**). Try `ps.py fetch <uuid>` to see the error. |
+| Opened photos stay blurry | The full-size fetch failed: offline, iCloud slow, or Photos access not allowed for your terminal (**System Settings → Privacy & Security → Photos**). Try `uv run photosearch fetch <uuid>` to see the error. |
 | Clicking a photo doesn't open Photos | Allow it in **System Settings → Privacy & Security → Automation**. |
 | `Could not get path to photo library database` | osxphotos couldn't work out the system library. It falls back to `~/Pictures/Photos Library.photoslibrary`; for another location pass `--library`. |
 | `index was built with vision_tokens=…` | The index remembers its settings so vectors don't get mixed. Use the same `--vision-tokens`, or delete `data/` and re-index. |
@@ -351,6 +350,46 @@ Don't switch the model to float16: it produces broken vectors (NaNs). The code u
 ---
 
 ## Development notes
+
+### Code layout
+
+`photosearch` (the command) is `src/photosearch/cli.py`; `photosearch-mcp` is `mcp_server.py`. Each module is one
+thing, and they only import downwards in this list:
+
+| Module | What it does |
+|---|---|
+| `config.py` | Where things live (`data/`, or `PHOTOSEARCH_DATA`), sizes |
+| `store.py` | The index in `data/index.sqlite`: vectors in memory, photo details |
+| `embed.py` | The search model |
+| `images.py` | Reading photos, writing JPEGs, contact sheets |
+| `index.py` | `photosearch index` and `thumbs` |
+| `search.py` | Search, look-alikes, filters, how interesting a photo looks |
+| `smartbox.py` | The optional ✨ smart search box (Jev) |
+| `places.py` | Home, trips, the map |
+| `people.py` | People and their portraits |
+| `stories.py` | Stories: making, editing, the slideshow page |
+| `explore.py` | Galaxy, time machine, rediscover, calendar, games, photo math, on this day |
+| `photos_app.py` | Everything that talks to the Photos app or iCloud (in a separate process) |
+| `albums.py`, `dupes.py` | Smart albums; tidying up near-duplicates |
+| `lan.py`, `server.py` | Phones on the home Wi-Fi; the web server and its API |
+
+The web page has no build step: plain scripts that share one global scope, loaded in order by `index.html`, and re-read
+on every request, so an edit shows on reload.
+
+### Tests
+
+```bash
+uv run pytest                 # about 15 s
+uv run pytest -m browser      # also tours every view in headless Chrome, desktop and phone size (about 5 min)
+```
+
+They run on a made-up library built fresh for each run (`tests/library.py`): 73 photos with vectors from a fake search
+model and generated thumbnails, including the cases the duplicate finder got wrong on a real library (different
+receipts, different screenshots, look-alikes years apart, a chain of shots that drifts). Nothing touches your library,
+the model, iCloud or Photos: a stand-in records what would have been added to which album. The phone tests connect
+through this Mac's Wi-Fi address, so the server sees a device other than itself; they're skipped when offline.
+
+### Measurements
 
 Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 videos, 13.3k originals in iCloud only):
 

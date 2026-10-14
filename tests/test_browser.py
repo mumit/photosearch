@@ -145,6 +145,7 @@ def test_tour(monkeypatch, width, height, phone):
         Path(shots).mkdir(parents=True, exist_ok=True)
     s = Server(monkeypatch)
     try:
-        assert tour(f"http://localhost:{s.port}/", width, height, phone, shots) == []
+        problems = tour(f"http://localhost:{s.port}/", width, height, phone, shots)
+        assert not problems, "\n".join(problems)
     finally:
         s.close()

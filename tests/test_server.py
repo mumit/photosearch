@@ -1,9 +1,9 @@
 """The web server on this Mac: every view's API answers, and only this page can read or write."""
-import json, socket
+import json, re, socket
 
 import pytest
 
-import ps
+from photosearch import albums, config, dupes
 from server import Server
 
 
@@ -18,7 +18,7 @@ def srv():
 def test_page_is_served_with_what_it_needs_to_know(srv):
     status, h, body = srv.get("/")
     assert status == 200 and h["content-type"].startswith("text/html")
-    server = json.loads(body.decode().split("const SERVER = ", 1)[1].split(";\n", 1)[0])
+    server = json.loads(body.decode().split("const SERVER = ", 1)[1].split(";</script>", 1)[0])
     assert server == dict(local=True, lan=None)
 
 
@@ -58,7 +58,7 @@ def test_unknowns_are_404(srv):
     assert srv.get("/api/person?name=Nobody")[0] == 404
     assert srv.get("/api/info?uuid=nope")[0] == 404
     assert srv.get("/nothing")[0] == 404
-    assert srv.get(f"/photo/nope.jpg")[0] == 404
+    assert srv.get("/photo/nope.jpg")[0] == 404
 
 
 def test_story_page_and_download(srv):
@@ -102,20 +102,20 @@ def test_writes_need_json(srv):
     for ctype in ("text/plain", "application/x-www-form-urlencoded", "multipart/form-data"):
         status, _, _ = srv.post("/api/album", '{"name":"x","q":"beach"}', headers={"Content-Type": ctype})
         assert status == 403
-    assert not (ps.ALBUMS).exists()
+    assert not (albums.ALBUMS).exists()
 
 
 def test_writes_from_other_origins_are_refused(srv):
     for origin in ("https://evil.example", "http://localhost:1", "null"):
         assert srv.post("/api/album", dict(name="x", q="beach"), headers={"Origin": origin})[0] == 403
-    assert not ps.ALBUMS.exists()
+    assert not albums.ALBUMS.exists()
     assert srv.post("/api/album", dict(name="x", q="beach"), headers={"Origin": f"http://localhost:{srv.port}"})[0] == 200
 
 
 def test_album_round_trip(srv, photos_app):
     a = srv.json("/api/album", dict(name="Dog", q="dog", n=4))
     assert a == dict(id="dog", n=4)
-    assert len(srv.json(f"/api/album?id=dog")["photos"]) == 4
+    assert len(srv.json("/api/album?id=dog")["photos"]) == 4
     assert srv.json("/api/album_photos", dict(id="dog")) == dict(added=4, total=4)
     assert srv.json("/api/album_delete", dict(id="dog")) == {}
     assert srv.json("/api/albums") == []
@@ -132,8 +132,8 @@ def test_dupes_round_trip(srv, lib, photos_app):
     key = page["groups"][0]["key"]
     srv.json("/api/dupes", dict(key=key, action="nope"))
     assert srv.json("/api/dupes")["total"] == page["total"] - 1
-    assert srv.json("/api/dupes_send", dict(level="same"))["album"] == ps.MAYBE_DELETE
-    assert photos_app.added and photos_app.added[0][0] == ps.MAYBE_DELETE
+    assert srv.json("/api/dupes_send", dict(level="same"))["album"] == dupes.MAYBE_DELETE
+    assert photos_app.added and photos_app.added[0][0] == dupes.MAYBE_DELETE
 
 
 def test_editing_a_story(srv, lib):
@@ -153,3 +153,36 @@ def test_icons_and_manifest(srv):
     for path in ("/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"):
         status, h, body = srv.get(path)
         assert status == 200 and body[:4] == b"\x89PNG"
+
+
+def test_the_pages_own_files(srv):
+    for path in ["/app.css"] + [f"/js/{f.name}" for f in (config.WEB / "js").glob("*.js")]:
+        status, h, body = srv.get(path)
+        assert status == 200 and body and h["content-type"].startswith(("text/css", "text/javascript")), path
+
+
+@pytest.mark.parametrize("path", ["/index.html", "/review.html", "/js/../index.html", "/js/x.js", "/web/app.css", "/js/", "/config.py"])
+def test_nothing_else_is_served(srv, path):
+    assert srv.get(path)[0] == 404
+
+
+def test_the_page_loads_every_script_once():
+    page = (config.WEB / "index.html").read_text()
+    scripts = re.findall(r'<script src="/js/([\w-]+\.js)"></script>', page)
+    assert sorted(scripts) == sorted(f.name for f in (config.WEB / "js").glob("*.js")) and len(set(scripts)) == len(scripts)
+
+
+def test_many_requests_at_once(srv, lib):
+    """A page loads its scripts and a grid of thumbnails in parallel; none may be turned away."""
+    import concurrent.futures, http.client
+
+    def get(i):
+        try:
+            c = http.client.HTTPConnection("127.0.0.1", srv.port, timeout=20)
+            c.request("GET", f"/thumb/{lib['beach0']}.jpg" if i % 2 else "/js/core.js", headers={"Host": f"localhost:{srv.port}"})
+            r = c.getresponse(); r.read(); c.close()
+            return r.status
+        except OSError as ex:
+            return type(ex).__name__
+    with concurrent.futures.ThreadPoolExecutor(100) as ex:
+        assert set(ex.map(get, range(100))) == {200}

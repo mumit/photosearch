@@ -1,6 +1,8 @@
 [project]
 name = "photosearch"
 version = "0.1.0"
+description = "Search an Apple Photos library by what's in the pictures, and play with it"
+readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
@@ -17,6 +19,14 @@ dependencies = [
     "umap-learn>=0.5.12",
 ]
 
+[project.scripts]
+photosearch = "photosearch.cli:main"
+photosearch-mcp = "photosearch.mcp_server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
@@ -25,5 +35,6 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["tests"]
 addopts = "-m 'not browser'"
 markers = ["browser: drives the web page in headless Chrome (slow; run with -m browser)"]

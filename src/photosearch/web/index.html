@@ -1,0 +1,274 @@
+<!doctype html>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Photosearch</title>
+<meta name="theme-color" content="#0f0e0c">
+<link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Photos">
+<link rel="stylesheet" href="/app.css">
+
+<header>
+  <a class="brand" href="#home"><i></i><span>photosearch</span></a>
+  <div id="omni">
+    <form id="f" autocomplete="off">
+      <svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <div id="fchips"></div>
+      <input id="q" placeholder="Search your photos…" enterkeyhint="search" aria-label="search">
+      <button type="button" class="ibtn" id="ftoggle" title="filters" aria-expanded="false"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg></button>
+      <button id="gobtn" title="search (↵)"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </form>
+    <div id="sugg" role="listbox"></div>
+    <div id="fpanel">
+      <label class="w">Who's in it <input id="fperson" placeholder="names, comma-separated" list="people"></label>
+      <label class="w">Where <input id="fplace" placeholder="a place, e.g. Lisbon" list="places"></label>
+      <label>After <input id="fafter" type="date"></label>
+      <label>Before <input id="fbefore" type="date"></label>
+      <label>Season <select id="fseason"><option value="">any</option><option>spring</option><option>summer</option><option>autumn</option><option>winter</option></select></label>
+      <label>Kind <select id="fkind"><option value="">photos & videos</option><option value="photo">photos</option><option value="video">videos</option></select></label>
+      <label class="w">Without <input id="fexclude" placeholder="e.g. selfies, screenshots"></label>
+      <div class="row"><label id="smartbox" hidden style="flex-direction:row;align-items:center;gap:6px;font-size:13px" title="Let Jev read filters out of your description">
+        <input type="checkbox" id="smart" checked> ✨ understand filters in my words</label><span class="sp"></span>
+        <button type="button" class="ghost tiny" id="fclear">Clear</button><button type="button" class="tiny" id="fapply">Apply</button></div>
+      <datalist id="people"></datalist><datalist id="places"></datalist>
+    </div>
+  </div>
+  <button class="ibtn" id="phonebtn" title="open on your phone or iPad" hidden><svg class="i" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg></button>
+  <nav id="tabs">
+    <a href="#home"><svg class="i" viewBox="0 0 24 24"><path d="M4 11l8-6.5 8 6.5v8.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
+    <a href="#world"><svg class="i" viewBox="0 0 24 24"><path d="M9 4.5 3.5 6.8v12.7L9 17.2l6 2.3 5.5-2.3V4.5L15 6.8z"/><path d="M9 4.5v12.7M15 6.8v12.7"/></svg><span>Map</span></a>
+    <a href="#galaxy"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M18.5 16.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg><span>Galaxy</span></a>
+    <a href="#time"><svg class="i" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"/><path d="M3 4v4h4"/><path d="M12 8v4.5l3 2"/></svg><span>Time</span></a>
+    <a href="#play"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="9" cy="9" r=".9" fill="currentColor"/><circle cx="15" cy="9" r=".9" fill="currentColor"/><circle cx="9" cy="15" r=".9" fill="currentColor"/><circle cx="15" cy="15" r=".9" fill="currentColor"/></svg><span>Play</span></a>
+    <a href="#stories"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M10 9.3v5.4l4.5-2.7z"/></svg><span>Stories</span></a>
+    <a href="#albums"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="7.5" width="13.5" height="13" rx="2.2"/><path d="M7 4.5h11a2.5 2.5 0 0 1 2.5 2.5v10"/><path d="M6.5 17l3.2-3.6 2.4 2.4 1.6-1.6 2.3 2.8"/></svg><span>Albums</span></a>
+  </nav>
+</header>
+
+<main>
+  <section id="home">
+    <div id="hero">
+      <div id="hslides"></div>
+      <div class="hshade"></div>
+      <div class="htext"><div class="kick" id="hkick">On this day</div><h1 id="hago">&nbsp;</h1><p id="hsub"></p></div>
+      <div class="hctl">
+        <button class="ibtn" id="hprev" title="the day before">‹</button>
+        <button class="ibtn" id="hnext" title="the day after">›</button>
+        <span class="status" id="hday" style="color:#ddd"></span><span class="sp"></span>
+        <div id="hdots"></div><span id="hcount"></span>
+      </div>
+    </div>
+    <div class="hsec" id="hmore" hidden><div class="shead"><h2 id="hmoreh">More from this day</h2><p id="hmorep"></p></div><div class="shelf" id="todayshelf"></div></div>
+    <div class="hsec"><div class="shead"><h2>Rediscover</h2><p>moments you may have forgotten</p><span class="sp"></span><button class="ghost tiny" id="shuffle">↻ Shuffle</button></div>
+      <div class="shelf" id="rediscover"></div></div>
+    <div class="hsec"><div class="shead"><h2>People</h2><p>everyone you've tagged in Photos</p></div><div class="shelf people" id="peopleshelf"></div></div>
+    <div class="hsec"><div class="shead"><h2>Trips</h2><p>found from where the photos were taken</p><span class="sp"></span><a href="#stories">All stories →</a></div>
+      <div class="shelf" id="tripshelf"></div></div>
+    <div class="hsec"><div class="shead"><h2>Ask your library</h2><p>describe a moment in your own words</p></div><div class="asks" id="asks"></div></div>
+    <div class="hsec"><div class="shead"><h2>Play with it</h2></div>
+      <div class="modes">
+        <a class="mode" href="#world" style="--art:radial-gradient(circle at 75% 25%, #2e9b8a, transparent 55%), linear-gradient(135deg, #12423d, #0a1c1a)"><span class="glyph">🗺️</span><b>Map</b><span>Everywhere you've been, each place by its best photo</span></a>
+        <a class="mode" href="#frame" style="--art:radial-gradient(circle at 30% 30%, #6b5a3a, transparent 60%), linear-gradient(135deg, #2b241a, #0d0b08)"><span class="glyph">🖼️</span><b>Photo frame</b><span>Turn a spare screen into a slow, endless slideshow</span></a>
+        <a class="mode" href="#galaxy" style="--art:radial-gradient(circle at 70% 30%, #6d4bd8, transparent 55%), radial-gradient(circle at 20% 80%, #1f8fd6, transparent 50%), #0b0b18"><span class="glyph">✦</span><b>Galaxy</b><span>Every photo on one map, look-alikes side by side</span></a>
+        <a class="mode" href="#time" style="--art:linear-gradient(135deg, #b4541f, #3d1d0d)"><span class="glyph">⏳</span><b>Time Machine</b><span>One thing, every year: watch it change</span></a>
+        <a class="mode" href="#play" style="--art:linear-gradient(135deg, #1e7d5a, #0d2c22)"><span class="glyph">🎲</span><b>Games</b><span>Guess the year, the place, or which came first</span></a>
+        <a class="mode" href="#math" style="--art:linear-gradient(135deg, #a8326e, #2c0d1f)"><span class="glyph">∑</span><b>Photo Math</b><span>This photo + snow − summer = ?</span></a>
+      </div></div>
+    <div class="hsec" id="calbox"><div class="shead"><h2>Day by day</h2><p id="calp"></p><span class="sp"></span>
+      <button class="ibtn" id="calprev" title="the year before">‹</button><b id="caly" class="caly"></b><button class="ibtn" id="calnext" title="the year after">›</button></div>
+      <div id="cal"></div><div id="caltip" hidden></div></div>
+    <div class="hsec"><div class="shead"><h2>Your years</h2><p>each one as a story</p></div><div class="shelf" id="yearshelf"></div></div>
+    <footer id="hfoot"></footer>
+  </section>
+
+  <section id="search">
+    <div id="rchips"></div>
+    <div id="rhead"><div><h1 id="rtitle"></h1><div class="meta" id="status"></div></div>
+      <div class="acts" id="racts"></div></div>
+    <div id="grid"></div>
+    <div id="more"></div>
+  </section>
+
+  <section id="world" class="full">
+    <div id="wmap"></div>
+    <div id="wbar"><span class="pill" id="wstatus"></span></div>
+    <div id="wregions"></div>
+    <aside id="wsheet"><div id="wsh"></div><div id="wgrid"></div></aside>
+  </section>
+
+  <section id="galaxy" class="full">
+    <canvas id="gcanvas"></canvas>
+    <div id="gbar">
+      <button class="ghost tiny" id="glit" hidden><span id="glitq"></span> ✕</button>
+      <div id="glegend"><span id="gy0"></span><i id="ggrad"></i><span id="gy1"></span></div>
+    </div>
+    <div id="gtip"></div>
+    <div id="gbig"></div>
+    <div id="gtools">
+      <button class="ibtn" id="gplay" title="watch the library grow, a year at a time">▶</button>
+      <input type="range" id="gyr" min="2000" max="2026" value="2026" aria-label="photos up to this year"><b id="gyl">All years</b>
+      <span class="sp"></span><div id="gppl" title="light up everyone's photos"></div>
+    </div>
+    <div id="gstatus">scroll to zoom · drag to pan · click a photo</div>
+  </section>
+
+  <section id="time" class="full">
+    <div id="stage"><div class="hb" id="tbg"></div><img id="timg" class="tl" alt=""><img id="timg2" class="tl" alt=""></div>
+    <div id="tyear"></div><div id="tmeta"></div>
+    <div id="tq-head"><h2 id="tq"></h2><button class="ghost tiny" id="twho">👤 Anyone</button><span class="status" id="tstatus" style="color:#bbb"></span><span class="sp"></span>
+      <div class="seg dark" id="tspeed"><button data-v="slow" class="on">Slow</button><button data-v="flip">Flipbook</button></div>
+      <button class="ghost tiny" id="tplay">▶ Play</button></div>
+    <div id="twhop" hidden></div>
+    <div id="strip"></div>
+    <div id="tempty">
+      <div class="kick">Time Machine</div>
+      <h1>Pick something that happens every year.</h1>
+      <p>The best match from each year, one after another. Type your own in the search box, or try one of these:</p>
+      <div class="asks" id="tchips"></div>
+      <p style="margin-top:10px">Or follow one person through the years:</p>
+      <div class="tpeople" id="tpeople"></div>
+    </div>
+  </section>
+
+  <section id="play"><div class="pad" id="playroot"></div></section>
+
+  <section id="math"><div class="pad">
+    <div class="kick">Photo Math</div>
+    <h1>Add and take away ideas</h1>
+    <p class="status" id="mstatus" style="margin:0 0 18px"></p>
+    <form id="mf">
+      <div id="mathbase"></div>
+      <span class="op">+</span><input id="mplus" placeholder="add… e.g. snow" style="flex:1 1 160px">
+      <span class="op">−</span><input id="mminus" placeholder="take away… e.g. summer" style="flex:1 1 160px">
+      <label title="how hard to push">×<input id="mw" type="range" min="0" max="3" step="0.1" value="1"> <span id="mwv">1.0</span></label>
+      <button>= Compute</button>
+    </form>
+    <div id="mchips"></div>
+    <div id="mgrid"></div>
+  </div></section>
+
+  <section id="person"><div id="pv"></div></section>
+
+  <section id="albums"><div class="pad">
+    <div class="kick">Albums</div>
+    <h1>Albums that fill themselves</h1>
+    <p class="lede">Save any search as an album, and new photos that match join it on their own. Take a wrong one out and it learns
+      what you meant. Copy one into the Photos app whenever you like; only Photosearch's own albums are touched, and only by adding.</p>
+    <div class="pgrid" id="albumgrid" style="margin-top:22px"></div>
+    <h2 class="sec">Tidy up</h2>
+    <a class="tidy" href="#cleanup"><div class="tart" id="tidyart"></div><div><b>Near-duplicates</b><span id="tidyn">bursts and copies of the same moment</span>
+      <small>Keep the sharpest of each; the rest go to an album in Photos for you to look through. Nothing is deleted here.</small></div></a>
+  </div></section>
+
+  <section id="album"><div class="pad" id="alb">
+    <div class="edtop"><a href="#albums">← Albums</a><span class="status" id="albstatus"></span><span class="sp"></span>
+      <button class="ghost" id="albshow">▶ Slideshow</button><button class="ghost" id="albphotos" hidden>Copy to Photos</button>
+      <button id="albsave">Create album</button></div>
+    <input id="albname" placeholder="Album name" maxlength="80">
+    <div class="albdef"><input id="albq" placeholder="What's in it… e.g. kids at the beach"><span id="albchips"></span></div>
+    <div class="albcut" id="albcut"><span>Fewer, closest matches</span><input type="range" id="albn" min="1" max="400" value="60"><span>More</span>
+      <b id="albcount"></b><span class="status" id="albtaught"></span></div>
+    <p class="status albhelp">✕ takes a photo out and teaches the album to find fewer like it · ☆ keeps one in for good. New photos join when they match as well as these.</p>
+    <div id="albgrid"></div>
+    <div id="albmiss" hidden><h2 class="sec">Just missed</h2><p class="status">Not in the album. ＋ puts one in for good, which also teaches it.</p><div id="albmissgrid"></div></div>
+    <p style="margin-top:28px"><button class="ghost tiny" id="albdel">Delete album</button></p>
+  </div></section>
+
+  <section id="cleanup"><div class="pad">
+    <div class="edtop"><a href="#albums">← Albums</a></div>
+    <div class="kick">Tidy up</div>
+    <h1>Near-duplicates</h1>
+    <p class="lede">Bursts and copies of the same moment. Photosearch suggests keeping the sharpest of each group; tap another photo to keep
+      that one instead. The rest can go to an album in Photos, <b>Photosearch · maybe delete</b>, to look through and delete there.
+      Nothing is ever deleted from here.</p>
+    <div class="cltop"><div class="seg" id="cllevel"><button data-l="same">Near-identical</button><button data-l="similar">Also similar shots</button></div>
+      <span class="status" id="clstats"></span><span class="sp"></span><button id="clsend" hidden></button></div>
+    <p class="status" id="clphone" hidden>Sending to Photos works from the Mac.</p>
+    <div id="clgroups"></div><div id="clmore" class="morebar"></div>
+  </div></section>
+
+  <section id="stories"><div class="pad">
+    <div class="kick">Stories</div>
+    <h1>Trips and years, told in photos</h1>
+    <p class="lede">Each one plays as a slideshow of its best, most varied moments. Trips are found from where photos were taken
+      (a run of days 75+ km from home). Without a story yet, one is made automatically the first time you play it. For a nicer one,
+      ask Claude: <i>“make a story of our Lisbon trip”</i>. It picks the photos and writes the chapters and captions.</p>
+    <h2 class="sec">Trips</h2><div class="pgrid" id="trips"></div>
+    <h2 class="sec">Years</h2><div class="pgrid" id="years"></div>
+  </div></section>
+
+  <section id="edit"><div class="pad" id="ed">
+    <div class="edtop">
+      <a href="#stories">← Stories</a><span class="status" id="edstatus"></span><span class="sp"></span>
+      <button class="ghost" id="edundo" disabled title="undo (⌘Z)">↶ Undo</button>
+      <a class="btn" id="edplay" target="_blank">▶ Play</a>
+    </div>
+    <input id="edtitle" data-f="title" placeholder="Title">
+    <input id="edintro" data-f="intro" placeholder="A line under the title">
+    <div id="edchapters"></div>
+    <button class="ghost" id="edaddch">+ Chapter</button>
+    <input id="edoutro" data-f="outro" placeholder="Last words, on the ending card" style="margin-top:16px">
+    <p class="status">Changes save as you go. Drag photos to reorder them or move them between chapters (or use ← →).
+      ↻ swaps a photo for a similar one from the same days. On a touch screen, press and hold a photo to drag it.</p>
+  </div>
+  <aside id="edpick">
+    <div class="edtop" style="margin:0"><b id="pickt"></b><span class="sp"></span><button class="ibtn" id="pickclose">✕</button></div>
+    <form id="pickf"><input id="pickq" placeholder="search these days… e.g. tacos"><button>Find</button></form>
+    <div class="status" id="pickstatus"></div>
+    <div id="pickgrid"></div>
+  </aside></section>
+</main>
+
+<div id="frame">
+  <div id="fslides"></div><div class="fshade"></div>
+  <div id="fmeta"><div id="fdate"></div><div id="fplace"></div></div>
+  <div id="fclockbox"><div id="fclock"></div><div id="fday"></div></div>
+  <div id="fpick" hidden></div>
+  <div id="fctl"><b id="ftitle"></b><span id="fpos"></span><button class="ghost tiny" id="fsrc">⚙ What to show</button><span class="sp"></span>
+    <button class="ibtn" id="fprev" title="previous (←)">‹</button><button class="ibtn" id="fpp" title="pause (space)">❚❚</button>
+    <button class="ibtn" id="fnext" title="next (→)">›</button><button class="ibtn" id="finfo" title="open this photo">ⓘ</button>
+    <button class="ibtn" id="fclose" title="close (Esc)">✕</button></div>
+</div>
+
+<div id="phone" hidden><div class="kbox"><button class="ibtn" id="phonex" title="close">✕</button><div id="phonebody"></div></div></div>
+
+<div id="keys" hidden><div class="kbox"><h2>Shortcuts</h2>
+  <dl><dt>/ or ⌘K</dt><dd>search, from anywhere</dd><dt>↑ ↓ ↵</dt><dd>pick a suggestion</dd><dt>← →</dt><dd>previous / next photo, year or slide</dd>
+  <dt>Space</dt><dd>play / pause (Time Machine, slideshows)</dd><dt>Esc</dt><dd>close</dd><dt>?</dt><dd>this list</dd></dl>
+  <p class="status">On a phone: swipe sideways in a big photo to browse, down to close. In the story editor, press and hold a photo to drag it.</p></div></div>
+
+<div id="lb">
+  <div id="lbbg"></div>
+  <div id="lbstage"><img id="lbimg" alt=""></div>
+  <div id="lbinfo">
+    <div><div class="d" id="lbdate"></div><div class="p" id="lbplace"></div></div>
+    <div id="lbppl"></div>
+    <div id="lbacts">
+      <button id="lbshow" title="play these as a slideshow">▶ Slideshow</button>
+      <button id="lbday" title="this day in other years">📅 This day</button>
+      <button id="lbmath" title="use in Photo Math">∑ Math</button>
+      <button id="lbopen" title="show it in the Photos app">Open in Photos</button>
+    </div>
+  </div>
+  <button class="ibtn" id="lbclose" title="close (Esc)">✕</button>
+  <button class="ibtn lbnav" id="lbprev" title="previous (←)">‹</button>
+  <button class="ibtn lbnav" id="lbnext" title="next (→)">›</button>
+  <div id="lbwander">
+    <div class="lw"><div class="lwt" id="lbmode"><button data-w="like">✦ Looks like this</button><button data-w="day">📅 Same day</button></div><div id="lbtrail"></div><span class="sp"></span><span id="lbpos"></span></div>
+    <div id="lbsims"></div>
+  </div>
+</div>
+
+<script>const SERVER = /*SERVER*/{};</script>
+<script src="/js/core.js"></script>
+<script src="/js/search.js"></script>
+<script src="/js/home.js"></script>
+<script src="/js/stories.js"></script>
+<script src="/js/galaxy.js"></script>
+<script src="/js/time.js"></script>
+<script src="/js/play.js"></script>
+<script src="/js/map.js"></script>
+<script src="/js/frame.js"></script>
+<script src="/js/people.js"></script>
+<script src="/js/phone.js"></script>
+<script src="/js/albums.js"></script>
+<script>renderChips(); route();</script>

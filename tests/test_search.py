@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-import ps
+from photosearch import explore, people, places, search, store, stories
 
 
 def names(lib, results):
@@ -11,19 +11,19 @@ def names(lib, results):
 
 
 def test_search_finds_what_the_words_describe(lib, con):
-    top = names(lib, ps.search(con, "dog playing", 9))
+    top = names(lib, search.search(con, "dog playing", 9))
     assert sorted(top) == sorted([f"dog{i}" for i in range(8)] + ["video"])  # the video is of the dog too
 
 
 def test_exclude_pushes_matches_away(lib, con):
-    both = names(lib, ps.search(con, "beach dog", 10))
-    without = names(lib, ps.search(con, "beach dog", 10, exclude="dog"))
+    both = names(lib, search.search(con, "beach dog", 10))
+    without = names(lib, search.search(con, "beach dog", 10, exclude="dog"))
     assert any(n.startswith("dog") for n in both[:10])
     assert not any(n.startswith("dog") for n in without[:8])
 
 
 def test_scores_come_best_first(con):
-    scores = [r["score"] for r in ps.search(con, "snow", 20)]
+    scores = [r["score"] for r in search.search(con, "snow", 20)]
     assert scores == sorted(scores, reverse=True)
 
 
@@ -33,110 +33,110 @@ def test_scores_come_best_first(con):
     (dict(place="lisbon"), lambda p: "Lisbon" in p["place"]),
     (dict(after="2025-01-01", before="2025-06-01"), lambda p: "2025-01-01" <= p["date"] < "2025-06-01"),
     (dict(kind="video"), lambda p: p["kind"] == "video"),
-    (dict(months=ps.SEASONS["winter"]), lambda p: int(p["date"][5:7]) in (12, 1, 2)),
+    (dict(months=search.SEASONS["winter"]), lambda p: int(p["date"][5:7]) in (12, 1, 2)),
 ])
 def test_filters(con, filters, check):
-    res = ps.search(con, "a photo", 100, **filters)
+    res = search.search(con, "a photo", 100, **filters)
     assert res and all(check(p) for p in res)
 
 
 def test_similar_finds_its_own_kind_but_not_itself(lib, con):
-    res = names(lib, ps.similar(con, lib["cake0"], 4))
+    res = names(lib, search.similar(con, lib["cake0"], 4))
     assert sorted(res) == ["cake1", "cake2", "cake3", "cake4"]
 
 
 def test_similar_to_an_unknown_photo(con):
     with pytest.raises(LookupError):
-        ps.similar(con, "00000000-0000-0000-0000-000000000000")
+        search.similar(con, "00000000-0000-0000-0000-000000000000")
 
 
 def test_documents_are_boring(lib, con):
-    _, _, pos = ps.vectors(con)
-    s = ps.interest(con)
+    _, _, pos = store.vectors(con)
+    s = search.interest(con)
     assert s[pos[lib["receipt0"]]] < 0 < s[pos[lib["beach0"]]]
 
 
 def test_filters_only_gives_their_most_interesting(lib, con):
-    res = ps.best_of(con, 50, person=["Sam"])
+    res = search.best_of(con, 50, person=["Sam"])
     assert res and all("Sam" in p["persons"] for p in res)
     assert [p["score"] for p in res] == sorted((p["score"] for p in res), reverse=True)
 
 
 def test_photo_info_carries_shape(lib, con):
-    info = ps.photo_info(con, [lib["screen0"], lib["beach0"]])
+    info = store.photo_info(con, [lib["screen0"], lib["beach0"]])
     assert info[lib["screen0"]]["ar"] == pytest.approx(184 / 400, abs=0.01)
     assert info[lib["beach0"]]["ar"] == pytest.approx(4 / 3, abs=0.01)
 
 
 def test_timeline_one_per_year(con):
-    years = [y["year"] for y in ps.timeline(con, "birthday cake")]
+    years = [y["year"] for y in explore.timeline(con, "birthday cake")]
     assert years == sorted(set(years))
-    assert all(len(y["results"]) == 1 for y in ps.timeline(con, "birthday cake"))
+    assert all(len(y["results"]) == 1 for y in explore.timeline(con, "birthday cake"))
 
 
 def test_timeline_for_a_person(con):
-    for y in ps.timeline(con, "", 2, person="Alex"):
+    for y in explore.timeline(con, "", 2, person="Alex"):
         assert all("Alex" in p["persons"] for p in y["results"])
 
 
 def test_photo_math_leaves_out_the_base(lib, con):
-    res = ps.photo_math(con, lib["dog0"], plus="snow", minus="dog", k=5)
+    res = explore.photo_math(con, lib["dog0"], plus="snow", minus="dog", k=5)
     assert lib["dog0"] not in {r["uuid"] for r in res}
     assert names(lib, res)[0].startswith(("snow", "alike"))
 
 
 def test_overview(con):
-    o = ps.overview(con)
+    o = explore.overview(con)
     assert dict(o["people"])["Sam"] > 0 and dict(o["places"])["Lisbon"] == 22
 
 
 def test_people_and_person(lib, con):
-    who = {p["name"]: p for p in ps.people(con)}
+    who = {p["name"]: p for p in people.people(con)}
     assert set(who) == {"Sam", "Alex"}
     assert who["Sam"]["cover"] == lib["portrait"]  # the close-up of Sam alone
-    sam = ps.person(con, "Sam")
+    sam = people.person(con, "Sam")
     assert sam["portrait"] == lib["portrait"] and dict(sam["together"])["Alex"] > 0
     with pytest.raises(LookupError):
-        ps.person(con, "Nobody")
+        people.person(con, "Nobody")
 
 
 def test_trips_find_the_week_away(con):
-    t = ps.trips(con)
+    t = places.trips(con)
     assert [(x["id"], x["name"], x["photos"]) for x in t] == [("trip-2025-03-10", "Lisbon", 22)]
 
 
 def test_world_regions(con):
-    w = ps.world(con)
+    w = places.world(con)
     assert {r["name"] for r in w["regions"]} >= {"Portland", "Lisbon", "Cannon Beach"}
     assert sum(c["n"] for c in w["cells"]) == con.execute("select count(*) from photos where lat is not null").fetchone()[0]
 
 
 def test_near(lib, con):
-    r = ps.near(con, 38.72, -9.14, radius_km=5)
+    r = places.near(con, 38.72, -9.14, radius_km=5)
     assert r["n"] == 22 and all(p["place"].startswith("Lisbon") for p in r["photos"])
 
 
 def test_days_calendar(lib, con):
-    d = ps.days(con, 2025)
+    d = explore.days(con, 2025)
     assert d["year"] == 2025 and {x["d"] for x in d["days"]} >= {"2025-03-10", "2025-03-14"}
     assert sum(x["n"] for x in d["days"] if x["d"].startswith("2025-03")) == 22
 
 
 def test_on_this_day(con):
-    r = ps.on_this_day(con, "03-12")
+    r = explore.on_this_day(con, "03-12")
     assert r["years"][0]["year"] == 2025 and r["years"][0]["trip"]["name"] == "Lisbon"
     with pytest.raises(LookupError):
-        ps.on_this_day(con, "13-45")
+        explore.on_this_day(con, "13-45")
 
 
 def test_highlights_skip_documents(lib, con):
-    picked = {p["uuid"] for p in ps.highlights(con, "2023-01-01", "2024-12-31", 60)}
+    picked = {p["uuid"] for p in stories.highlights(con, "2023-01-01", "2024-12-31", 60)}
     assert picked and not picked & {lib["receipt0"], lib["receipt1"], lib["receiptcopy0"], lib["receiptcopy1"]}
 
 
 def test_game_round(con):
     for mode in ("year", "place"):
-        g = ps.game_round(con, mode)
+        g = explore.game_round(con, mode)
         assert g["first"] <= int(g["date"][:4]) <= g["last"]
         if mode == "place":
             assert g["lat"] is not None
@@ -147,6 +147,6 @@ def test_dated_leaves_out_shared_timestamps(con):
     rows = [(f"FA{n:06X}-0000-0000-0000-000000000000", "2002-01-01T00:00:00", "photo", "", "", "[]", "[]", "[]", "",
              con.execute("select vec from photos limit 1").fetchone()[0], None, None, "{}") for n in range(50)]
     con.executemany("insert into photos values(?,?,?,?,?,?,?,?,?,?,?,?,?)", rows); con.commit()
-    assert 2002 not in {y["year"] for y in ps.timeline(con, "a photo")}
-    assert ps.photo_info(con, [rows[0][0]])[rows[0][0]]["undated"] is True
-    assert json.loads(json.dumps(ps.stories(con)))  # still renders
+    assert 2002 not in {y["year"] for y in explore.timeline(con, "a photo")}
+    assert store.photo_info(con, [rows[0][0]])[rows[0][0]]["undated"] is True
+    assert json.loads(json.dumps(stories.stories(con)))  # still renders

@@ -1,67 +1,67 @@
 """`serve --lan`: phones and tablets on the home Wi-Fi get in with the family passcode, and only then.
 
 The HTTP tests connect through this Mac's own Wi-Fi address, so the server sees a device that isn't this Mac."""
-import json, os, stat
+import json, os, stat, time
 
 import pytest
 
-import ps
+from photosearch import albums, lan
 from server import Server
 
-IP = ps.lan_ip()
+IP = lan.lan_ip()
 needs_wifi = pytest.mark.skipif(IP.startswith("127."), reason="not on a network")
 
 
 # ---------------------------------------------------------------- the passcode
 
 @pytest.fixture
-def lan():
-    return ps.LanAccess(8765)
+def access():
+    return lan.LanAccess(8765)
 
 
-def test_passcode_looks_like_words_and_a_number(lan):
-    a, b, n = lan.st["passcode"].split("-")
-    assert a in ps.WORDS and b in ps.WORDS and 10 <= int(n) <= 99
+def test_passcode_looks_like_words_and_a_number(access):
+    a, b, n = access.st["passcode"].split("-")
+    assert a in lan.WORDS and b in lan.WORDS and 10 <= int(n) <= 99
 
 
-def test_passcode_file_is_private(lan):
-    assert stat.S_IMODE(os.stat(ps.LAN_FILE).st_mode) == 0o600
+def test_passcode_file_is_private(access):
+    assert stat.S_IMODE(os.stat(lan.LAN_FILE).st_mode) == 0o600
 
 
-def test_typing_is_forgiving(lan):
-    a, b, n = lan.st["passcode"].split("-")
-    assert lan.sign_in("1.2.3.4", f"  {a.title()} {b.upper()}  {n} ")
+def test_typing_is_forgiving(access):
+    a, b, n = access.st["passcode"].split("-")
+    assert access.sign_in("1.2.3.4", f"  {a.title()} {b.upper()}  {n} ")
 
 
-def test_sessions(lan):
-    token = lan.sign_in("1.2.3.4", lan.st["passcode"])
-    assert lan.signed_in(f"theme=dark; ps_session={token}")
-    assert not lan.signed_in(f"ps_session={token}x") and not lan.signed_in("ps_session=") and not lan.signed_in(None)
-    assert ps.LanAccess(8765).signed_in(f"ps_session={token}")  # kept across restarts
-    assert not ps.LanAccess(8765, new=True).signed_in(f"ps_session={token}")  # --new-passcode signs everyone out
+def test_sessions(access):
+    token = access.sign_in("1.2.3.4", access.st["passcode"])
+    assert access.signed_in(f"theme=dark; ps_session={token}")
+    assert not access.signed_in(f"ps_session={token}x") and not access.signed_in("ps_session=") and not access.signed_in(None)
+    assert lan.LanAccess(8765).signed_in(f"ps_session={token}")  # kept across restarts
+    assert not lan.LanAccess(8765, new=True).signed_in(f"ps_session={token}")  # --new-passcode signs everyone out
 
 
-def test_wrong_guesses_lock_that_device_out_for_longer_each_time(lan, monkeypatch):
+def test_wrong_guesses_lock_that_device_out_for_longer_each_time(access, monkeypatch):
     now = [1000.0]
-    monkeypatch.setattr(ps.time, "time", lambda: now[0])
+    monkeypatch.setattr(time, "time", lambda: now[0])
     for _ in range(4):
         with pytest.raises(PermissionError, match="not it"):
-            lan.sign_in("1.2.3.4", "wrong")
-    lan.sign_in("5.6.7.8", lan.st["passcode"])  # four wrong is fine
+            access.sign_in("1.2.3.4", "wrong")
+    access.sign_in("5.6.7.8", access.st["passcode"])  # four wrong is fine
     with pytest.raises(PermissionError, match="not it"):
-        lan.sign_in("1.2.3.4", "wrong")
+        access.sign_in("1.2.3.4", "wrong")
     with pytest.raises(PermissionError, match="too many"):
-        lan.sign_in("1.2.3.4", lan.st["passcode"])  # locked out, even with the right one
-    assert lan.sign_in("5.6.7.8", lan.st["passcode"])  # another device isn't
+        access.sign_in("1.2.3.4", access.st["passcode"])  # locked out, even with the right one
+    assert access.sign_in("5.6.7.8", access.st["passcode"])  # another device isn't
     now[0] += 61
     with pytest.raises(PermissionError, match="not it"):
-        lan.sign_in("1.2.3.4", "wrong")  # the sixth: two minutes
+        access.sign_in("1.2.3.4", "wrong")  # the sixth: two minutes
     now[0] += 61
     with pytest.raises(PermissionError, match="too many"):
-        lan.sign_in("1.2.3.4", lan.st["passcode"])
+        access.sign_in("1.2.3.4", access.st["passcode"])
     now[0] += 60
-    assert lan.sign_in("1.2.3.4", lan.st["passcode"])
-    assert "1.2.3.4" not in lan.fails  # and a success forgives
+    assert access.sign_in("1.2.3.4", access.st["passcode"])
+    assert "1.2.3.4" not in access.fails  # and a success forgives
 
 
 # ---------------------------------------------------------------- over the network
@@ -70,7 +70,7 @@ def test_wrong_guesses_lock_that_device_out_for_longer_each_time(lan, monkeypatc
 def srv():
     with pytest.MonkeyPatch.context() as mp:
         s = Server(mp, lan=True)
-        s.passcode = json.loads(ps.LAN_FILE.read_text())["passcode"]
+        s.passcode = json.loads(lan.LAN_FILE.read_text())["passcode"]
         yield s
         s.close()
 
@@ -95,7 +95,7 @@ def test_a_new_device_sees_only_the_sign_in_page(srv):
     for path in ("/api/search?q=beach", "/api/people", "/thumb/x.jpg", "/photo/x.jpg"):
         assert phone(srv, "GET", path)[0] == 401, path
     assert phone(srv, "POST", "/api/album", dict(name="x", q="beach"))[0] == 401
-    assert not ps.ALBUMS.exists()
+    assert not albums.ALBUMS.exists()
 
 
 @needs_wifi
@@ -115,7 +115,7 @@ def test_signing_in_sets_a_strict_cookie(srv):
 @needs_wifi
 def test_signed_in_devices_can_browse_but_not_see_the_passcode(srv, cookie, lib):
     status, _, body = phone(srv, "GET", "/", cookie=cookie)
-    server = json.loads(body.decode().split("const SERVER = ", 1)[1].split(";\n", 1)[0])
+    server = json.loads(body.decode().split("const SERVER = ", 1)[1].split(";</script>", 1)[0])
     assert not server["local"] and not server["lan"] and srv.passcode.encode() not in body
     status, _, body = phone(srv, "GET", "/api/search?q=beach", cookie=cookie)
     assert status == 200 and json.loads(body)["results"]
@@ -139,7 +139,7 @@ def test_a_made_up_cookie_doesnt_work(srv):
 @needs_wifi
 def test_the_mac_itself_needs_no_passcode_and_is_shown_it(srv):
     status, _, body = srv.get("/")
-    server = json.loads(body.decode().split("const SERVER = ", 1)[1].split(";\n", 1)[0])
+    server = json.loads(body.decode().split("const SERVER = ", 1)[1].split(";</script>", 1)[0])
     assert server["local"] and server["lan"] == dict(url=f"http://{IP}:{srv.port}", code=srv.passcode)
 
 
@@ -159,7 +159,7 @@ def test_other_names_for_this_mac_are_refused(srv):
 def test_lockout_over_http(monkeypatch):
     s = Server(monkeypatch, lan=True)
     try:
-        code = json.loads(ps.LAN_FILE.read_text())["passcode"]
+        code = json.loads(lan.LAN_FILE.read_text())["passcode"]
         for _ in range(5):
             assert phone(s, "POST", "/login", dict(code="wrong"))[0] == 403
         status, _, body = phone(s, "POST", "/login", dict(code=code))

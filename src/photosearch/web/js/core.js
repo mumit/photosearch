@@ -1,0 +1,196 @@
+// Helpers every view uses, routing (#mode/argument), photo tiles in justified rows, and the lightbox.
+// Plain scripts sharing one global scope, loaded in order by index.html; no build step.
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const api = async (path, params = {}) => {
+  const res = await fetch(path + "?" + new URLSearchParams(params));
+  if (res.status === 401) { location.replace("/login"); throw new Error("sign in first"); }
+  const r = await res.json();
+  if (r.error) throw new Error(r.error);
+  return r;
+};
+const post = async (path, body) => {
+  const r = await (await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })).json();
+  if (r.error) throw new Error(r.error);
+  return r.results;
+};
+// A photo kept only in iCloud has a tiny local preview. Shown big, ask the server to fetch its full-size copy
+// (~1 s, or longer when iCloud is slow) and swap that in, unless the view has moved on to another photo by then.
+async function sharpen(img, uuid) {
+  const still = () => img.isConnected && img.src.includes(uuid);
+  try {
+    let st = (await post("/api/sharp", { uuids: [uuid] }))[uuid];
+    if (st !== "fetching") return;
+    for (let i = 0; i < 40 && st === "fetching" && still(); i++) {
+      await new Promise(ok => setTimeout(ok, 1500));
+      st = (await api("/api/sharp", { uuids: uuid })).results[uuid];
+    }
+    if (st === "sharp" && still()) img.src = `/photo/${uuid}.jpg?sharp`;
+  } catch {}  // the preview stays: fine
+}
+const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+const once = fn => { let p; return () => p ??= fn().catch(e => { p = null; throw e; }); };
+const short = place => (place || "").split(",")[0];
+const longDate = (d, opt = { weekday:"long", month:"long", day:"numeric", year:"numeric" }) => {
+  const [y, m, day] = d.split("-").map(Number); return new Date(y, m - 1, day).toLocaleDateString(undefined, opt);
+};
+const ago = n => !n ? "Earlier this year" : n === 1 ? "A year ago" : `${n} years ago`;
+// the header's height, for the full-screen modes to fit under it
+new ResizeObserver(([e]) => document.documentElement.style.setProperty("--hh", e.target.offsetHeight + "px")).observe(document.querySelector("header"));
+
+/* ---------- routing: #mode or #mode/argument, so back and forward work everywhere ---------- */
+const views = {}, leave = {};
+let tab = null;
+function route() {
+  const h = location.hash.slice(1) || "home", k = h.indexOf("/");
+  const next = k < 0 ? h : h.slice(0, k), arg = k < 0 ? "" : h.slice(k + 1);
+  lbOff(); closeSugg(); closePanel();
+  if (tab && tab !== next) leave[tab]?.();
+  tab = views[next] ? next : "home";
+  document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.hash === "#" + ({ edit: "stories", math: "play", person: "home", album: "albums", cleanup: "albums" }[tab] || tab)));
+  document.querySelectorAll("main section").forEach(s => s.classList.toggle("on", s.id === tab));
+  $("q").placeholder = PLACEHOLDER[tab] || PLACEHOLDER.home;
+  if (!["search", "galaxy", "time"].includes(tab)) $("q").value = "";
+  if (tab !== "frame") { frameOff(); lastHash = "#" + h; }
+  $("omni").classList.toggle("bare", tab === "galaxy" || tab === "time");
+  if (tab !== "search" && FIELDS.some(k => F[k])) { for (const k of FIELDS) F[k] = ""; AUTO = new Set(); renderChips(); }  // chips describe the results on show
+  views[tab](arg);
+}
+// modes cross-fade where the browser can (the header stays put); the photo views need no help
+addEventListener("hashchange", () => document.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches
+  ? document.startViewTransition(route) : route());
+const go = h => { if (location.hash !== "#" + h) location.hash = h; else route(); };
+const PLACEHOLDER = { home: "Search your photos… e.g. “kids in the snow”", galaxy: "Light up the galaxy… e.g. beach",
+                      time: "Something that happens every year… e.g. birthday cake" };
+addEventListener("keydown", e => {  // "?": the shortcuts
+  if (e.key === "?" && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) $("keys").hidden = !$("keys").hidden;
+  else if (e.key === "Escape") $("keys").hidden = true;
+});
+$("keys").onclick = () => { $("keys").hidden = true; };
+addEventListener("keydown", e => {  // "/" or ⌘K: to the search box from anywhere
+  if ((e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) || ((e.metaKey || e.ctrlKey) && e.key === "k")) {
+    e.preventDefault(); lbOff(); $("q").focus(); $("q").select();
+  }
+});
+
+/* ---------- photo tiles ---------- */
+const clampAr = ar => Math.min(2.4, Math.max(0.55, ar || 1));
+const loaded = "this.classList.add('ok')";
+function tileHTML(x, i, { badge, caption = true } = {}) {
+  return `<figure class="tile" data-i="${i}" style="--ar:${clampAr(x.ar)}">
+    <img loading="lazy" src="/thumb/${x.uuid}.jpg" alt="" onload="${loaded}">
+    ${badge ? `<b class="badge">${esc(badge)}</b>` : ""}${x.kind === "video" ? `<span class="vid">▶ video</span>` : ""}
+    ${caption ? `<figcaption><span>${x.undated ? "date unknown" : longDate(x.date, { month:"short", day:"numeric", year:"numeric" })}</span><span>${esc(short(x.place))}</span></figcaption>` : ""}
+  </figure>`;
+}
+// Justified rows, like a photo book: each row fills the width and every photo keeps its shape.
+const innerW = el => { const c = getComputedStyle(el); return el.clientWidth - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight); };
+function justify(el, items, base = 0) {
+  const W = innerW(el), gap = 6, h = Math.max(110, Math.min(230, W / 2.8));
+  if (!W) return "";
+  let html = "", row = [], sum = 0;
+  const flush = last => {
+    if (!row.length) return;
+    const rh = Math.min((W - gap * (row.length - 1)) / sum, last ? h * 1.1 : Infinity);
+    const fill = !last || rh < h * 1.1;
+    html += `<div class="jrow" style="height:${rh.toFixed(1)}px">` + row.map(([x, i]) =>
+      tileHTML(x, i).replace('style="', `style="flex:${fill ? clampAr(x.ar) + " 1 0" : "none"};width:${(clampAr(x.ar) * rh).toFixed(1)}px;`)).join("") + "</div>";
+    row = []; sum = 0;
+  };
+  items.forEach((x, i) => {
+    row.push([x, base + i]); sum += clampAr(x.ar);
+    if (sum * h + gap * (row.length - 1) >= W) flush(false);
+  });
+  flush(true);
+  return html;
+}
+// A grid of photos: clicking one opens it big, and the layout redoes itself when the width changes.
+function bindGrid(el, results, render = () => justify(el, results)) {
+  el._render = render; el.innerHTML = render();
+  el.onclick = e => { const t = e.target.closest(".tile"); if (t) lightbox(el._list || results, +t.dataset.i); };
+  if (!el._ro) { let w = el.clientWidth; el._ro = new ResizeObserver(() => { if (el.clientWidth !== w) { w = el.clientWidth; el.innerHTML = el._render(); } }); el._ro.observe(el); }
+}
+function bindShelf(el, list, badge) {
+  el.innerHTML = list.map((x, i) => tileHTML(x, i, { badge: badge?.(x) })).join("");
+  el.onclick = e => { const t = e.target.closest(".tile"); if (t) lightbox(list, +t.dataset.i); };
+}
+const skeleton = (n, w = 1.3) => Array.from({ length: n }, () => `<div class="tile skel" style="aspect-ratio:${w}"></div>`).join("");
+
+/* ---------- lightbox ---------- */
+const LB = { list: [], at: 0, trail: [], simsFor: null, timer: 0 };
+function lightbox(list, i, keepTrail = false) {
+  if (!keepTrail) LB.trail = [];
+  LB.list = list; LB.at = i;
+  const x = list[i];
+  $("lbimg").src = `/photo/${x.uuid}.jpg`; sharpen($("lbimg"), x.uuid);
+  $("lbbg").style.backgroundImage = `url(/thumb/${x.uuid}.jpg)`;
+  $("lbdate").textContent = x.undated ? "Date unknown" : longDate(x.date);
+  $("lbplace").innerHTML = x.place ? `<a data-place="${esc(short(x.place))}" title="more from here">${esc(x.place)}</a>` : "";
+  $("lbppl").innerHTML = (x.persons || []).map(p => `<a data-person="${esc(p)}" title="${esc(p)}'s page">${esc(p)}</a>`).join("");
+  $("lbday").hidden = !!x.undated;
+  $("lbprev").style.visibility = i > 0 ? "" : "hidden"; $("lbnext").style.visibility = i < list.length - 1 ? "" : "hidden";
+  $("lbpos").textContent = list.length > 1 ? `${i + 1} of ${list.length}` : "";
+  $("lbtrail").innerHTML = LB.trail.map((t, k) => `<img src="/thumb/${t.uuid}.jpg" data-k="${k}" title="back to here">`).join("");
+  $("lb").classList.add("on");
+  clearTimeout(LB.timer); LB.timer = setTimeout(() => loadSims(x), 220);  // not on every arrow press while flicking through
+}
+LB.mode = store.get("wander", "like");
+async function loadSims(x) {
+  const key = x.uuid + LB.mode;
+  document.querySelectorAll("#lbmode button").forEach(b => b.classList.toggle("on", b.dataset.w === LB.mode));
+  if (LB.simsFor === key) return;
+  LB.simsFor = key; $("lbsims").innerHTML = "";
+  if (LB.mode === "day" && x.undated) { $("lbsims").innerHTML = `<span class="status">no date on this one</span>`; return; }
+  try {
+    const q = LB.mode === "day" ? { after: x.date, before: nextDay(x.date), k: 60 } : { like: x.uuid, k: 16 };
+    let r = (await api("/api/search", q)).results;
+    if (LB.simsFor !== key) return;
+    r = r.filter(s => s.uuid !== x.uuid);
+    if (!r.length) { $("lbsims").innerHTML = `<span class="status">nothing else from that day</span>`; return; }
+    LB.sims = r;
+    $("lbsims").innerHTML = r.map((s, k) => `<img src="/thumb/${s.uuid}.jpg" data-k="${k}" style="width:${(76 * clampAr(s.ar)).toFixed(0)}px" alt="">`).join("");
+  } catch {}
+}
+function lbOff() { $("lb").classList.remove("on"); LB.simsFor = null; }
+$("lbclose").onclick = lbOff;
+$("lbmode").onclick = e => {
+  const w = e.target.dataset.w; if (!w || w === LB.mode) return;
+  LB.mode = w; store.set("wander", w); loadSims(LB.list[LB.at]);
+};
+$("lbprev").onclick = () => LB.at > 0 && lightbox(LB.list, LB.at - 1, true);
+$("lbnext").onclick = () => LB.at < LB.list.length - 1 && lightbox(LB.list, LB.at + 1, true);
+$("lbstage").onclick = e => { if (e.target.id === "lbstage") lbOff(); };
+$("lbsims").onclick = e => {  // wander: hop to a look-alike, leaving a trail back
+  const k = e.target.dataset.k; if (k == null) return;
+  LB.trail.push(LB.list[LB.at]); if (LB.trail.length > 12) LB.trail.shift();
+  lightbox(LB.sims, +k, true);
+};
+$("lbtrail").onclick = e => {
+  const k = e.target.dataset.k; if (k == null) return;
+  const back = LB.trail[k]; LB.trail = LB.trail.slice(0, +k);
+  lightbox([back], 0, true);
+};
+$("lbppl").onclick = e => { const p = e.target.dataset.person; if (p) go("person/" + encodeURIComponent(p)); };
+$("lbplace").onclick = e => { const p = e.target.dataset.place; if (p) searchFor("", only({ place: p })); };
+$("lbshow").onclick = () => openFrame({ list: LB.list, start: LB.at, title: tab === "search" ? $("rtitle").textContent : "" });
+$("lbday").onclick = () => go("home/" + LB.list[LB.at].date.slice(5));
+$("lbmath").onclick = () => { setMathBase(LB.list[LB.at]); go("math"); };
+$("lbopen").hidden = !SERVER.local;  // it opens Photos on the Mac's screen
+$("lbopen").onclick = () => fetch("/api/open?uuid=" + LB.list[LB.at].uuid);
+addEventListener("keydown", e => {
+  if (!$("lb").classList.contains("on")) return;
+  if (e.key === "Escape") lbOff();
+  if (e.key === "ArrowRight") $("lbnext").click();
+  if (e.key === "ArrowLeft") $("lbprev").click();
+});
+{ // swipe: sideways to browse, down to close
+  let p0 = null;
+  $("lbstage").addEventListener("pointerdown", e => { p0 = [e.clientX, e.clientY]; });
+  $("lbstage").addEventListener("pointerup", e => {
+    if (!p0) return; const dx = e.clientX - p0[0], dy = e.clientY - p0[1]; p0 = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) (dx < 0 ? $("lbnext") : $("lbprev")).click();
+    else if (dy > 90) lbOff();
+  });
+}

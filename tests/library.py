@@ -81,7 +81,7 @@ class Library:
         return im
 
     def build(self, data):
-        """Writes data/index.sqlite and data/thumbs/ as `ps.py index` would."""
+        """Writes data/index.sqlite and data/thumbs/ as `photosearch index` would."""
         thumbs = data / "thumbs"; thumbs.mkdir(parents=True, exist_ok=True)
         con = sqlite3.connect(data / "index.sqlite")
         con.execute("""create table photos(uuid text primary key, date text, kind text, title text, place text,

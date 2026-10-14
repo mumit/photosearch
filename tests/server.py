@@ -1,8 +1,8 @@
-"""Runs `ps.py serve` in this process, so it sees the made-up library and the fake model, and talks to it over HTTP."""
+"""Runs `photosearch serve` in this process, so it sees the made-up library and the fake model, and talks to it over HTTP."""
 import http.client, http.server, json, socket, threading, time
 from argparse import Namespace
 
-import ps
+from photosearch import server
 
 
 def free_port():
@@ -19,7 +19,7 @@ class Server:
             def __init__(s, *a, **k):
                 super().__init__(*a, **k); made.append(s)
         monkeypatch.setattr(http.server, "ThreadingHTTPServer", Recorded)
-        threading.Thread(target=ps.cmd_serve, args=(Namespace(port=self.port, lan=lan, new_passcode=False),), daemon=True).start()
+        threading.Thread(target=server.cmd_serve, args=(Namespace(port=self.port, lan=lan, new_passcode=False),), daemon=True).start()
         for _ in range(500):
             if made:
                 break
