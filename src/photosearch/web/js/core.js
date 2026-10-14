@@ -177,7 +177,7 @@ $("lbplace").onclick = e => { const p = e.target.dataset.place; if (p) searchFor
 $("lbshow").onclick = () => openFrame({ list: LB.list, start: LB.at, title: tab === "search" ? $("rtitle").textContent : "" });
 $("lbday").onclick = () => go("home/" + LB.list[LB.at].date.slice(5));
 $("lbmath").onclick = () => { setMathBase(LB.list[LB.at]); go("math"); };
-$("lbopen").hidden = !SERVER.local;  // it opens Photos on the Mac's screen
+$("lbopen").hidden = !SERVER.local || SERVER.demo;  // it opens Photos on the Mac's screen
 $("lbopen").onclick = () => fetch("/api/open?uuid=" + LB.list[LB.at].uuid);
 addEventListener("keydown", e => {
   if (!$("lb").classList.contains("on")) return;

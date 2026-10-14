@@ -24,6 +24,7 @@ from .explore import on_this_day
 from .stories import REVIEWS, auto_review, date_range, load_review, render_review, save_review, story_uuids
 from .photos_app import add_now, cmd_add_to_album, cmd_fetch, fetch_large, needs_fetch
 from .server import cmd_serve
+from .demo import cmd_demo_check
 
 
 def cmd_album(a):
@@ -101,7 +102,11 @@ def main():
     p = sub.add_parser("serve"); p.add_argument("--port", type=int, default=8765)
     p.add_argument("--lan", action="store_true", help="also let phones and tablets on this network in, with a passcode")
     p.add_argument("--new-passcode", action="store_true", help="with --lan: a new passcode, and every device signs in again")
+    p.add_argument("--demo", action="store_true", help="presenter mode, for recording: only a demo's index (PHOTOSEARCH_DATA), "
+                   "nothing about this Mac or how phones get in")
     p.set_defaults(fn=cmd_serve)
+    p = sub.add_parser("demo-check", help="before showing a demo (PHOTOSEARCH_DATA): nothing in it from your own library")
+    p.add_argument("real", help="your own library's data folder, e.g. data"); p.set_defaults(fn=cmd_demo_check)
     p = sub.add_parser("fetch", help="full-size copies from iCloud for photos whose local preview is small")
     p.add_argument("what", nargs="+", help="story ids (2025, trip-2024-05-02) or photo uuids"); p.set_defaults(fn=cmd_fetch)
     p = sub.add_parser("thumbs", help="rebuild thumbnails at the current size, where the source allows")

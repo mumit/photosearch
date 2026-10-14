@@ -1,13 +1,13 @@
 """`photosearch serve`: the web page and its API."""
-import json, time
+import json, sys, time
 from datetime import date
 from pathlib import Path
 
 import numpy as np
 
 from . import embed, photos_app, smartbox
-from .config import DATA, THUMBS, WEB
-from .store import ThreadCon, photo_info
+from .config import DATA, LIBRARY, ROOT, THUMBS, WEB
+from .store import ThreadCon, index_library, photo_info
 from .images import photo_jpeg
 from .search import SEASONS, best_of, search, similar
 from .smartbox import parse_query
@@ -53,9 +53,35 @@ MANIFEST = json.dumps(dict(name="Photosearch", short_name="Photos", start_url="/
 STATIC = {"/app.css": "text/css; charset=utf-8"} | {f"/js/{f.name}": "text/javascript; charset=utf-8" for f in (WEB / "js").glob("*.js")}
 
 
+def presenter_library(a):
+    """`serve --demo`, for recording a demo: the name of the library it shows, or exits if this isn't a demo index.
+    It must be a separate data folder (PHOTOSEARCH_DATA) built from a separate Photos library, never your own."""
+    if a.lan:
+        sys.exit("--demo is for recording on this Mac, so it doesn't go with --lan")
+    if DATA.resolve() == (ROOT / "data").resolve():
+        sys.exit("--demo needs a demo's data folder (PHOTOSEARCH_DATA=...): data/ is your own library's index")
+    lib = index_library()
+    if not lib:
+        sys.exit(f"{DATA} doesn't record which Photos library it's of: run `photosearch index --library ...` for it")
+    try:
+        from osxphotos.utils import get_system_library_path
+        system = get_system_library_path() or str(LIBRARY)
+    except Exception:
+        system = str(LIBRARY)
+    if Path(lib).resolve() == Path(system).resolve():
+        sys.exit(f"{DATA} is an index of your own library ({lib}), not a demo's")
+    return Path(lib).stem
+
+
 def cmd_serve(a):
+    make_server(a).serve_forever()
+
+
+def make_server(a):
+    """The web server for `serve`'s arguments, listening but not yet answering (serve_forever does)."""
     from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
     from urllib.parse import urlparse, parse_qs
+    demo = presenter_library(a) if getattr(a, "demo", False) else None
     con = ThreadCon()
     lan = LanAccess(a.port, a.new_passcode) if a.lan else None
     allowed = {f"localhost:{a.port}", f"127.0.0.1:{a.port}"} | (lan.hosts if lan else set())
@@ -148,11 +174,12 @@ def cmd_serve(a):
                     else self.send(b"forbidden", "text/plain", 403)
             if not self.gate(page=not u.path.startswith(("/api/", "/thumb/", "/photo/"))):
                 return
-            if u.path == "/api/open" and not self.local():
+            if u.path == "/api/open" and (demo or not self.local()):
                 return self.send(json.dumps(dict(error="Open in Photos only works on the Mac")).encode(), "application/json", 403)
             if u.path == "/":
                 # re-read, so edits show on reload; tell the page whether it's on this Mac, and (only then) how phones get in
-                server = dict(local=self.local(), lan=lan and self.local() and dict(url=lan.url, code=lan.st["passcode"]))
+                server = dict(local=self.local(), lan=lan and self.local() and dict(url=lan.url, code=lan.st["passcode"]),
+                              demo=bool(demo))
                 page = (WEB / "index.html").read_text().replace("/*SERVER*/{}", json.dumps(server).replace("</", "<\\/"), 1)
                 return self.send(page.encode(), "text/html; charset=utf-8")
             if u.path in STATIC:
@@ -242,7 +269,7 @@ def cmd_serve(a):
                 return self.send(json.dumps(dict(error=str(ex))).encode(), "application/json", 400)
             self.send(json.dumps(dict(results=res)).encode(), "application/json")
 
-    print(f"http://localhost:{a.port}", flush=True)
+    print(f"http://localhost:{a.port}" + (f"  (presenter mode: {demo})" if demo else ""), flush=True)
     if lan:
         print(f"Phones and tablets on this Wi-Fi: {lan.url}  passcode: {lan.st['passcode']}\n"
               f"(or scan the QR code under 📱 on this Mac's page; macOS may ask to allow incoming connections: allow it)", flush=True)
@@ -251,4 +278,4 @@ def cmd_serve(a):
         # connections, the rest were reset: a photo or a whole script would go missing.
         request_queue_size = 128
         daemon_threads = True
-    Server(("0.0.0.0" if lan else "127.0.0.1", a.port), H).serve_forever()
+    return Server(("0.0.0.0" if lan else "127.0.0.1", a.port), H)

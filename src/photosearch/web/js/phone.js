@@ -2,7 +2,7 @@
 // Plain scripts sharing one global scope, loaded in order by index.html; no build step.
 
 /* ---------- on your phone: the address and passcode as a QR code (shown on the Mac only) ---------- */
-$("phonebtn").hidden = !SERVER.local;
+$("phonebtn").hidden = !SERVER.local || SERVER.demo;  // presenter mode: no addresses or passcodes on screen
 $("phonebtn").onclick = async () => {
   const lan = SERVER.lan;
   $("phonebody").innerHTML = lan ? `<div class="kick">On your phone or iPad</div><h2>Scan to open Photosearch</h2>

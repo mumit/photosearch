@@ -1,5 +1,5 @@
 """Runs `photosearch serve` in this process, so it sees the made-up library and the fake model, and talks to it over HTTP."""
-import http.client, http.server, json, socket, threading, time
+import http.client, json, socket, threading
 from argparse import Namespace
 
 from photosearch import server
@@ -11,20 +11,10 @@ def free_port():
 
 
 class Server:
-    def __init__(self, monkeypatch, lan=False, host="127.0.0.1"):
+    def __init__(self, monkeypatch=None, lan=False, host="127.0.0.1", demo=False):
         self.port, self.host = free_port(), host
-        made = []
-
-        class Recorded(http.server.ThreadingHTTPServer):
-            def __init__(s, *a, **k):
-                super().__init__(*a, **k); made.append(s)
-        monkeypatch.setattr(http.server, "ThreadingHTTPServer", Recorded)
-        threading.Thread(target=server.cmd_serve, args=(Namespace(port=self.port, lan=lan, new_passcode=False),), daemon=True).start()
-        for _ in range(500):
-            if made:
-                break
-            time.sleep(0.02)
-        self.httpd = made[0]
+        self.httpd = server.make_server(Namespace(port=self.port, lan=lan, new_passcode=False, demo=demo))
+        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
 
     def request(self, method, path, body=None, host=None, headers=None, via=None, timeout=20):
         """(status, headers, body). via: the address to connect to (default this Mac's loopback)."""

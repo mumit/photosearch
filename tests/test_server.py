@@ -19,7 +19,7 @@ def test_page_is_served_with_what_it_needs_to_know(srv):
     status, h, body = srv.get("/")
     assert status == 200 and h["content-type"].startswith("text/html")
     server = json.loads(body.decode().split("const SERVER = ", 1)[1].split(";</script>", 1)[0])
-    assert server == dict(local=True, lan=None)
+    assert server == dict(local=True, lan=None, demo=False)
 
 
 @pytest.mark.parametrize("path", [
