@@ -186,3 +186,9 @@ def test_many_requests_at_once(srv, lib):
             return type(ex).__name__
     with concurrent.futures.ThreadPoolExecutor(100) as ex:
         assert set(ex.map(get, range(100))) == {200}
+
+
+def test_galaxy_forgets_deleted_photos(srv, lib, con):
+    assert lib["beach0"] in srv.json("/api/galaxy", timeout=300)["uuids"]
+    con.execute("delete from photos where uuid=?", (lib["beach0"],)); con.commit()
+    assert lib["beach0"] not in srv.json("/api/galaxy", timeout=300)["uuids"]

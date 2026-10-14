@@ -74,6 +74,7 @@ def cmd_index(a):
         for u in gone:
             con.execute("delete from photos where uuid=?", (u,))
             (THUMBS / f"{u}.jpg").unlink(missing_ok=True)
+            (LARGE / f"{u}.jpg").unlink(missing_ok=True)  # and its full-size copy, if one was fetched
         keep = done & lib.keys()
         con.executemany(f"update photos set ({META_COLS}) = ({','.join('?' * N_META)}) where uuid=?",
                         [meta(lib[u]) + (u,) for u in keep])

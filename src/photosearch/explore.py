@@ -14,12 +14,13 @@ from .stories import highlights
 
 
 def galaxy(con):
-    """2-D map of the library (UMAP over the vectors) with named regions. Cached; redone once the index grows 10%."""
+    """2-D map of the library (UMAP over the vectors) with named regions. Cached; redone once the index grows 10%, and
+    as soon as any photo in it has left the library (it mustn't keep showing what was deleted)."""
     uuids, M, _ = vectors(con)
     f = DATA / "galaxy.json"
     if f.exists():
         g = json.loads(f.read_text())
-        if len(g["uuids"]) >= 0.9 * len(uuids):
+        if len(g["uuids"]) >= 0.9 * len(uuids) and set(g["uuids"]) <= set(uuids):
             return g
     import umap
     from sklearn.cluster import KMeans
