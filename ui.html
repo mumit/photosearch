@@ -25,6 +25,17 @@
   button { background:var(--acc); color:#fff; border-color:var(--acc); cursor:pointer; }
   button.ghost { background:var(--card); color:var(--fg); border-color:var(--line); }
   .small { width:9.5em; }
+  #filters { display:contents; }
+  #ftoggle { display:none; }
+  @media (max-width: 600px) {  /* phones: the description and Search on one row; filters fold away behind a button */
+    #f .grow { flex:1 1 0; min-width:0; font-size:16px; }
+    #ftoggle { display:block; padding:8px; }
+    #ftoggle.set { border-color:var(--acc); color:var(--acc); }
+    #filters { display:none; order:9; flex:1 1 100%; grid-template-columns:1fr 1fr; gap:8px; }
+    #filters.open { display:grid; }
+    #filters .small, #filters select { width:auto; min-width:0; }
+    #filters #exclude, #filters #person, #filters #smartbox { grid-column:1 / -1; }
+  }
   .auto { border-color:var(--acc); box-shadow:0 0 0 2px color-mix(in srgb, var(--acc) 25%, transparent); }
   .status { color:var(--mut); font-size:13px; margin-top:8px; min-height:1.2em; }
   .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
@@ -157,6 +168,8 @@
   <div id="head-search">
     <form id="f">
       <input id="q" class="grow" placeholder="Describe a photo… e.g. “birthday cake with candles at night”">
+      <button type="button" class="ghost" id="ftoggle" aria-expanded="false" title="filters">Filters</button>
+      <div id="filters">
       <input id="exclude" class="small" placeholder="without… e.g. selfies">
       <input id="person" class="small" placeholder="people, comma-separated">
       <input id="after" class="small" type="date" title="after">
@@ -164,6 +177,7 @@
       <select id="season" title="season"><option value="">any season</option><option>spring</option><option>summer</option><option>autumn</option><option>winter</option></select>
       <select id="kind"><option value="">all</option><option>photo</option><option>video</option></select>
       <label id="smartbox" hidden title="Let Jev fill in the filters from your description"><input type="checkbox" id="smart" checked> ✨ smart</label>
+      </div>
       <button>Search</button>
     </form>
     <div class="status" id="status"></div>
@@ -344,6 +358,17 @@ const FIELDS = ["person", "after", "before", "season", "kind", "exclude"];
 const SMART = { enabled: false, auto: new Set() };
 api("/api/parse").then(r => { SMART.enabled = r.results.enabled; $("smartbox").hidden = !SMART.enabled; }).catch(() => {});
 FIELDS.forEach(k => $(k).addEventListener("input", () => { SMART.auto.delete(k); $(k).classList.remove("auto"); }));
+// phones: filters sit behind a button that counts the ones set
+function countFilters() {
+  const n = FIELDS.filter(k => $(k).value).length;
+  $("ftoggle").textContent = n ? `Filters · ${n}` : "Filters";
+  $("ftoggle").classList.toggle("set", n > 0);
+}
+$("ftoggle").onclick = () => {
+  const open = $("filters").classList.toggle("open");
+  $("ftoggle").setAttribute("aria-expanded", open);
+};
+FIELDS.forEach(k => $(k).addEventListener("change", countFilters));
 async function smartFill(q) {
   for (const k of SMART.auto) { $(k).value = ""; $(k).classList.remove("auto"); }
   SMART.auto.clear();
@@ -361,6 +386,7 @@ async function runSearch(params) {
     $("status").textContent = "understanding…";
     note = await smartFill(params.q).catch(e => "smart search unavailable (" + e.message + ")");
   }
+  countFilters();
   for (const k of FIELDS.slice(0, 5)) if ($(k).value) params[k] = $(k).value;
   if ($("exclude").value && params.q) params.exclude = $("exclude").value;
   $("status").textContent = "searching…";
