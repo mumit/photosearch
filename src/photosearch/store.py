@@ -47,8 +47,17 @@ def vectors(con):
     return _vecs[1:]
 
 
+def index_library():
+    """The Photos library this index was built from (recorded by `photosearch index`), or None for an older index."""
+    row = db().execute("select value from meta where key='library'").fetchone()
+    return row[0] if row else None
+
+
 def photos_db(library=None):
+    """The Photos library: the one given, else the one this index was built from, else the system library. So a
+    second data folder (PHOTOSEARCH_DATA, e.g. a demo) always reads its own library."""
     import osxphotos
+    library = library or index_library()
     if library:
         return osxphotos.PhotosDB(dbfile=library)
     try:

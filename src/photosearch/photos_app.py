@@ -10,6 +10,29 @@ from .images import open_image
 from .stories import STORY_ID, load_review, story_uuids
 
 
+def add_now(name, uuids):
+    """Add photos (uuids from this index) to an album in the Photos app, made if needed, in this process; only ever
+    adds. Returns how many were added. Refuses before touching anything unless Photos has this index's library open:
+    otherwise the album would be made in whichever library is open, e.g. your own while a demo's photos are added."""
+    import photoscript
+    from osxphotos.photosalbum import PhotosAlbum
+    uuids = list(dict.fromkeys(uuids))
+    pdb = photos_db()
+    order = {u: i for i, u in enumerate(uuids)}
+    photos = sorted(pdb.photos(uuid=uuids), key=lambda p: order[p.uuid])
+    if not photos:
+        return 0
+    for i in sorted({0, len(photos) // 2, len(photos) - 1}):  # one index is one library, so a few will tell
+        try:
+            photoscript.Photo(photos[i].uuid)
+        except ValueError:
+            raise LookupError(f"Photos has another library open, or didn't answer. Open {Path(pdb.library_path).stem} in "
+                              "Photos (hold Option while opening it), and check that this app may control Photos (System "
+                              "Settings → Privacy & Security → Automation). Nothing was added.") from None
+    PhotosAlbum(name).add_list(photos)
+    return len(photos)
+
+
 def add_to_photos_album(name, uuids):
     """Add photos to an album in the Photos app (made if needed), in a `photosearch add-to-album` process: Photos is driven
     by AppleScript, which is happiest on a process's main thread. Only ever adds. Returns how many were added."""
@@ -26,11 +49,7 @@ def add_to_photos_album(name, uuids):
 
 
 def cmd_add_to_album(a):
-    from osxphotos.photosalbum import PhotosAlbum
-    order = {u: i for i, u in enumerate(a.uuids)}
-    photos = sorted(photos_db().photos(uuid=list(order)), key=lambda p: order[p.uuid])
-    PhotosAlbum(a.name).add_list(photos)
-    print(f"added {len(photos)} photos to album '{a.name}'")
+    print(f"added {add_now(a.name, a.uuids)} photos to album '{a.name}'")
 
 
 _fetch_lock, _pdb = threading.Lock(), None

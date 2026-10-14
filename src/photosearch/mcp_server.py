@@ -88,11 +88,7 @@ def library_overview() -> dict:
 def make_album(name: str, uuids: list[str]) -> str:
     """Add photos to an album in the Photos app, creating it if needed. Only adds; never removes or deletes.
     Check the photos with view_photos first."""
-    from osxphotos.photosalbum import PhotosAlbum
-    order = {u: i for i, u in enumerate(uuids)}
-    photos = sorted(store.photos_db().photos(uuid=list(order)), key=lambda p: order[p.uuid])
-    PhotosAlbum(name).add_list(photos)
-    return f"added {len(photos)} of {len(uuids)} photos to album '{name}'"
+    return f"added {photos_app.add_now(name, uuids)} of {len(uuids)} photos to album '{name}'"
 
 
 class ReviewPhoto(TypedDict):

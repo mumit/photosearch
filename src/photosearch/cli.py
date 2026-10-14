@@ -16,23 +16,19 @@ import argparse, json, sys
 from pathlib import Path
 
 from . import embed
-from .store import db, photos_db
+from .store import db
 from .index import cmd_index, cmd_thumbs
 from .search import search, similar
 from .places import trips
 from .explore import on_this_day
 from .stories import REVIEWS, auto_review, date_range, load_review, render_review, save_review, story_uuids
-from .photos_app import cmd_add_to_album, cmd_fetch, fetch_large, needs_fetch
+from .photos_app import add_now, cmd_add_to_album, cmd_fetch, fetch_large, needs_fetch
 from .server import cmd_serve
 
 
 def cmd_album(a):
-    from osxphotos.photosalbum import PhotosAlbum
-    res = search(db(), a.query, a.k, **fkw(a))
-    order = {r["uuid"]: i for i, r in enumerate(res)}
-    photos = sorted(photos_db().photos(uuid=list(order)), key=lambda p: order[p.uuid])
-    PhotosAlbum(a.name).add_list(photos)
-    print(f"added {len(photos)} photos to album '{a.name}'")
+    n = add_now(a.name, [r["uuid"] for r in search(db(), a.query, a.k, **fkw(a))])
+    print(f"added {n} photos to album '{a.name}'")
 
 
 def show(results):

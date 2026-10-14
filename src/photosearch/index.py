@@ -62,6 +62,12 @@ def cmd_index(a):
     print("opening Photos library…", flush=True)
     pdb = photos_db(a.library)
     print(f"library: {pdb.library_path}")
+    # one index, one library: indexing another into it would drop every photo the other one doesn't have
+    have = con.execute("select value from meta where key='library'").fetchone()
+    if have and Path(have[0]).resolve() != Path(pdb.library_path).resolve():
+        sys.exit(f"this index is of {have[0]}, not {pdb.library_path}; for another library, use another data folder "
+                 "(PHOTOSEARCH_DATA=...)")
+    con.execute("insert or ignore into meta values('library', ?)", (str(pdb.library_path),)); con.commit()
     lib = {p.uuid: p for p in pdb.photos(intrash=False)}
     if lib:  # never prune against an empty read
         gone = done - lib.keys()

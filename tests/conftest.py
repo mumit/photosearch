@@ -13,7 +13,7 @@ os.environ["PHOTOSEARCH_DATA"] = str(WORK / "data")  # before photosearch is imp
 class NoPhotosOrModel:
     """The tests must pass on a fresh clone, for someone whose terminal can't read Photos and who hasn't downloaded the
     model: so the libraries that read the Photos library or run the model can't even be imported here."""
-    BLOCKED = ("osxphotos", "photokit", "torch", "sentence_transformers", "transformers")
+    BLOCKED = ("osxphotos", "photoscript", "photokit", "torch", "sentence_transformers", "transformers")
 
     def find_spec(self, name, path=None, target=None):
         if name.split(".")[0] in self.BLOCKED:
