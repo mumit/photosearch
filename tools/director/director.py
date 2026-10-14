@@ -17,7 +17,7 @@ HERE = Path(__file__).resolve().parent
 
 class Page:
     def __init__(self, ws, frames):
-        self.ws, self.n, self.waiting, self.frames, self.errors = ws, 0, {}, frames, []
+        self.ws, self.n, self.waiting, self.frames, self.errors, self.photos = ws, 0, {}, frames, [], set()
 
     async def read(self):
         try:
@@ -34,6 +34,10 @@ class Page:
                 p = m["params"]
                 self.frames.append((p["metadata"]["timestamp"], base64.b64decode(p["data"])))
                 await self.ws.send(json.dumps(dict(id=0, method="Page.screencastFrameAck", params=dict(sessionId=p["sessionId"]))))
+            elif m.get("method") == "Network.requestWillBeSent":  # every photo the page loads: what the video can show
+                u = m["params"]["request"]["url"].split("?")[0]
+                if "/thumb/" in u or "/photo/" in u:
+                    self.photos.add(u.rsplit("/", 1)[1].removesuffix(".jpg"))
             elif m.get("method") == "Runtime.exceptionThrown":
                 d = m["params"]["exceptionDetails"]
                 self.errors.append(d.get("exception", {}).get("description", d.get("text")))
@@ -72,7 +76,7 @@ async def record(beats, url, w, h, dpr, frames, theme="dark"):
         async with websockets.connect(ws_url, max_size=200_000_000) as ws:
             page = Page(ws, frames)
             reader = asyncio.create_task(page.read())
-            await page.cmd("Page.enable"); await page.cmd("Runtime.enable")
+            await page.cmd("Page.enable"); await page.cmd("Runtime.enable"); await page.cmd("Network.enable")
             await page.cmd("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=dpr, mobile=False)
             await page.cmd("Emulation.setEmulatedMedia", features=[dict(name="prefers-color-scheme", value=theme)])
             await page.cmd("Page.navigate", url=url)
@@ -88,23 +92,27 @@ async def record(beats, url, w, h, dpr, frames, theme="dark"):
                     await page.run(js)
                 await asyncio.sleep(hold)
                 print(f"  {name:22} {time.time() - t:5.1f}s", flush=True)
+            frames.append((time.time(), None))  # when recording stopped: the last frame holds until here
             await page.cmd("Page.stopScreencast")
             await asyncio.sleep(0.3)
             reader.cancel()
-            return page.errors
+            return page.errors, page.photos
     finally:
         chrome.kill(); chrome.wait()
         shutil.rmtree(profile, ignore_errors=True)
 
 
 def encode(frames, out, fps=60, size="1920:1080"):
-    """Each frame shown until the next was painted; then resampled to a steady fps."""
+    """Each frame shown until the next was painted (Chrome only sends one when something changes, so a still page sends
+    none), then resampled to a steady fps."""
+    end = frames[-1][0] if frames and frames[-1][1] is None else None
+    frames = [f for f in frames if f[1] is not None]
     tmp = Path(tempfile.mkdtemp(prefix="director-frames-"))
     try:
         lines = []
         for i, (t, jpg) in enumerate(frames):
             (tmp / f"{i:06}.jpg").write_bytes(jpg)
-            nxt = frames[i + 1][0] if i + 1 < len(frames) else t + 1 / fps
+            nxt = frames[i + 1][0] if i + 1 < len(frames) else max(end or 0, t + 1 / fps)
             lines += [f"file '{tmp / f'{i:06}.jpg'}'", f"duration {max(nxt - t, 1 / 240):.5f}"]
         lines.append(f"file '{tmp / f'{len(frames) - 1:06}.jpg'}'")
         (tmp / "list.txt").write_text("\n".join(lines))
@@ -126,15 +134,17 @@ def main():
     w, h = map(int, wh.split("x"))
     beats = runpy.run_path(a.storyboard)["BEATS"]
     frames = []
-    errors = asyncio.run(record(beats, a.url, w, h, float(dpr), frames, a.theme))
-    if len(frames) < 2:
+    errors, photos = asyncio.run(record(beats, a.url, w, h, float(dpr), frames, a.theme))
+    Path(a.out).with_suffix(".photos.json").write_text(json.dumps(sorted(photos)))  # for checking each one before sharing
+    if len(frames) < 3:
         sys.exit("no frames captured")
     span = frames[-1][0] - frames[0][0]
-    gaps = sorted(b[0] - a_[0] for a_, b in zip(frames, frames[1:]))
+    gaps = sorted(b[0] - a_[0] for a_, b in zip(frames[:-1], frames[1:-1]))
     print(f"{len(frames)} frames over {span:.1f}s: {len(frames) / span:.0f} fps on average, "
           f"longest gap {gaps[-1] * 1000:.0f} ms, 95% of gaps under {gaps[int(len(gaps) * .95)] * 1000:.0f} ms")
     encode(frames, a.out, size=f"{int(w * float(dpr)) // 2 * 2}:{int(h * float(dpr)) // 2 * 2}")
-    print("wrote", a.out, "| page errors:", errors or "none")
+    print("wrote", a.out, f"| {len(photos)} photos loaded (listed in {Path(a.out).with_suffix('.photos.json').name})",
+          "| page errors:", errors or "none")
 
 
 if __name__ == "__main__":
