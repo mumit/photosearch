@@ -80,14 +80,13 @@ def cover(con, start, end):
 
 
 def story_span(con, rid):
-    """(first day, last day, fields every review of it carries) for a year or a trip. A trip with a saved review
-    keeps the days it was made with, even if new photos would now shift where the trip is detected."""
+    """(first day, last day, fields every review of it carries) for a year or a trip. A trip with a review you or
+    Claude made keeps the days it was made with, even if new photos would now shift where the trip is detected."""
     if not STORY_ID.fullmatch(rid):
         raise LookupError(f"not a story id: {rid!r} (a year like 2025, or a trip like trip-2024-05-02)")
     if rid.isdigit():
         return f"{rid}-01-01", f"{rid}-12-31", dict(id=rid, kind="year", year=int(rid))
-    f = REVIEWS / f"{rid}.json"
-    t = json.loads(f.read_text()) if f.exists() else find_trip(con, rid)
+    t = saved_review(rid) or find_trip(con, rid)
     return t["start"], t["end"], dict(id=rid, kind="trip", start=t["start"], end=t["end"])
 
 
@@ -132,12 +131,19 @@ def save_review(review):
     (REVIEWS / f"{review['id']}.json").write_text(json.dumps(review, indent=1, ensure_ascii=False))
 
 
-def load_review(con, rid, make=False):
+def saved_review(rid):
+    """The review saved for a story, or None. Automatic ones don't count: they're made afresh each time, so they follow
+    the library (new photos, deleted ones, places Photos has named since). Yours and Claude's are kept as made."""
     f = REVIEWS / f"{rid}.json"
-    if f.exists():
-        r = json.loads(f.read_text())
+    r = json.loads(f.read_text()) if f.exists() else None
+    return r if r and r.get("made_by") != "auto" else None
+
+
+def load_review(con, rid, make=False):
+    r = saved_review(rid)
+    if r:
         return dict(r, id=rid, kind=r.get("kind", "year"))  # year reviews saved before trips existed
-    if not make:
+    if not make and not (REVIEWS / f"{rid}.json").exists():
         raise LookupError(f"no review for {rid}")
     r = auto_review(con, rid)
     save_review(r)
@@ -146,7 +152,7 @@ def load_review(con, rid, make=False):
 
 def stories(con):
     """Every trip and year, newest first: its saved review's title and author if it has one, else what was detected."""
-    made = {f.stem: json.loads(f.read_text()) for f in REVIEWS.glob("*.json")} if REVIEWS.exists() else {}
+    made = {f.stem: r for f in REVIEWS.glob("*.json") if (r := saved_review(f.stem))} if REVIEWS.exists() else {}
     def story(rid, start, end, **x):
         r = made.get(rid, {})
         first = next((p["uuid"] for c in r.get("chapters", []) for p in c["photos"]), None)

@@ -67,3 +67,24 @@ def test_date_range(a, b, text):
 def test_export_names():
     assert stories.export_name(dict(kind="year", id="2025")) == "year-in-review-2025.html"
     assert stories.export_name(dict(kind="trip", title="São Paulo!", start="2024-05-02")) == "sao-paulo-2024.html"
+
+
+def test_automatic_stories_follow_the_library(con):
+    r = stories.load_review(con, "trip-2025-03-10", make=True)
+    stories.save_review(dict(r, title="Trip"))  # saved before Photos had named the place, say
+    assert stories.load_review(con, "trip-2025-03-10")["title"] == "Lisbon"
+    assert next(s for s in stories.stories(con) if s["id"] == "trip-2025-03-10")["title"] == "Lisbon"
+
+
+def test_an_automatic_story_of_a_trip_that_no_longer_is_goes(con):
+    stories.save_review(dict(id="trip-2019-01-01", kind="trip", start="2019-01-01", end="2019-01-02", title="Gone",
+                             made_by="auto", chapters=[]))
+    assert "trip-2019-01-01" not in {s["id"] for s in stories.stories(con)}
+    with pytest.raises(LookupError):
+        stories.load_review(con, "trip-2019-01-01")
+
+
+def test_stories_you_or_claude_made_are_kept_as_made(con):
+    r = stories.load_review(con, "trip-2025-03-10", make=True)
+    stories.save_review(dict(r, title="Our week in Lisbon", made_by="claude"))
+    assert stories.load_review(con, "trip-2025-03-10")["title"] == "Our week in Lisbon"
