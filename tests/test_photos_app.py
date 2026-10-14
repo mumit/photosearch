@@ -27,7 +27,7 @@ class FakePhotos:
                 fake.albums.setdefault(name, [])  # the real one makes the album here, before adding
                 self.name = name
 
-            def add_list(self, photos):
+            def extend(self, photos):  # osxphotos' own name; the stand-in has no others, so a wrong one fails here
                 fake.albums[self.name] += [p.uuid for p in photos]
 
         def Photo(uuid):

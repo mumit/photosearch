@@ -29,7 +29,7 @@ def add_now(name, uuids):
             raise LookupError(f"Photos has another library open, or didn't answer. Open {Path(pdb.library_path).stem} in "
                               "Photos (hold Option while opening it), and check that this app may control Photos (System "
                               "Settings → Privacy & Security → Automation). Nothing was added.") from None
-    PhotosAlbum(name).add_list(photos)
+    PhotosAlbum(name).extend(photos)
     return len(photos)
 
 
