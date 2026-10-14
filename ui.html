@@ -2,6 +2,9 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Photosearch</title>
 <meta name="theme-color" content="#0f0e0c">
+<link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Photos">
 <style>
   /* A darkroom: near-black and warm, so the photos carry the colour; editorial serif headings, amber like the story player */
   :root { --bg:#0f0e0c; --bg2:#181614; --card:#1d1b18; --line:#2f2b27; --fg:#f4efe6; --mut:#a39c90; --acc:#f2b33d; --on-acc:#1a1408;
@@ -506,6 +509,45 @@
   #fpickx { position:absolute; top:12px; right:12px; color:#fff; }
   #fsrc { color:#fff; border-color:rgba(255,255,255,.25); background:rgba(0,0,0,.25); margin-left:10px; }
   @media (max-width: 760px) { #fctl { gap:4px; padding:10px; } #ftitle { font-size:15px; max-width:34vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } #fpos { display:none; } #fsrc { margin-left:4px; padding:4px 8px; } #fctl .ibtn { width:32px; height:32px; } }
+
+  /* ---------- round four: phones, galaxy years, time machine people ---------- */
+  @media (display-mode: standalone) { header { padding-top:calc(8px + env(safe-area-inset-top)); } #lbclose, #lbinfo, #fctl { margin-top:env(safe-area-inset-top); } }
+  #phonebtn { flex:none; }
+  @media (max-width: 760px) { #phonebtn { display:none; } }
+  #phone { position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.55); display:grid; place-items:center; padding:16px; }
+  #phone .kbox { position:relative; text-align:center; max-width:440px; }
+  #phone h2 { font-size:26px; margin:6px 0 14px; }
+  #phone #qr { display:inline-block; padding:12px; background:#fff; border-radius:14px; margin:4px 0 10px; }
+  #phone #qr img, #phone #qr canvas { display:block; }
+  #phone .code { font-size:18px; color:var(--acc); }
+  #phone pre { background:var(--bg2); border:1px solid var(--line); border-radius:10px; padding:10px; text-align:left; overflow-x:auto; }
+  #phonex { position:absolute; top:10px; right:10px; }
+  #gtools { position:absolute; left:14px; right:14px; bottom:40px; display:flex; align-items:center; gap:10px; pointer-events:none; flex-wrap:wrap; }
+  #gtools > * { pointer-events:auto; }
+  #gtools .ibtn { color:#fff; background:rgba(20,20,28,.8); border-color:#333; }
+  #gyr { width:min(300px, 40vw); accent-color:#f2b33d; }
+  #gyl { color:#ddd; font-size:13px; font-weight:500; min-width:72px; text-shadow:0 1px 4px #000; }
+  #gppl { display:flex; gap:4px; background:rgba(20,20,28,.8); padding:4px; border-radius:999px; }
+  #gppl img { width:30px; height:30px; border-radius:50%; object-fit:cover; cursor:pointer; border:1.5px solid transparent; }
+  #gppl img:hover { border-color:#f2b33d; transform:scale(1.1); }
+  #gbig { position:absolute; left:16px; bottom:76px; font:600 clamp(60px, 10vw, 140px)/1 var(--serif); color:#fff; opacity:.85; letter-spacing:-.04em;
+          pointer-events:none; text-shadow:0 4px 30px rgba(0,0,0,.6); }
+  @media (max-width: 760px) { #gppl { display:none; } #gstatus { display:none; } #gtools { bottom:14px; } #gbig { bottom:56px; } }
+  #stage .tl { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity var(--fade, .7s) ease; cursor:zoom-in; max-width:none; max-height:none; box-shadow:none; }
+  #stage .tl.on { opacity:1; }
+  .seg.dark { background:rgba(0,0,0,.35); border-color:rgba(255,255,255,.2); }
+  .seg.dark button { color:#bbb; } .seg.dark button.on { background:#fff; color:#000; }
+  #twho { color:#fff; border-color:rgba(255,255,255,.3); background:rgba(0,0,0,.35); }
+  #twhop { position:absolute; z-index:3; top:58px; left:clamp(16px, 4vw, 48px); width:min(360px, calc(100% - 32px)); max-height:60%; overflow-y:auto;
+           background:rgba(20,18,16,.95); border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:6px; backdrop-filter:blur(14px); }
+  #twhop a { display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:10px; color:#eee; text-decoration:none; font-size:14px; }
+  #twhop a:hover { background:rgba(255,255,255,.1); }
+  #twhop img { width:30px; height:30px; border-radius:50%; object-fit:cover; }
+  .tpeople { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  .tpeople a { display:flex; flex-direction:column; align-items:center; gap:4px; color:#ddd; text-decoration:none; font-size:12px; }
+  .tpeople img { width:58px; height:58px; border-radius:50%; object-fit:cover; border:2px solid rgba(255,255,255,.25); transition:transform .2s, border-color .2s; }
+  .tpeople a:hover img { transform:scale(1.08); border-color:#f2b33d; }
+  @media (max-width: 760px) { #tq-head { flex-wrap:wrap; } #tq-head .status { display:none; } }
 </style>
 
 <header>
@@ -533,6 +575,7 @@
       <datalist id="people"></datalist><datalist id="places"></datalist>
     </div>
   </div>
+  <button class="ibtn" id="phonebtn" title="open on your phone or iPad" hidden><svg class="i" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg></button>
   <nav id="tabs">
     <a href="#home"><svg class="i" viewBox="0 0 24 24"><path d="M4 11l8-6.5 8 6.5v8.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
     <a href="#world"><svg class="i" viewBox="0 0 24 24"><path d="M9 4.5 3.5 6.8v12.7L9 17.2l6 2.3 5.5-2.3V4.5L15 6.8z"/><path d="M9 4.5v12.7M15 6.8v12.7"/></svg><span>Map</span></a>
@@ -597,24 +640,34 @@
   <section id="galaxy" class="full">
     <canvas id="gcanvas"></canvas>
     <div id="gbar">
-      <button class="ghost tiny" id="glit" hidden>✦ <span id="glitq"></span> ✕</button>
+      <button class="ghost tiny" id="glit" hidden><span id="glitq"></span> ✕</button>
       <div id="glegend"><span id="gy0"></span><i id="ggrad"></i><span id="gy1"></span></div>
     </div>
     <div id="gtip"></div>
+    <div id="gbig"></div>
+    <div id="gtools">
+      <button class="ibtn" id="gplay" title="watch the library grow, a year at a time">▶</button>
+      <input type="range" id="gyr" min="2000" max="2026" value="2026" aria-label="photos up to this year"><b id="gyl">All years</b>
+      <span class="sp"></span><div id="gppl" title="light up everyone's photos"></div>
+    </div>
     <div id="gstatus">scroll to zoom · drag to pan · click a photo</div>
   </section>
 
   <section id="time" class="full">
-    <div id="stage"><div class="hb" id="tbg"></div><img id="timg" alt=""></div>
+    <div id="stage"><div class="hb" id="tbg"></div><img id="timg" class="tl" alt=""><img id="timg2" class="tl" alt=""></div>
     <div id="tyear"></div><div id="tmeta"></div>
-    <div id="tq-head"><h2 id="tq"></h2><span class="status" id="tstatus" style="color:#bbb"></span><span class="sp"></span>
+    <div id="tq-head"><h2 id="tq"></h2><button class="ghost tiny" id="twho">👤 Anyone</button><span class="status" id="tstatus" style="color:#bbb"></span><span class="sp"></span>
+      <div class="seg dark" id="tspeed"><button data-v="slow" class="on">Slow</button><button data-v="flip">Flipbook</button></div>
       <button class="ghost tiny" id="tplay">▶ Play</button></div>
+    <div id="twhop" hidden></div>
     <div id="strip"></div>
     <div id="tempty">
       <div class="kick">Time Machine</div>
       <h1>Pick something that happens every year.</h1>
       <p>The best match from each year, one after another. Type your own in the search box, or try one of these:</p>
       <div class="asks" id="tchips"></div>
+      <p style="margin-top:10px">Or follow one person through the years:</p>
+      <div class="tpeople" id="tpeople"></div>
     </div>
   </section>
 
@@ -680,6 +733,8 @@
     <button class="ibtn" id="fclose" title="close (Esc)">✕</button></div>
 </div>
 
+<div id="phone" hidden><div class="kbox"><button class="ibtn" id="phonex" title="close">✕</button><div id="phonebody"></div></div></div>
+
 <div id="keys" hidden><div class="kbox"><h2>Shortcuts</h2>
   <dl><dt>/ or ⌘K</dt><dd>search, from anywhere</dd><dt>↑ ↓ ↵</dt><dd>pick a suggestion</dd><dt>← →</dt><dd>previous / next photo, year or slide</dd>
   <dt>Space</dt><dd>play / pause (Time Machine, slideshows)</dd><dt>Esc</dt><dd>close</dd><dt>?</dt><dd>this list</dd></dl>
@@ -711,7 +766,9 @@
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
 const api = async (path, params = {}) => {
-  const r = await (await fetch(path + "?" + new URLSearchParams(params))).json();
+  const res = await fetch(path + "?" + new URLSearchParams(params));
+  if (res.status === 401) { location.replace("/login"); throw new Error("sign in first"); }
+  const r = await res.json();
   if (r.error) throw new Error(r.error);
   return r;
 };
@@ -882,6 +939,7 @@ $("lbplace").onclick = e => { const p = e.target.dataset.place; if (p) searchFor
 $("lbshow").onclick = () => openFrame({ list: LB.list, start: LB.at, title: tab === "search" ? $("rtitle").textContent : "" });
 $("lbday").onclick = () => go("home/" + LB.list[LB.at].date.slice(5));
 $("lbmath").onclick = () => { setMathBase(LB.list[LB.at]); go("math"); };
+$("lbopen").hidden = !SERVER.local;  // it opens Photos on the Mac's screen
 $("lbopen").onclick = () => fetch("/api/open?uuid=" + LB.list[LB.at].uuid);
 addEventListener("keydown", e => {
   if (!$("lb").classList.contains("on")) return;
@@ -1444,7 +1502,10 @@ async function openGalaxy() {
   $("gy0").textContent = G.y0; $("gy1").textContent = G.y1;
   $("ggrad").style.background = `linear-gradient(90deg, ${[0, .25, .5, .75, 1].map(t => yearColor(G.y0 + t * (G.y1 - G.y0))).join(",")})`;
   $("gstatus").textContent = `${G.data.uuids.length.toLocaleString()} photos · similar photos sit together · scroll to zoom · drag to pan · click a photo`;
+  Object.assign($("gyr"), { min: G.y0, max: G.y1, value: G.y1 });
   fitGalaxy();
+  if (G.hi) flyTo(G.hi);
+  loadPeople().then(p => { $("gppl").innerHTML = p.slice(0, 8).map(x => `<img src="/thumb/${x.cover}.jpg" alt="" title="${esc(x.name)}" data-name="${esc(x.name)}">`).join(""); }).catch(() => {});
 };
 function resizeGalaxy() {
   const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1;
@@ -1464,6 +1525,7 @@ function render() {
   const n = d.uuids.length, zoom = G.s / G.s0;
   const vis = [];
   for (let i = 0; i < n; i++) {
+    if (G.upto && (!d.year[i] || d.year[i] > G.upto)) continue;  // not taken yet, at this point in the years
     const sx = d.x[i] * 1000 * G.s + G.ox, sy = d.y[i] * 1000 * G.s + G.oy;
     if (sx > -60 && sx < G.w + 60 && sy > -60 && sy < G.h + 60) vis.push([i, sx, sy]);
   }
@@ -1484,7 +1546,7 @@ function render() {
       if (lit && on) continue;  // drawn on top below
       cx.globalAlpha = 1;
       cx.fillStyle = on ? yearColor(d.year[i], 0.85) : "rgba(120,120,140,.18)";
-      const r = Math.min(6, 2.2 * Math.sqrt(zoom));
+      const r = Math.min(6, 2.2 * Math.sqrt(zoom)) * (G.upto && d.year[i] === G.upto ? 2 : 1);  // this year's photos stand out
       cx.fillRect(sx - r / 2, sy - r / 2, r, r);
     }
   }
@@ -1564,17 +1626,53 @@ cv.ondblclick = e => zoomAt(e.offsetX, e.offsetY, 2.5);
 async function galaxyOpen(i) {
   lightbox([(await api("/api/info", { uuid: G.data.uuids[i] })).results], 0);
 }
-views.galaxy = arg => { const q = decodeURIComponent(arg || ""); $("q").value = q; openGalaxy(); lightUp(q); };
-async function lightUp(q) {  // the search box, on this mode: light up the best matches
-  if (!q) return clearHi();
-  if (G.litQ === q) return;
-  G.litQ = q;
-  const r = await api("/api/search", { q, k: 250 });
-  if (G.litQ !== q) return;
-  G.hi = new Set(r.results.map(x => x.uuid)); $("glit").hidden = false; $("glitq").textContent = q;
-  $("gstatus").textContent = `lit: the 250 best matches for “${q}”`;
-  draw();
+views.galaxy = arg => {  // #galaxy/beach lights up a search; #galaxy/?person=Name, everyone's photos of them
+  const [qs, ps] = (arg || "").split("?"), q = decodeURIComponent(qs || ""), person = new URLSearchParams(ps || "").get("person");
+  $("q").value = q; openGalaxy();
+  person ? lightUp("👤 " + person, { person, k: 6000 }, `all of ${person}'s photos`) : lightUp(q, { q, k: 250 }, `the 250 best matches for “${q}”`);
+};
+async function lightUp(key, params, what) {
+  if (!key) return clearHi();
+  if (G.litQ === key) return;
+  G.litQ = key;
+  const r = await api("/api/search", params);
+  if (G.litQ !== key) return;
+  G.hi = new Set(r.results.map(x => x.uuid)); $("glit").hidden = false; $("glitq").textContent = key.startsWith("👤") ? key : "✦ " + key;
+  $("gstatus").textContent = `lit: ${what}`;
+  draw(); flyTo(G.hi);
 }
+// glide to where most of the lit photos are (the closest 70% around their middle)
+function flyTo(set) {
+  const d = G.data; if (!d || !set?.size || !G.w) return;
+  const pts = []; d.uuids.forEach((u, i) => { if (set.has(u)) pts.push([d.x[i], d.y[i]]); });
+  if (!pts.length) return;
+  const mid = k => pts.map(p => p[k]).sort((a, b) => a - b)[pts.length >> 1], mx = mid(0), my = mid(1);
+  const dist = pts.map(p => Math.hypot(p[0] - mx, p[1] - my)).sort((a, b) => a - b);
+  const r = Math.max(0.035, dist[Math.floor(dist.length * 0.7)]);
+  const s1 = Math.max(G.s0 * 0.5, Math.min(G.s0 * 60, Math.min(G.w, G.h) * 0.42 / (r * 1000)));
+  const ox1 = G.w / 2 - mx * 1000 * s1, oy1 = G.h / 2 - my * 1000 * s1, [s0, ox0, oy0] = [G.s, G.ox, G.oy], t0 = performance.now();
+  const step = t => {
+    const k = Math.min(1, (t - t0) / 900), e = 1 - (1 - k) ** 3;
+    G.s = s0 + (s1 - s0) * e; G.ox = ox0 + (ox1 - ox0) * e; G.oy = oy0 + (oy1 - oy0) * e; render();
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+// the years: the slider shows the library as it was up to a year; ▶ plays it growing from the first
+function setUpto(y) { G.upto = y; $("gyl").textContent = y ? `up to ${y}` : "All years"; $("gbig").textContent = y || ""; draw(); }
+function stopGrow() { clearInterval(G.grow); G.grow = 0; $("gplay").textContent = "▶"; }
+$("gyr").oninput = () => { stopGrow(); const v = +$("gyr").value; setUpto(v >= G.y1 ? null : v); };
+$("gplay").onclick = () => {
+  if (G.grow) return stopGrow();
+  if (!G.data) return;
+  let y = G.y0; $("gplay").textContent = "❚❚"; setUpto(y); $("gyr").value = y;
+  G.grow = setInterval(() => {
+    if (++y > G.y1) { stopGrow(); setUpto(null); $("gyr").value = G.y1; return; }
+    setUpto(y); $("gyr").value = y;
+  }, 750);
+};
+$("gppl").onclick = e => { const n = e.target.dataset.name; if (n) go("galaxy/?person=" + encodeURIComponent(n)); };
+leave.galaxy = () => stopGrow();
 function clearHi() {
   const was = G.litQ; G.hi = null; G.litQ = null; $("glit").hidden = true; draw();
   if (was && location.hash !== "#galaxy") history.replaceState(null, "", "#galaxy");
@@ -1582,26 +1680,49 @@ function clearHi() {
 $("glit").onclick = clearHi;
 
 /* ---------- time machine ---------- */
-const T = { years: [], at: 0, timer: 0, q: null };
+const T = { years: [], at: 0, timer: 0, key: null, q: "", person: "", speed: store.get("tspeed", "slow"), front: 0 };
 const T_PRESETS = ["birthday cake", "christmas tree", "beach", "snow", "first day of school", "family dinner",
                    "halloween costume", "fireworks", "hiking in the mountains", "a selfie"];
 $("tchips").innerHTML = T_PRESETS.map(p => `<a class="pill" href="#time/${encodeURIComponent(p)}">${p}</a>`).join("");
-views.time = arg => {
-  const q = decodeURIComponent(arg || "");
-  $("q").value = q || T.q || "";
-  $("tempty").hidden = !!q || !!T.years.length;
-  if (q && q !== T.q) runTime(q);
+const timeHash = (q, person) => "time/" + encodeURIComponent(q || "") + (person ? "?person=" + encodeURIComponent(person) : "");
+views.time = arg => {  // #time/birthday cake, #time/birthday cake?person=Name, or #time/?person=Name (their best each year)
+  const [qs, ps] = (arg || "").split("?"), q = decodeURIComponent(qs || ""), person = new URLSearchParams(ps || "").get("person") || "";
+  $("q").value = q || (person ? "" : T.q);
+  const key = q + "|" + person;
+  $("tempty").hidden = !!(q || person) || !!T.years.length;
+  if ((q || person) && key !== T.key) runTime(q, person);
+  loadPeople().then(p => { $("tpeople").innerHTML = p.slice(0, 10).map(x => `<a href="#${timeHash("", x.name)}" title="${esc(x.name)}"><img src="/thumb/${x.cover}.jpg" alt=""><span>${esc(firstName(x.name))}</span></a>`).join(""); }).catch(() => {});
 };
+$("twho").onclick = async () => {
+  if (!$("twhop").hidden) { $("twhop").hidden = true; return; }
+  const p = await loadPeople().catch(() => []);
+  $("twhop").innerHTML = `<a href="#${timeHash(T.q, "")}">👥 Anyone</a>` + p.slice(0, 16).map(x =>
+    `<a href="#${timeHash(T.q, x.name)}"><img src="/thumb/${x.cover}.jpg" alt="">${esc(x.name)}</a>`).join("");
+  $("twhop").hidden = false;
+};
+$("twhop").onclick = e => { if (e.target.closest("a")) $("twhop").hidden = true; };
+$("tspeed").onclick = e => {
+  const v = e.target.dataset.v; if (!v) return;
+  T.speed = v; store.set("tspeed", v); speedUI(); if (T.timer) { stopPlay(); $("tplay").click(); }
+};
+function speedUI() {
+  document.querySelectorAll("#tspeed button").forEach(b => b.classList.toggle("on", b.dataset.v === T.speed));
+  $("stage").style.setProperty("--fade", T.speed === "flip" ? ".18s" : ".7s");
+}
+speedUI();
 leave.time = () => stopPlay();
-async function runTime(q) {
-  T.q = q; stopPlay();
-  $("tempty").hidden = true; $("tq").textContent = `“${q}”`;
+async function runTime(q, person = "") {
+  const key = q + "|" + person;
+  T.key = key; T.q = q; T.person = person; stopPlay();
+  $("tempty").hidden = true; $("tq").textContent = q ? `“${q}”` : `${person}`;
+  $("twho").textContent = person ? `👤 ${firstName(person)}` : "👤 Anyone";
   $("tstatus").textContent = "travelling…";
-  const r = await api("/api/timeline", { q });
-  if (T.q !== q) return;
+  const r = await api("/api/timeline", person ? { q, person } : { q });
+  if (T.key !== key) return;
+  if (!r.results.length) { $("tstatus").textContent = "nothing found"; $("strip").innerHTML = ""; return; }
   const best = Math.max(...r.results.map(y => y.results[0].score));
-  T.years = r.results.map(y => ({ ...y.results[0], year: y.year, weak: y.results[0].score < best - 0.08 }));
-  $("tstatus").textContent = `${T.years.length} years · faded ones are weak matches · ← →`;
+  T.years = r.results.map(y => ({ ...y.results[0], year: y.year, weak: !!q && y.results[0].score < best - 0.08 }));
+  $("tstatus").textContent = q ? `${T.years.length} years · faded ones are weak matches · ← →` : `${T.years.length} years of ${firstName(person)} · ← →`;
   $("strip").innerHTML = T.years.map((y, i) =>
     `<div data-i="${i}" class="${y.weak ? "weak" : ""}"><img src="/thumb/${y.uuid}.jpg" data-i="${i}">${y.year}</div>`).join("");
   showYear(T.years.findIndex(y => !y.weak));
@@ -1609,16 +1730,18 @@ async function runTime(q) {
 function showYear(i) {
   if (i < 0 || i >= T.years.length) return;
   T.at = i; const y = T.years[i];
-  $("timg").style.opacity = 0;
-  setTimeout(() => { $("timg").src = `/photo/${y.uuid}.jpg`; sharpen($("timg"), y.uuid); $("tbg").style.backgroundImage = `url(/thumb/${y.uuid}.jpg)`; }, 150);
+  // two layers: the next year loads behind, then dissolves over the last one
+  const back = [$("timg"), $("timg2")][1 - T.front], front = [$("timg"), $("timg2")][T.front];
+  back.onload = () => { if (T.years[T.at] !== y) return; back.classList.add("on"); front.classList.remove("on"); T.front = 1 - T.front;
+                        $("tbg").style.backgroundImage = `url(/thumb/${y.uuid}.jpg)`; };
+  back.src = `/photo/${y.uuid}.jpg`; sharpen(back, y.uuid);
   $("tyear").textContent = y.year;
   $("tmeta").innerHTML = `${longDate(y.date, { month:"long", day:"numeric" })}<br>${esc(short(y.place))}<br>${esc(y.persons.slice(0, 4).join(", "))}`;
   document.querySelectorAll("#strip > div").forEach((d, j) => d.classList.toggle("cur", j === i));
   document.querySelector("#strip .cur")?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
   const nx = T.years[i + 1]; if (nx) new Image().src = `/photo/${nx.uuid}.jpg`;  // preload
 }
-$("timg").onload = () => { $("timg").style.opacity = 1; };
-$("timg").onclick = () => lightbox(T.years, T.at);
+$("stage").onclick = e => { if (e.target.classList.contains("tl")) lightbox(T.years, T.at); };
 $("strip").onclick = e => { const i = e.target.closest("[data-i]")?.dataset.i; if (i != null) { stopPlay(); showYear(+i); } };
 function stopPlay() { clearInterval(T.timer); T.timer = 0; $("tplay").textContent = "▶ Play"; }
 $("tplay").onclick = () => {
@@ -1626,7 +1749,7 @@ $("tplay").onclick = () => {
   if (!T.years.length) return;
   $("tplay").textContent = "❚❚ Pause";
   const strong = () => T.years.map((y, i) => i).filter(i => !T.years[i].weak);
-  T.timer = setInterval(() => { const s = strong(); showYear(s[(s.indexOf(T.at) + 1) % s.length]); }, 1800);
+  T.timer = setInterval(() => { const s = strong(); showYear(s[(s.indexOf(T.at) + 1) % s.length]); }, T.speed === "flip" ? 550 : 1800);
 };
 addEventListener("keydown", e => {
   if (tab !== "time" || $("lb").classList.contains("on") || /INPUT|TEXTAREA/.test(e.target.tagName)) return;
@@ -2066,6 +2189,31 @@ async function framePick() {
   $("fpick").onclick = e => { if (e.target.closest("a")) framePickOff(); };
 }
 function framePickOff() { FR.picking = false; $("fpick").hidden = true; framePause(false); frameUI(); }
+
+/* ---------- on your phone: the address and passcode as a QR code (shown on the Mac only) ---------- */
+$("phonebtn").hidden = !SERVER.local;
+$("phonebtn").onclick = async () => {
+  const lan = SERVER.lan;
+  $("phonebody").innerHTML = lan ? `<div class="kick">On your phone or iPad</div><h2>Scan to open Photosearch</h2>
+      <div id="qr"></div>
+      <p>Or open <b>${esc(lan.url)}</b> and type the passcode <b class="code">${esc(lan.code)}</b></p>
+      <p class="status">Same Wi-Fi as this Mac. Then use <b>Share → Add to Home Screen</b> to keep it as an app; on a spare iPad,
+        open 🖼 Photo frame. To sign every device out: <code>ps.py serve --lan --new-passcode</code>.</p>`
+    : `<div class="kick">On your phone or iPad</div><h2>Turn on home Wi-Fi access</h2>
+      <p>Right now only this Mac can open Photosearch. To let the family's phones and iPads in (with a passcode), stop the server
+        (Ctrl-C) and start it with:</p><pre>uv run python ps.py serve --lan</pre>
+      <p class="status">Then come back here: this button shows a QR code to scan.</p>`;
+  $("phone").hidden = false;
+  if (lan) {
+    try {
+      if (!window.QRCode) await new Promise((ok, fail) => { const sc = document.createElement("script");
+        sc.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"; sc.onload = ok; sc.onerror = fail; document.head.append(sc); });
+      new QRCode($("qr"), { text: `${lan.url}/login?code=${encodeURIComponent(lan.code)}`, width: 220, height: 220, colorDark: "#000", colorLight: "#fff" });
+    } catch { $("qr").innerHTML = `<p class="status">(The QR code needs internet to draw; type the address instead.)</p>`; }
+  }
+};
+$("phonex").onclick = () => { $("phone").hidden = true; };
+$("phone").onclick = e => { if (e.target.id === "phone") $("phone").hidden = true; };
 
 /* ---------- photo math ---------- */
 const M = { base: null };

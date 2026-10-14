@@ -12,7 +12,7 @@
 Nothing is downloaded from iCloud: with "Optimize Mac Storage" on we embed the
 local preview Photos keeps (the model only sees ~280 visual tokens anyway).
 """
-import argparse, calendar, functools, io, json, math, os, random, re, sqlite3, sys, threading, time, unicodedata
+import argparse, calendar, functools, hmac, io, json, math, os, random, re, secrets, socket, sqlite3, sys, threading, time, unicodedata
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -448,11 +448,14 @@ def galaxy(con):
     return g
 
 
-def timeline(con, query, per=1):
-    """The best match for `query` in each year."""
-    uuids, M, _ = vectors(con)
-    s = M @ embed_query(query)
+def timeline(con, query, per=1, person=None):
+    """The best match for `query` in each year; with a person, only photos of them (and no query: their best)."""
+    uuids, M, pos = vectors(con)
+    s = M @ embed_query(query) if query else interest(con).copy()
     years = dict(con.execute(f"select uuid, substr(date,1,4) from photos where {DATED}"))
+    if person:
+        theirs = {u for (u,) in con.execute("select uuid from photos where exists (select 1 from json_each(persons) where value = ?)", (person,))}
+        years = {u: y for u, y in years.items() if u in theirs}
     best = {}
     for i in np.argsort(-s):
         y = years.get(uuids[i])
@@ -1210,6 +1213,111 @@ def cmd_today(a):
 
 # ---------------------------------------------------------------- web UI
 
+LAN_FILE = DATA / "lan.json"
+WORDS = ("maple river otter cedar harbor meadow pebble lantern comet willow ember canyon falcon juniper orchard summit "
+         "kettle marble sparrow tulip garnet breeze acorn island").split()
+
+def lan_ip():
+    """This Mac's address on the home network (a UDP "connect" sends nothing; it only picks the route)."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1)); return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
+class LanAccess:
+    """`serve --lan`: phones and tablets on the home network may use the page after typing the family passcode once;
+    each device then keeps a cookie that `serve --lan --new-passcode` revokes. Wrong guesses lock that device out,
+    for longer each time."""
+    def __init__(self, port, new=False):
+        st = {} if new or not LAN_FILE.exists() else json.loads(LAN_FILE.read_text())
+        if not st.get("passcode"):
+            st = dict(passcode=f"{secrets.choice(WORDS)}-{secrets.choice(WORDS)}-{10 + secrets.randbelow(90)}", sessions=[])
+        self.st, self.port, self.ip, self.fails, self.lock = st, port, lan_ip(), {}, threading.Lock()
+        self.save()
+        name = socket.gethostname().lower().removesuffix(".local")
+        self.hosts = {f"{h}:{port}" for h in (self.ip, name, name + ".local")}
+
+    def save(self):
+        LAN_FILE.write_text(json.dumps(self.st)); os.chmod(LAN_FILE, 0o600)
+
+    @property
+    def url(self):
+        return f"http://{self.ip}:{self.port}"
+
+    def signed_in(self, cookies):
+        token = next((c.split("=", 1)[1] for c in (cookies or "").split("; ") if c.startswith("ps_session=")), "")
+        return bool(token) and any(hmac.compare_digest(token, t) for t in self.st["sessions"])
+
+    def sign_in(self, ip, code):
+        """A new session token, or raises PermissionError (wrong code, or locked out after too many)."""
+        with self.lock:
+            n, until = self.fails.get(ip, (0, 0))
+            if time.time() < until:
+                raise PermissionError(f"too many tries: wait {int(until - time.time()) + 1} s")
+            if not hmac.compare_digest(" ".join(str(code).lower().split()).replace(" ", "-"), self.st["passcode"]):
+                n += 1
+                self.fails[ip] = (n, time.time() + min(3600, 60 * 2 ** (n - 5)) if n >= 5 else 0)
+                raise PermissionError("that's not it")
+            self.fails.pop(ip, None)
+            token = secrets.token_urlsafe(24)
+            self.st["sessions"].append(token); self.save()
+            return token
+
+
+LOGIN = """<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Photosearch</title><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#0f0e0c">
+<style>body{margin:0;min-height:100dvh;display:grid;place-items:center;background:#0f0e0c;color:#f4efe6;font:16px -apple-system,system-ui,sans-serif}
+form{display:flex;flex-direction:column;gap:14px;width:min(340px,calc(100% - 40px));text-align:center}
+img{width:84px;height:84px;border-radius:20px;margin:0 auto 6px}h1{font:600 30px ui-serif,"New York",Georgia,serif;margin:0}
+p{color:#a39c90;margin:0 0 6px}input{font:inherit;font-size:18px;padding:13px 16px;border-radius:14px;border:1px solid #2f2b27;background:#1d1b18;color:inherit;text-align:center}
+button{font:inherit;font-weight:600;padding:13px;border-radius:999px;border:0;background:#f2b33d;color:#1a1408}#err{color:#ff8a7a;min-height:1.3em}</style>
+<form id="f"><img src="/icon-192.png" alt=""><h1>Photosearch</h1><p>Type the family passcode. It's shown on the Mac running Photosearch.</p>
+<input id="c" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="e.g. maple-river-42" autofocus><button>Open</button><div id="err"></div></form>
+<script>
+async function go(code) {
+  const r = await fetch("/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code }) });
+  if (r.ok) return location.replace("/");
+  document.getElementById("err").textContent = (await r.json()).error;
+}
+document.getElementById("f").onsubmit = e => { e.preventDefault(); go(document.getElementById("c").value); };
+const code = new URLSearchParams(location.search).get("code");  // the QR code on the Mac carries it
+if (code) { history.replaceState(null, "", "/login"); go(code); }
+</script>"""
+
+
+def app_icon(px):
+    """The app icon: the brand's colour wheel (amber, coral, violet, blue, green, as in the page's logo) around a dark
+    lens. Drawn once, then cached."""
+    f = DATA / f"icon-{px}.png"
+    if not f.exists():
+        from PIL import Image, ImageFilter
+        stops = np.array([(242, 179, 61), (232, 102, 74), (143, 91, 214), (62, 143, 214), (79, 192, 141), (242, 179, 61)], float)
+        y, x = np.mgrid[0:px, 0:px] / px - 0.5
+        t = ((np.degrees(np.arctan2(y, x)) + 110) % 360) / 360 * (len(stops) - 1)
+        i = np.floor(t).astype(int); w = (t - i)[..., None]
+        rgb = stops[i] * (1 - w) + stops[np.minimum(i + 1, len(stops) - 1)] * w
+        r = np.hypot(x, y)[..., None]
+        rgb = rgb * (1.08 - 0.5 * np.clip(r - 0.3, 0, 1))  # a little darker towards the corners
+        lens = r[..., 0] < 0.24
+        rgb[lens] = (15, 14, 12)
+        rgb[(r[..., 0] >= 0.24) & (r[..., 0] < 0.262)] = (246, 241, 232)
+        hl = (np.hypot(x + 0.08, y + 0.08) < 0.035)  # a glint on the lens
+        rgb[hl] = rgb[hl] * 0.75 + 255 * 0.25
+        img = Image.fromarray(np.clip(rgb, 0, 255).astype(np.uint8))
+        img.resize((px * 2, px * 2)).filter(ImageFilter.SMOOTH).resize((px, px), Image.LANCZOS).save(f)
+    return f.read_bytes()
+
+
+MANIFEST = json.dumps(dict(name="Photosearch", short_name="Photos", start_url="/", display="standalone", background_color="#0f0e0c",
+                           theme_color="#0f0e0c", icons=[dict(src="/icon-192.png", sizes="192x192", type="image/png"),
+                                                         dict(src="/icon-512.png", sizes="512x512", type="image/png", purpose="any maskable")]))
+
+
 class ThreadCon:
     """A connection per thread. The server answers requests in parallel, and queries interleaved on one shared
     sqlite connection hand back each other's rows."""
@@ -1226,6 +1334,8 @@ def cmd_serve(a):
     from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
     from urllib.parse import urlparse, parse_qs
     con = ThreadCon()
+    lan = LanAccess(a.port, a.new_passcode) if a.lan else None
+    allowed = {f"localhost:{a.port}", f"127.0.0.1:{a.port}"} | (lan.hosts if lan else set())
     model()  # warm up before first request
     fetcher = Fetcher(con)
 
@@ -1251,7 +1361,7 @@ def cmd_serve(a):
         except Exception as ex:  # offline, bad key, rate limit: search still works without it
             return dict(enabled=True, error=f"{ex.__class__.__name__}: {ex}")
 
-    def api_open(q):  # reveal in Photos via AppleScript
+    def api_open(q):  # reveal in Photos via AppleScript (on this Mac's screen, so only for this Mac)
         import subprocess
         uuid = "".join(c for c in q["uuid"] if c.isalnum() or c in "-/")
         subprocess.run(["osascript", "-e", f'tell application "Photos" to spotlight media item id "{uuid}"'])
@@ -1272,7 +1382,7 @@ def cmd_serve(a):
            "/api/world": lambda q: world(con), "/api/people": lambda q: people(con),
            "/api/person": lambda q: person(con, q.get("name", "")), "/api/days": lambda q: days(con, int(q.get("year", date.today().year))),
            "/api/near": lambda q: near(con, float(q["lat"]), float(q["lon"]), min(500.0, float(q.get("km", 2))), min(120, int(q.get("k", 60)))),
-           "/api/timeline": lambda q: timeline(con, q.get("q", ""), int(q.get("per", 1))),
+           "/api/timeline": lambda q: timeline(con, q.get("q", ""), int(q.get("per", 1)), q.get("person")),
            "/api/game": lambda q: game_round(con, q.get("mode", "year")),
            "/api/math": lambda q: photo_math(con, q["base"], q.get("plus", ""), q.get("minus", ""),
                                              float(q.get("w", 1)), int(q.get("k", 24)))}
@@ -1284,10 +1394,41 @@ def cmd_serve(a):
             self.send_response(code); self.send_header("content-type", ctype)
             self.send_header("content-length", str(len(body))); self.end_headers(); self.wfile.write(body)
 
+        def local(self):
+            return self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+
+        def gate(self, page):
+            """True when this request may go on. Every request must name this server (Host), which stops DNS
+            rebinding: a website whose name resolves to 127.0.0.1 can't read photos through the visitor's browser.
+            This Mac may use everything; other devices (--lan only) need a signed-in session."""
+            if (self.headers.get("host") or "").lower() not in allowed:
+                return self.send(b"forbidden", "text/plain", 403)
+            if self.local() or (lan and lan.signed_in(self.headers.get("cookie"))):
+                return True
+            if page:
+                return self.send(LOGIN.encode(), "text/html; charset=utf-8")
+            return self.send(json.dumps(dict(error="sign in first")).encode(), "application/json", 401)
+
         def do_GET(self):
             u = urlparse(self.path); q = {k: v[0] for k, v in parse_qs(u.query).items() if v[0]}
+            if u.path in ("/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png", "/favicon.ico"):
+                if (self.headers.get("host") or "").lower() not in allowed:  # nothing private here, so no sign-in
+                    return self.send(b"forbidden", "text/plain", 403)
+                if u.path == "/manifest.webmanifest":
+                    return self.send(MANIFEST.encode(), "application/manifest+json")
+                return self.send(app_icon(512 if "512" in u.path else 180 if "apple" in u.path else 192), "image/png")
+            if u.path == "/login":
+                return self.send(LOGIN.encode(), "text/html; charset=utf-8") if (self.headers.get("host") or "").lower() in allowed \
+                    else self.send(b"forbidden", "text/plain", 403)
+            if not self.gate(page=not u.path.startswith(("/api/", "/thumb/", "/photo/"))):
+                return
+            if u.path == "/api/open" and not self.local():
+                return self.send(json.dumps(dict(error="Open in Photos only works on the Mac")).encode(), "application/json", 403)
             if u.path == "/":
-                return self.send((HERE / "ui.html").read_bytes(), "text/html; charset=utf-8")  # re-read: edits show on reload
+                # re-read, so edits show on reload; tell the page whether it's on this Mac, and (only then) how phones get in
+                server = dict(local=self.local(), lan=lan and self.local() and dict(url=lan.url, code=lan.st["passcode"]))
+                page = (HERE / "ui.html").read_text().replace("<script>", f"<script>\nconst SERVER = {json.dumps(server)};", 1)
+                return self.send(page.encode(), "text/html; charset=utf-8")
             name = Path(u.path).name
             try:
                 if u.path.startswith("/thumb/"):
@@ -1317,15 +1458,25 @@ def cmd_serve(a):
                 return self.send(json.dumps(dict(error=str(ex))).encode(), "application/json", 404)
             self.send(b"not found", "text/plain", 404)
 
-        def do_POST(self):  # the requests that write: saving an edited story, fetching full-size copies
+        def do_POST(self):  # the requests that write: signing in, saving an edited story, fetching full-size copies
             # Only this page may write. Other sites can't send JSON here without a CORS preflight, which we never
             # answer; checking Host too stops DNS rebinding (a site whose name resolves to 127.0.0.1).
-            here = {f"localhost:{a.port}", f"127.0.0.1:{a.port}"}
             origin = self.headers.get("origin")
-            if (self.headers.get("host") not in here or (origin and urlparse(origin).netloc not in here)
+            if ((self.headers.get("host") or "").lower() not in allowed or (origin and urlparse(origin).netloc.lower() not in allowed)
                     or self.headers.get("content-type", "").split(";")[0].strip() != "application/json"):
                 return self.send(b"forbidden", "text/plain", 403)
             path = urlparse(self.path).path
+            if path == "/login" and lan:
+                try:
+                    body = json.loads(self.rfile.read(min(4096, int(self.headers.get("content-length") or 0))))
+                    token = lan.sign_in(self.client_address[0], body.get("code", ""))
+                except (PermissionError, ValueError, AttributeError) as ex:
+                    return self.send(json.dumps(dict(error=str(ex) or "that's not it")).encode(), "application/json", 403)
+                self.send_response(200); self.send_header("content-type", "application/json")
+                self.send_header("set-cookie", f"ps_session={token}; Max-Age=31536000; Path=/; HttpOnly; SameSite=Strict")
+                self.send_header("content-length", "2"); self.end_headers(); return self.wfile.write(b"{}")
+            if not self.gate(page=False):
+                return
             if path not in ("/api/story", "/api/sharp"):
                 return self.send(b"not found", "text/plain", 404)
             try:
@@ -1340,8 +1491,11 @@ def cmd_serve(a):
                 return self.send(json.dumps(dict(error=str(ex))).encode(), "application/json", 400)
             self.send(json.dumps(dict(results=res)).encode(), "application/json")
 
-    print(f"http://localhost:{a.port}")
-    ThreadingHTTPServer(("127.0.0.1", a.port), H).serve_forever()
+    print(f"http://localhost:{a.port}", flush=True)
+    if lan:
+        print(f"Phones and tablets on this Wi-Fi: {lan.url}  passcode: {lan.st['passcode']}\n"
+              f"(or scan the QR code under 📱 on this Mac's page; macOS may ask to allow incoming connections: allow it)", flush=True)
+    ThreadingHTTPServer(("0.0.0.0" if lan else "127.0.0.1", a.port), H).serve_forever()
 
 
 # ---------------------------------------------------------------- cli
@@ -1363,7 +1517,10 @@ def main():
     filters(p); p.set_defaults(fn=cmd_search)
     p = sub.add_parser("similar"); p.add_argument("uuid"); filters(p); p.set_defaults(fn=cmd_similar)
     p = sub.add_parser("album"); p.add_argument("name"); p.add_argument("query"); filters(p); p.set_defaults(fn=cmd_album)
-    p = sub.add_parser("serve"); p.add_argument("--port", type=int, default=8765); p.set_defaults(fn=cmd_serve)
+    p = sub.add_parser("serve"); p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--lan", action="store_true", help="also let phones and tablets on this network in, with a passcode")
+    p.add_argument("--new-passcode", action="store_true", help="with --lan: a new passcode, and every device signs in again")
+    p.set_defaults(fn=cmd_serve)
     p = sub.add_parser("fetch", help="full-size copies from iCloud for photos whose local preview is small")
     p.add_argument("what", nargs="+", help="story ids (2025, trip-2024-05-02) or photo uuids"); p.set_defaults(fn=cmd_fetch)
     p = sub.add_parser("thumbs", help="rebuild thumbnails at the current size, where the source allows")

@@ -145,8 +145,8 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 | **Search** | Describe a photo. Results keep their shape, in rows like a photo book, sorted by best match or by date. Picking a person or place from the suggestions shows their most interesting photos. Put what you *don't* want in **without…** (e.g. "selfies"): the model is weak at "no …" inside the description. Every search has its own address, so back and forward work. |
 | **People** | A page per person tagged in Photos: their best photo from every year (**▶ through the years** plays them in turn), who they're most often photographed with, their places and favourite photos. Portraits are picked by the search model as the closest thing to a close-up of a face. Names anywhere (suggestions, the big photo view) lead here. |
 | **Map** | Everywhere you've been, each place as a pin showing its best photo and how many were taken there. It opens on home; chips along the bottom fly to the other regions (named like trips: "Lisbon", "Sintra & Cascais") or show everywhere. Nearby places merge until you zoom in. Tap a pin for that place's best photos, or **▶ Slideshow** them. Map tiles come from OpenStreetMap (so it needs internet); your photos never leave the Mac. |
-| **Galaxy** | Your whole library on one zoomable map, with similar photos next to each other and colored by year. Scroll to zoom, drag to pan, hover to peek. Type in the search box to see where, say, "beach" lives. The first visit takes a minute to lay out the map. |
-| **Time Machine** | Pick something that happens every year ("birthday cake", "christmas tree") and flip through the best match from each year. ▶ or space plays them in turn. |
+| **Galaxy** | Your whole library on one zoomable map, with similar photos next to each other and colored by year. Scroll to zoom, drag to pan, hover to peek. Type in the search box to see where, say, "beach" lives, and the map glides there; the faces along the bottom light up everyone's photos of one person. **▶** plays the years: the library grows from the first photo, each year's new ones standing out. The first visit takes a minute to lay out the map. |
+| **Time Machine** | Pick something that happens every year ("birthday cake", "christmas tree") and flip through the best match from each year, or follow one person (👤): their best photo each year, or just their birthdays. ▶ or space plays them in turn, slowly dissolving or as a quick **Flipbook**. |
 | **Play** | *Guess the Year*, *Guess the Place* and *Which Came First?* (two photos: tap the older one). Play alone (10 rounds, best scores kept) or add players to pass the phone around: everyone gets 5 turns and the end shows who won. **Photo Math** lives here too: start from a photo or words, then add and take away ideas, *this photo + snow − summer*. |
 | **Photo frame** | `#frame`, or from Home: a slow, endless full-screen slideshow of your best photos with the time and date, for a spare iPad or TV. It keeps the screen awake. **⚙ What to show** picks everything, on this day, one person, or any search (`#frame/?person=…`, `#frame/?q=…`). **▶ Slideshow** on any search, place or open photo plays just those. |
 | **Stories** | Every trip (found automatically from where photos were taken) and every year as a slideshow of its best, most varied moments, with chapters and captions. **⤓** saves one as a single HTML file (photos included) you can send to family; **✎** edits it. |
@@ -172,6 +172,28 @@ shows it in the Photos app (the first time, macOS asks whether your terminal may
 Search results come 48 at a time; **Show more** at the bottom fetches the next batch.
 
 *Guess the Place* loads its map from OpenStreetMap, so it needs internet; only map tiles are fetched, never your photos.
+
+### On your phone and iPad
+
+By default only this Mac can open the page. To let the family in from phones and iPads on the same Wi-Fi:
+
+```bash
+uv run python ps.py serve --lan
+```
+
+It prints an address like `http://192.168.4.112:8765` and a passcode like `maple-river-42` (kept in `data/lan.json`).
+On the Mac's page, the 📱 button shows a QR code: scan it with a phone camera and the phone is signed in. Or open the
+address and type the passcode. Each device stays signed in (a cookie) until you run
+`ps.py serve --lan --new-passcode`, which makes a new passcode and signs every device out. Five wrong guesses lock
+a device out for a minute, then longer each time.
+
+In Safari, **Share → Add to Home Screen** keeps it as an app with its own icon, full screen. A spare iPad makes a
+good photo frame: open 🖼 Photo frame and pick what it shows. *Open in Photos* only appears on the Mac, since it opens
+Photos there.
+
+Good to know: the connection is plain HTTP, so the passcode and photos cross your home Wi-Fi unencrypted. That's fine on
+a home network you trust, but don't use `--lan` on public Wi-Fi. The first time, macOS may ask whether Python may
+accept incoming connections: allow it. Without `--lan`, the server only answers on this Mac.
 
 Stop the server with Ctrl-C. It only runs while that terminal window is open. Claude is only needed for the
 MCP features (asking about photos in chat, curated stories); everything in the web page works without it.
