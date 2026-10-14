@@ -5,13 +5,14 @@
   ps.py similar UUID [-k 24]                  photos that look like this one
   ps.py serve  [--port 8765]                  local web UI: search, galaxy, time machine, games, photo math
   ps.py album "Name" "query" [-k 50]          put the results into a Photos album
+  ps.py today  [--day 08-14]                  photos from this day in earlier years
   ps.py trips                                 trips, found from where photos were taken
   ps.py review 2025|trip-2024-05-02 [--export F.html]   a year or a trip as a slideshow
 
 Nothing is downloaded from iCloud: with "Optimize Mac Storage" on we embed the
 local preview Photos keeps (the model only sees ~280 visual tokens anyway).
 """
-import argparse, functools, io, json, math, os, random, re, sqlite3, sys, time, unicodedata
+import argparse, calendar, functools, io, json, math, os, random, re, sqlite3, sys, time, unicodedata
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -444,7 +445,8 @@ INTERESTING = ["people at a party or celebration", "a family on vacation", "a be
                "a city street while travelling", "friends sharing a meal", "a festival or event", "a group photo",
                "a famous landmark", "animals"]
 BORING = ["a screenshot of a phone screen", "a photo of a document, receipt or paper", "a dark blurry photo",
-          "a whiteboard or a sign with text", "an object photographed for reference", "a photo of a computer screen"]
+          "a whiteboard or a sign with text", "an object photographed for reference", "a photo of a computer screen",
+          "a photo of an ID card, passport or credit card"]
 _interest = (None, None)
 
 def interest(con):
@@ -544,10 +546,16 @@ def span_photos(con, start, end, home=None):
             if r[0] in pos and not (home and r[3] is not None and km(home, (r[3], r[4])) <= AWAY_KM)]
 
 
+# Highlights never include photos that look more boring than interesting (interest below 0: ~10% of the library,
+# mostly documents, screenshots and ID cards), even when a day has nothing else: better no photo than a passport.
+MIN_INTEREST = 0.0
+
+
 def highlights(con, start, end, n=40, home=None):
     """A varied set of the best photos taken from day start to day end (inclusive), in date order: candidates for a
-    review (home as in span_photos). Greedy pick of the most interesting photo (family photos count a little extra), skipping near-duplicates
-    of anything already picked and spreading picks across events (runs of photos with no day-long gap)."""
+    review (home as in span_photos). Greedy pick of the most interesting photo (family photos count a little extra),
+    skipping near-duplicates of anything already picked and spreading picks across events (runs of photos with no
+    day-long gap)."""
     uuids, M, pos = vectors(con)
     rows = span_photos(con, start, end, home)
     if not rows:
@@ -555,7 +563,9 @@ def highlights(con, start, end, n=40, home=None):
     times = [datetime.fromisoformat(r[1]) for r in rows]
     event = np.cumsum([0] + [(b - a).total_seconds() > 86400 for a, b in zip(times, times[1:])])
     V = M[[pos[r[0]] for r in rows]]
-    base = interest(con)[[pos[r[0]] for r in rows]] + 0.02 * np.array([min(len(json.loads(r[2])), 3) for r in rows])
+    score = interest(con)[[pos[r[0]] for r in rows]]
+    base = score + 0.02 * np.array([min(len(json.loads(r[2])), 3) for r in rows])
+    base[score < MIN_INTEREST] = -np.inf
     picked, per_event, closest = [], np.zeros(event[-1] + 1), np.full(len(rows), -1.0)
     for _ in range(min(n, len(rows))):
         val = base - 0.3 * np.clip(closest, 0, None) - 0.04 * per_event[event]
@@ -835,6 +845,48 @@ def cmd_review(a):
         print(f"wrote {a.export} ({Path(a.export).stat().st_size / 1e6:.1f} MB): one file, opens in any browser")
 
 
+# ---------------------------------------------------------------- on this day
+
+def on_this_day(con, day=None, per_year=4):
+    """The best few photos from this date (MM-DD, default today) in each earlier year, newest first, each with the
+    trip it was part of, if any. If no year has photos on the day itself, it's the week around it instead."""
+    today = date.today()
+    day = day or today.strftime("%m-%d")
+    try:
+        m, d = map(int, re.fullmatch(r"(\d{2})-(\d{2})", day).groups())
+        date(2000, m, d)  # a leap year, so 02-29 is a day
+    except (AttributeError, ValueError):
+        raise LookupError(f"not a day: {day!r} (MM-DD, e.g. 08-14)")
+    years = [int(y) for (y,) in con.execute(f"select distinct substr(date,1,4) from photos where {DATED} order by 1 desc")]
+    found = trips(con)
+    for window in (0, 3):
+        out = []
+        for y in years:
+            center = date(y, m, min(d, 28) if (m, d) == (2, 29) and not calendar.isleap(y) else d)
+            if center >= today:
+                continue
+            a, b = (center - timedelta(days=window)).isoformat(), (center + timedelta(days=window)).isoformat()
+            picks = highlights(con, a, b, per_year)
+            if picks:
+                t = next((t for t in found if t["start"] <= center.isoformat() <= t["end"]), None)
+                out.append(dict(year=y, ago=today.year - y, date=center.isoformat(), photos=picks,
+                                trip=t and {k: t[k] for k in ("id", "name", "start", "end")}))
+        if out:
+            break
+    return dict(day=f"{m:02}-{d:02}", window=window, years=out)
+
+
+def cmd_today(a):
+    r = on_this_day(db(), a.day)
+    if r["window"]:
+        print(f"nothing on {r['day']} itself; the week around it:")
+    for y in r["years"]:
+        trip = f"  (trip: {y['trip']['name']}, {y['trip']['id']})" if y["trip"] else ""
+        ago = "this year" if not y["ago"] else f"{y['ago']} year{'s' * (y['ago'] > 1)} ago"
+        print(f"\n{y['year']} · {ago}{trip}")
+        show([dict(x, score=0.0) for x in y["photos"]])
+
+
 # ---------------------------------------------------------------- web UI
 
 def cmd_serve(a):
@@ -873,7 +925,7 @@ def cmd_serve(a):
             raise LookupError(q["uuid"])
         return info[q["uuid"]]
 
-    api = {"/api/stories": lambda q: stories(con), "/api/story": lambda q: story_for_editor(con, q.get("id", "")),
+    api = {"/api/today": lambda q: on_this_day(con, q.get("day")), "/api/stories": lambda q: stories(con), "/api/story": lambda q: story_for_editor(con, q.get("id", "")),
            "/api/story_photos": lambda q: story_candidates(con, q.get("id", ""), q.get("q"), q.get("like")),
            "/api/search": api_search, "/api/open": api_open, "/api/info": api_info, "/api/parse": api_parse,
            "/api/galaxy": lambda q: galaxy(con),
@@ -958,6 +1010,8 @@ def main():
     p = sub.add_parser("similar"); p.add_argument("uuid"); filters(p); p.set_defaults(fn=cmd_similar)
     p = sub.add_parser("album"); p.add_argument("name"); p.add_argument("query"); filters(p); p.set_defaults(fn=cmd_album)
     p = sub.add_parser("serve"); p.add_argument("--port", type=int, default=8765); p.set_defaults(fn=cmd_serve)
+    p = sub.add_parser("today", help="photos from this day in earlier years")
+    p.add_argument("--day", help="MM-DD instead of today"); p.set_defaults(fn=cmd_today)
     p = sub.add_parser("trips", help="trips, found from where photos were taken"); p.set_defaults(fn=cmd_trips)
     p = sub.add_parser("review", help="a year or trip as a slideshow: build (if needed), optionally export as one file")
     p.add_argument("story", help="a year (2025) or a trip id from `ps.py trips` (trip-2024-05-02)")

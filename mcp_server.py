@@ -107,6 +107,24 @@ class Chapter(TypedDict, total=False):
 
 
 @mcp.tool(annotations=READ)
+def on_this_day(day: str | None = None) -> list:
+    """The best few photos from this date in each earlier year (day: "MM-DD", default today), with the trip each
+    was part of, as one numbered contact sheet plus the details. Falls back to the week around the day if the day
+    itself has none. Look at the sheet before describing what was happening."""
+    r = ps.on_this_day(con, day)
+    if not r["years"]:
+        return [f"no photos from around {r['day']} in any earlier year"]
+    photos = [p for y in r["years"] for p in y["photos"]][:SHEET_MAX]
+    sheet = ps.contact_sheet(con, [p["uuid"] for p in photos], cell=CELL)
+    n, out = 0, []
+    for y in r["years"]:
+        nums = list(range(n + 1, n + 1 + len(y["photos"]))); n += len(y["photos"])
+        out.append(dict(year=y["year"], years_ago=y["ago"], trip=y["trip"], photos=[dict(**({"n": k} if k <= SHEET_MAX else {}), **p)  # past the sheet: no number
+                                                                                 for k, p in zip(nums, tidy(y["photos"]))]))
+    return [Image(data=sheet, format="jpeg"), json.dumps(dict(day=r["day"], week_around=bool(r["window"]), years=out), ensure_ascii=False)]
+
+
+@mcp.tool(annotations=READ)
 def list_stories() -> list[dict]:
     """The trips (found from where photos were taken) and years that can be made into a slideshow, newest first,
     with their ids, days, photo counts, and who made the current review (none yet, "auto" or "claude")."""

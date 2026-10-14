@@ -132,6 +132,7 @@ Open **http://localhost:8765**. It works while `index` is still running, and pic
 
 | Tab | What it does |
 |---|---|
+| **On this day** | What the Search tab opens on: the best few photos from today's date in each earlier year, and which trip you were on (with a link to its story). ‹ › steps through other days; `ps.py today` does the same in the terminal. Photos that look like documents, screenshots or ID cards are left out. |
 | **Search** | Describe a photo. Put what you *don't* want in **without…** (e.g. "selfies"): the model is weak at "no …" inside the description. Filter by person (names you've tagged in Photos), date range, or photo/video. |
 | **Galaxy** | Your whole library on one zoomable map, with similar photos next to each other and colored by year. Scroll to zoom, drag to pan, hover to peek. Type in *Light up…* to see where, say, "beach" lives. The first visit takes a minute to lay out the map. |
 | **Time Machine** | Pick something that happens every year ("birthday cake", "christmas tree") and flip through the best match from each year. |
@@ -186,7 +187,7 @@ claude mcp add --scope user photosearch -- uv run --directory "$PWD" python mcp_
 Then, in a new Claude Code session, ask things like *"find photos of Sam at the beach, no selfies, and make an
 album"*. Claude searches, **looks at the results** on a numbered contact sheet, drops the wrong ones, and only then
 answers or builds the album. Tools: `search_photos` (with `exclude`, people, place, date and kind filters),
-`similar_photos`, `best_per_year`, `view_photos`, `library_overview`, `list_stories`, `story_highlights`, `save_story`,
+`similar_photos`, `best_per_year`, `view_photos`, `library_overview`, `on_this_day`, `list_stories`, `story_highlights`, `save_story`,
 `make_album` (adds only, never removes).
 
 ### Stories: trips and years
@@ -321,5 +322,5 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
 **Status:** full library indexed (16,975 items in 140 min on an M3 Pro; 42 skipped for lack of a local preview). Every web tab checked in headless
 Chrome. `album` / `make_album` have not been run yet. 1,042 photos carry a placeholder date (2002-01-01 00:00); they are treated as undated.
 
-**Ideas next:** *on this day*; smart albums you teach with a few examples; duplicate cleanup;
+**Ideas next:** smart albums you teach with a few examples; duplicate cleanup;
 index the audio track of videos.

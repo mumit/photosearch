@@ -39,6 +39,15 @@
   .tag { background:var(--line); border-radius:4px; padding:0 4px; }
   .pad { padding:16px 20px; }
 
+  /* on this day */
+  #today { max-width:1400px; }
+  .otdhead { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .otdhead h2 { margin:0; font-size:22px; }
+  .ty { margin:18px 0 6px; }
+  .ty h3 { margin:0 0 8px; font-size:16px; font-weight:600; }
+  .ty h3 span { color:var(--mut); font-weight:400; }
+  .ty .grid { padding:0; }
+
   /* galaxy */
   #galaxy { position:relative; overflow:hidden; }
   #gcanvas { position:absolute; inset:0; width:100%; height:100%; cursor:grab; touch-action:none; background:#0b0b10; }
@@ -182,7 +191,7 @@
 </header>
 
 <main>
-  <section id="search"><div class="grid" id="grid"></div></section>
+  <section id="search"><div class="pad" id="today" hidden></div><div class="grid" id="grid"></div></section>
 
   <section id="galaxy">
     <canvas id="gcanvas"></canvas>
@@ -278,7 +287,8 @@ function gridHTML(results) {
   return results.map((x, i) => `
     <figure>
       <img loading="lazy" src="/thumb/${x.uuid}.jpg" data-i="${i}" title="${esc(x.place)} ${esc(x.persons.join(", "))}">
-      <figcaption><span>${x.undated ? "date unknown" : x.date}${x.kind === "video" ? ' <span class="tag">video</span>' : ""}</span><span>${x.score.toFixed(2)}</span></figcaption>
+      <figcaption>${x.score == null ? `<span>${esc((x.place || "").split(",")[0])}</span>` :  /* on this day: the year's in the heading */
+        `<span>${x.undated ? "date unknown" : x.date}${x.kind === "video" ? ' <span class="tag">video</span>' : ""}</span><span>${x.score.toFixed(2)}</span>`}</figcaption>
     </figure>`).join("");
 }
 function bindGrid(el, results) {
@@ -338,11 +348,45 @@ async function runSearch(params) {
   const r = await api("/api/search", params);
   $("status").textContent = `${r.results.length} results from ${r.total.toLocaleString()} indexed · ${r.ms} ms` +
     (params.like ? " · showing photos similar to the one you picked" : "") + (note ? " · " + note : "");
+  $("today").hidden = true;
   bindGrid($("grid"), r.results);
   scrollTo(0, 0);
 }
-$("f").onsubmit = e => { e.preventDefault(); if ($("q").value.trim()) runSearch({ q: $("q").value }); };
-views.search = () => $("q").focus();
+// an empty search goes back to "on this day"
+$("f").onsubmit = e => { e.preventDefault(); $("q").value.trim() ? runSearch({ q: $("q").value }) : showToday(); };
+views.search = () => { $("q").focus(); if (!$("grid").innerHTML && !OTD.shown) showToday(); };
+
+/* ---------- on this day: the landing view of the search tab ---------- */
+const OTD = { shown: false };
+const md = d => `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const shiftDay = (day, n) => { const [m, d] = day.split("-").map(Number); return md(new Date(2000, m - 1, d + n)); };  // 2000: has Feb 29
+async function showToday(day) {
+  OTD.shown = true;
+  $("grid").innerHTML = ""; $("status").textContent = "";
+  let r;
+  try { r = (await api("/api/today", day ? { day } : {})).results; }
+  catch (e) { $("today").hidden = false; $("today").innerHTML = `<p class="status">${esc(e.message)}</p>`; return; }
+  const [m, d] = r.day.split("-").map(Number), name = new Date(2000, m - 1, d).toLocaleDateString(undefined, { month:"long", day:"numeric" });
+  const isToday = r.day === md(new Date());
+  const ago = y => !y.ago ? "Earlier this year" : y.ago === 1 ? "A year ago" : `${y.ago} years ago`;
+  $("today").hidden = false;
+  $("today").innerHTML = `
+    <div class="otdhead">
+      <button class="ghost tiny" data-day="${shiftDay(r.day, -1)}" title="the day before">‹</button>
+      <h2>${isToday ? "On this day" : name}</h2>
+      <button class="ghost tiny" data-day="${shiftDay(r.day, 1)}" title="the day after">›</button>
+      <span class="status" style="margin:0">${isToday ? name : `<a href="#search" data-day="">back to today</a>`}</span>
+    </div>
+    ${r.window ? `<p class="status">No photos on ${name} itself in any year, so here's the week around it.</p>` : ""}
+    ${r.years.map((y, k) => `<div class="ty">
+      <h3>${ago(y)} <span>· ${y.year}${y.trip ? ` · on the <a href="/review/${y.trip.id}" target="_blank">${esc(y.trip.name)} trip ▶</a>` : ""}</span></h3>
+      <div class="grid" data-k="${k}"></div></div>`).join("") || `<p class="status">No photos from around ${name} in earlier years.</p>`}`;
+  r.years.forEach((y, k) => bindGrid($("today").querySelector(`.grid[data-k="${k}"]`), y.photos));
+}
+$("today").addEventListener("click", e => {
+  const b = e.target.closest("[data-day]"); if (!b) return;
+  e.preventDefault(); showToday(b.dataset.day || undefined);
+});
 
 /* ---------- galaxy ---------- */
 const G = { data: null, s: 1, ox: 0, oy: 0, hi: null, imgs: new Map(), vis: [], raf: 0 };
