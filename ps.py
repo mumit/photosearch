@@ -510,24 +510,108 @@ def overview(con):
     return dict(people=people.most_common(80), places=places.most_common(120), years=sorted(years.items()))
 
 
+PORTRAIT = "a close-up portrait photo of a person's smiling face"
+
+def portraits(con, rows):
+    """rows: (uuid, year, number of other people). The best portrait among them: a close-up of a face (the search model
+    can tell), from the last three years they were photographed (kids change), preferably of them alone."""
+    _, M, pos = vectors(con)
+    score = interest(con)
+    rows = [r for r in rows if r[0] in pos and score[pos[r[0]]] >= MIN_INTEREST] or rows  # not an ID card or a screenshot
+    last = max(r[1] for r in rows)
+    cand = [r for r in rows if r[1] >= last - 2 and r[0] in pos]
+    q = embed_query(PORTRAIT)
+    return max(cand, key=lambda r: float(M[pos[r[0]]] @ q) - 0.02 * min(r[2], 4))[0]
+
+
+def people(con, n=30):
+    """The most photographed people, each with a portrait, for the home page."""
+    _, _, pos = vectors(con)
+    count, rows = Counter(), defaultdict(list)
+    for u, ps, kind, y in con.execute(f"select uuid, persons, kind, cast(substr(date,1,4) as int) from photos where persons != '[]' and {DATED}"):
+        if u not in pos:
+            continue
+        names = json.loads(ps)
+        count.update(names)
+        if kind == "photo":
+            for name in names:
+                rows[name].append((u, y, len(names) - 1))
+    return [dict(name=p, n=c, cover=portraits(con, rows[p]) if rows[p] else None) for p, c in count.most_common(n)]
+
+
+def person(con, name):
+    """One person's page: their best photo each year, who they're photographed with, and where."""
+    uuids, _, pos = vectors(con)
+    score = interest(con)
+    rows = [r for r in con.execute(f"select uuid, substr(date,1,10), persons, place, kind from photos where {DATED} and "
+                                   "exists (select 1 from json_each(persons) where value = ?)", (name,)) if r[0] in pos]
+    if not rows:
+        raise LookupError(f"nobody called {name!r} is tagged")
+    by_year, with_, places, faces = {}, Counter(), Counter(), []
+    for u, d, ps, place, kind in rows:
+        others = [p for p in json.loads(ps) if p != name]
+        with_.update(others)
+        if place:
+            places[short_place(place)] += 1
+        s_ = score[pos[u]] - 0.03 * len(others)
+        if kind == "photo":
+            faces.append((u, int(d[:4]), len(others)))
+        if kind == "photo" and s_ > by_year.get(d[:4], (-9, None))[0]:
+            by_year[d[:4]] = (s_, u)
+    info = photo_info(con, [u for _, u in by_year.values()])
+    dates = sorted(r[1] for r in rows)
+    return dict(name=name, n=len(rows), first=dates[0], last=dates[-1], portrait=portraits(con, faces) if faces else None,
+                years=[dict(info[u], year=int(y)) for y, (_, u) in sorted(by_year.items())],
+                together=with_.most_common(8), places=places.most_common(8))
+
+
+def days(con, year):
+    """Every day of a year that has photos: how many, and the most interesting one, for a calendar heatmap."""
+    uuids, _, pos = vectors(con)
+    score = interest(con)
+    out = {}
+    for u, d in con.execute(f"select uuid, substr(date,1,10) from photos where substr(date,1,4) = ? and {DATED}", (str(year),)):
+        if u not in pos:
+            continue
+        c = out.setdefault(d, [0, -9, None])
+        c[0] += 1
+        if score[pos[u]] > c[1]:
+            c[1], c[2] = float(score[pos[u]]), u
+    return dict(year=int(year), days=[dict(d=d, n=c[0], cover=c[2]) for d, c in sorted(out.items())])
+
+
 def world(con):
-    """Where the photos were taken, in ~1 km cells: position, count, the most interesting photo, the place's name."""
+    """Where the photos were taken, in ~1 km cells (position, count, the most interesting photo, the place's name), and
+    the regions they make: cells within ~80 km of the busiest one, named like trips are ("Lisbon")."""
     uuids, _, pos = vectors(con)
     score = interest(con)
     cells = {}
-    for u, la, lo, place, d in con.execute("select uuid, lat, lon, place, substr(date,1,10) from photos where lat is not null and lon is not null"):
+    for u, la, lo, place, d, g in con.execute("select uuid, lat, lon, place, substr(date,1,10), geo from photos where lat is not null and lon is not null"):
         if u not in pos:
             continue
-        c = cells.setdefault((round(la, 2), round(lo, 2)), dict(lat=0.0, lon=0.0, n=0, best=-9, cover=None, names=Counter(), first=d, last=d))
+        c = cells.setdefault((round(la, 2), round(lo, 2)), dict(lat=0.0, lon=0.0, n=0, best=-9, cover=None, names=Counter(), geos=[], first=d, last=d))
+        if len(c["geos"]) < 50:
+            c["geos"].append(json.loads(g or "{}"))
         c["lat"] += la; c["lon"] += lo; c["n"] += 1
         if place:
             c["names"][short_place(place)] += 1
         c["first"], c["last"] = min(c["first"], d), max(c["last"], d)
         if score[pos[u]] > c["best"]:
             c.update(best=float(score[pos[u]]), cover=u)
-    return [dict(lat=round(c["lat"] / c["n"], 5), lon=round(c["lon"] / c["n"], 5), n=c["n"], cover=c["cover"],
-                 place=c["names"].most_common(1)[0][0] if c["names"] else "",
-                 first=c["first"], last=c["last"]) for c in cells.values()]
+    out = [dict(lat=round(c["lat"] / c["n"], 5), lon=round(c["lon"] / c["n"], 5), n=c["n"], cover=c["cover"],
+                place=c["names"].most_common(1)[0][0] if c["names"] else "", first=c["first"], last=c["last"]) for c in cells.values()]
+    regions = []
+    for k in sorted(range(len(out)), key=lambda k: -out[k]["n"]):
+        c = out[k]
+        r = next((r for r in regions if km((r["lat"], r["lon"]), (c["lat"], c["lon"])) < 80), None)
+        if r is None:
+            r = dict(lat=c["lat"], lon=c["lon"], n=0, cells=[], geos=[]); regions.append(r)
+        r["n"] += c["n"]; r["cells"].append(k); r["geos"] += list(cells.values())[k]["geos"]
+    for r in regions:
+        ks = r["cells"]
+        r.update(name=trip_name(r.pop("geos")), bounds=[min(out[k]["lat"] for k in ks), min(out[k]["lon"] for k in ks),
+                                                       max(out[k]["lat"] for k in ks), max(out[k]["lon"] for k in ks)])
+    return dict(cells=out, regions=regions)
 
 
 def near(con, lat, lon, radius_km=2.0, k=60):
@@ -1185,7 +1269,8 @@ def cmd_serve(a):
            "/api/search": api_search, "/api/open": api_open, "/api/info": api_info, "/api/parse": api_parse,
            "/api/galaxy": lambda q: galaxy(con), "/api/overview": lambda q: overview(con),
            "/api/rediscover": lambda q: rediscover(con, min(60, int(q.get("n", 24)))),
-           "/api/world": lambda q: world(con),
+           "/api/world": lambda q: world(con), "/api/people": lambda q: people(con),
+           "/api/person": lambda q: person(con, q.get("name", "")), "/api/days": lambda q: days(con, int(q.get("year", date.today().year))),
            "/api/near": lambda q: near(con, float(q["lat"]), float(q["lon"]), min(500.0, float(q.get("km", 2))), min(120, int(q.get("k", 60)))),
            "/api/timeline": lambda q: timeline(con, q.get("q", ""), int(q.get("per", 1))),
            "/api/game": lambda q: game_round(con, q.get("mode", "year")),

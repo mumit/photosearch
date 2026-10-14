@@ -452,6 +452,60 @@
   .tghost { position:fixed; left:0; top:0; width:100px; height:100px; object-fit:cover; border-radius:12px; z-index:80; pointer-events:none;
             box-shadow:0 18px 40px rgba(0,0,0,.5); border:3px solid var(--acc); }
   .strip figure { -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+
+  /* ---------- round three: people, calendar, regions, frame picker, transitions ---------- */
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration:.22s; }
+  header { view-transition-name:header; }
+  nav#tabs { view-transition-name:dock; }
+  .avatar { display:flex; flex-direction:column; align-items:center; gap:3px; width:112px; text-decoration:none; color:var(--fg); }
+  .avatar img, .avatar .ini { width:100px; height:100px; border-radius:50%; object-fit:cover; border:2px solid var(--line); transition:transform .25s, border-color .25s; background:var(--bg2); }
+  .avatar .ini { display:grid; place-items:center; font:600 30px var(--serif); color:var(--mut); }
+  .avatar:hover img, .avatar:hover .ini { border-color:var(--acc); transform:scale(1.05); }
+  .avatar b { font-size:13px; font-weight:600; text-align:center; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:4px; }
+  .avatar small { color:var(--mut); font-size:11px; }
+  .avatars { display:flex; flex-wrap:wrap; gap:16px; padding:0 clamp(16px, 4vw, 48px); }
+  .shelf.people { gap:14px; }
+  .shelf.tall { --sh:clamp(200px, 30vw, 340px); }
+  .phead { display:flex; align-items:center; gap:clamp(16px, 3vw, 36px); padding:36px clamp(16px, 4vw, 48px) 6px; flex-wrap:wrap; }
+  .pportrait { width:clamp(110px, 14vw, 170px); height:clamp(110px, 14vw, 170px); border-radius:50%; object-fit:cover; border:3px solid var(--acc);
+               box-shadow:0 0 0 8px color-mix(in srgb, var(--acc) 15%, transparent); }
+  .phead h1 { font-size:clamp(40px, 7vw, 84px); line-height:.95; letter-spacing:-.03em; margin:8px 0 14px; }
+  .pbtns { display:flex; gap:8px; flex-wrap:wrap; }
+  #pbest { padding:0 clamp(16px, 4vw, 48px) 48px; }
+  #calbox { position:relative; }
+  .caly { font:600 22px var(--serif); min-width:56px; text-align:center; }
+  #cal { overflow-x:auto; padding:0 clamp(16px, 4vw, 48px) 8px; --c:clamp(11px, 1.35vw, 17px); scrollbar-width:thin; }
+  .calm, .calg { display:grid; grid-template-columns:repeat(54, var(--c)); gap:3px; width:max-content; }
+  .calm { font-size:11px; color:var(--mut); margin-bottom:6px; height:14px; }
+  .calm span { grid-row:1; white-space:nowrap; }
+  .calg { grid-template-rows:repeat(7, var(--c)); grid-auto-flow:column; }
+  .calg i { border-radius:3px; background:color-mix(in srgb, var(--acc) calc(var(--v) * 100%), var(--bg2)); cursor:pointer; transition:transform .1s; }
+  .calg i:hover { transform:scale(1.5); outline:1px solid var(--fg); position:relative; z-index:1; }
+  .calg i.none { background:var(--bg2); cursor:default; } .calg i.none:hover { transform:none; outline:0; }
+  .calg i.pad { background:none; cursor:default; } .calg i.pad:hover { transform:none; outline:0; }
+  #caltip { position:absolute; z-index:5; display:flex; gap:10px; align-items:center; background:var(--card); border:1px solid var(--line); border-radius:12px;
+            padding:6px 12px 6px 6px; box-shadow:0 12px 30px rgba(0,0,0,.35); font-size:13px; pointer-events:none; }
+  #caltip img { width:64px; height:64px; border-radius:8px; object-fit:cover; }
+  #wregions { position:absolute; left:14px; right:60px; bottom:14px; z-index:500; display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; padding:2px; }
+  #wregions .pill { flex:none; background:color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); font-size:13px; }
+  #wregions .pill small { color:var(--mut); }
+  @media (max-width: 760px) { #wregions { right:52px; bottom:10px; left:10px; } }
+  .lwt { display:inline-flex; gap:2px; background:rgba(255,255,255,.08); border-radius:999px; padding:2px; }
+  .lwt button { background:none; border:0; color:#bbb; padding:4px 10px; font-size:12px; font-weight:500; }
+  .lwt button.on { background:rgba(255,255,255,.9); color:#000; }
+  #lbsims .status { color:#999; padding:24px 4px; }
+  #fpick { position:absolute; z-index:3; left:50%; top:50%; transform:translate(-50%, -50%); width:min(560px, calc(100% - 32px)); background:rgba(20,18,16,.92);
+           backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,.12); border-radius:22px; padding:24px; cursor:default; }
+  #fpick .fopts { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0; }
+  #fpick .fopts a { padding:10px 16px; border-radius:999px; background:rgba(255,255,255,.08); color:#fff; text-decoration:none; }
+  #fpick .fopts a:hover, #fpick .favs a:hover img { background:rgba(255,255,255,.18); border-color:var(--acc); }
+  #fpick .favs { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  #fpick .favs a { display:flex; flex-direction:column; align-items:center; gap:4px; color:#ddd; text-decoration:none; font-size:12px; }
+  #fpick .favs img { width:56px; height:56px; border-radius:50%; object-fit:cover; border:2px solid rgba(255,255,255,.3); }
+  #fpick form { display:flex; gap:8px; margin:0; } #fpick input { flex:1; min-width:0; background:rgba(255,255,255,.08); color:#fff; border-color:rgba(255,255,255,.15); }
+  #fpickx { position:absolute; top:12px; right:12px; color:#fff; }
+  #fsrc { color:#fff; border-color:rgba(255,255,255,.25); background:rgba(0,0,0,.25); margin-left:10px; }
+  @media (max-width: 760px) { #fctl { gap:4px; padding:10px; } #ftitle { font-size:15px; max-width:34vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } #fpos { display:none; } #fsrc { margin-left:4px; padding:4px 8px; } #fctl .ibtn { width:32px; height:32px; } }
 </style>
 
 <header>
@@ -505,6 +559,7 @@
     <div class="hsec" id="hmore" hidden><div class="shead"><h2 id="hmoreh">More from this day</h2><p id="hmorep"></p></div><div class="shelf" id="todayshelf"></div></div>
     <div class="hsec"><div class="shead"><h2>Rediscover</h2><p>moments you may have forgotten</p><span class="sp"></span><button class="ghost tiny" id="shuffle">↻ Shuffle</button></div>
       <div class="shelf" id="rediscover"></div></div>
+    <div class="hsec"><div class="shead"><h2>People</h2><p>everyone you've tagged in Photos</p></div><div class="shelf people" id="peopleshelf"></div></div>
     <div class="hsec"><div class="shead"><h2>Trips</h2><p>found from where the photos were taken</p><span class="sp"></span><a href="#stories">All stories →</a></div>
       <div class="shelf" id="tripshelf"></div></div>
     <div class="hsec"><div class="shead"><h2>Ask your library</h2><p>describe a moment in your own words</p></div><div class="asks" id="asks"></div></div>
@@ -517,6 +572,9 @@
         <a class="mode" href="#play" style="--art:linear-gradient(135deg, #1e7d5a, #0d2c22)"><span class="glyph">🎲</span><b>Games</b><span>Guess the year, the place, or which came first</span></a>
         <a class="mode" href="#math" style="--art:linear-gradient(135deg, #a8326e, #2c0d1f)"><span class="glyph">∑</span><b>Photo Math</b><span>This photo + snow − summer = ?</span></a>
       </div></div>
+    <div class="hsec" id="calbox"><div class="shead"><h2>Day by day</h2><p id="calp"></p><span class="sp"></span>
+      <button class="ibtn" id="calprev" title="the year before">‹</button><b id="caly" class="caly"></b><button class="ibtn" id="calnext" title="the year after">›</button></div>
+      <div id="cal"></div><div id="caltip" hidden></div></div>
     <div class="hsec"><div class="shead"><h2>Your years</h2><p>each one as a story</p></div><div class="shelf" id="yearshelf"></div></div>
     <footer id="hfoot"></footer>
   </section>
@@ -532,6 +590,7 @@
   <section id="world" class="full">
     <div id="wmap"></div>
     <div id="wbar"><span class="pill" id="wstatus"></span></div>
+    <div id="wregions"></div>
     <aside id="wsheet"><div id="wsh"></div><div id="wgrid"></div></aside>
   </section>
 
@@ -576,6 +635,8 @@
     <div id="mgrid"></div>
   </div></section>
 
+  <section id="person"><div id="pv"></div></section>
+
   <section id="stories"><div class="pad">
     <div class="kick">Stories</div>
     <h1>Trips and years, told in photos</h1>
@@ -612,7 +673,8 @@
   <div id="fslides"></div><div class="fshade"></div>
   <div id="fmeta"><div id="fdate"></div><div id="fplace"></div></div>
   <div id="fclockbox"><div id="fclock"></div><div id="fday"></div></div>
-  <div id="fctl"><b id="ftitle"></b><span id="fpos"></span><span class="sp"></span>
+  <div id="fpick" hidden></div>
+  <div id="fctl"><b id="ftitle"></b><span id="fpos"></span><button class="ghost tiny" id="fsrc">⚙ What to show</button><span class="sp"></span>
     <button class="ibtn" id="fprev" title="previous (←)">‹</button><button class="ibtn" id="fpp" title="pause (space)">❚❚</button>
     <button class="ibtn" id="fnext" title="next (→)">›</button><button class="ibtn" id="finfo" title="open this photo">ⓘ</button>
     <button class="ibtn" id="fclose" title="close (Esc)">✕</button></div>
@@ -640,7 +702,7 @@
   <button class="ibtn lbnav" id="lbprev" title="previous (←)">‹</button>
   <button class="ibtn lbnav" id="lbnext" title="next (→)">›</button>
   <div id="lbwander">
-    <div class="lw"><span>✦ Looks like this: tap one to wander</span><div id="lbtrail"></div><span class="sp"></span><span id="lbpos"></span></div>
+    <div class="lw"><div class="lwt" id="lbmode"><button data-w="like">✦ Looks like this</button><button data-w="day">📅 Same day</button></div><div id="lbtrail"></div><span class="sp"></span><span id="lbpos"></span></div>
     <div id="lbsims"></div>
   </div>
 </div>
@@ -692,16 +754,18 @@ function route() {
   lbOff(); closeSugg(); closePanel();
   if (tab && tab !== next) leave[tab]?.();
   tab = views[next] ? next : "home";
-  document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.hash === "#" + ({ edit: "stories", math: "play" }[tab] || tab)));
+  document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.hash === "#" + ({ edit: "stories", math: "play", person: "home" }[tab] || tab)));
   document.querySelectorAll("main section").forEach(s => s.classList.toggle("on", s.id === tab));
   $("q").placeholder = PLACEHOLDER[tab] || PLACEHOLDER.home;
   if (!["search", "galaxy", "time"].includes(tab)) $("q").value = "";
-  if (tab !== "frame") frameOff();
+  if (tab !== "frame") { frameOff(); lastHash = "#" + h; }
   $("omni").classList.toggle("bare", tab === "galaxy" || tab === "time");
   if (tab !== "search" && FIELDS.some(k => F[k])) { for (const k of FIELDS) F[k] = ""; AUTO = new Set(); renderChips(); }  // chips describe the results on show
   views[tab](arg);
 }
-addEventListener("hashchange", route);
+// modes cross-fade where the browser can (the header stays put); the photo views need no help
+addEventListener("hashchange", () => document.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches
+  ? document.startViewTransition(route) : route());
 const go = h => { if (location.hash !== "#" + h) location.hash = h; else route(); };
 const PLACEHOLDER = { home: "Search your photos… e.g. “kids in the snow”", galaxy: "Light up the galaxy… e.g. beach",
                       time: "Something that happens every year… e.g. birthday cake" };
@@ -769,7 +833,7 @@ function lightbox(list, i, keepTrail = false) {
   $("lbbg").style.backgroundImage = `url(/thumb/${x.uuid}.jpg)`;
   $("lbdate").textContent = x.undated ? "Date unknown" : longDate(x.date);
   $("lbplace").innerHTML = x.place ? `<a data-place="${esc(short(x.place))}" title="more from here">${esc(x.place)}</a>` : "";
-  $("lbppl").innerHTML = (x.persons || []).map(p => `<a data-person="${esc(p)}" title="more of ${esc(p)}">${esc(p)}</a>`).join("");
+  $("lbppl").innerHTML = (x.persons || []).map(p => `<a data-person="${esc(p)}" title="${esc(p)}'s page">${esc(p)}</a>`).join("");
   $("lbday").hidden = !!x.undated;
   $("lbprev").style.visibility = i > 0 ? "" : "hidden"; $("lbnext").style.visibility = i < list.length - 1 ? "" : "hidden";
   $("lbpos").textContent = list.length > 1 ? `${i + 1} of ${list.length}` : "";
@@ -777,18 +841,29 @@ function lightbox(list, i, keepTrail = false) {
   $("lb").classList.add("on");
   clearTimeout(LB.timer); LB.timer = setTimeout(() => loadSims(x), 220);  // not on every arrow press while flicking through
 }
+LB.mode = store.get("wander", "like");
 async function loadSims(x) {
-  if (LB.simsFor === x.uuid) return;
-  LB.simsFor = x.uuid; $("lbsims").innerHTML = "";
+  const key = x.uuid + LB.mode;
+  document.querySelectorAll("#lbmode button").forEach(b => b.classList.toggle("on", b.dataset.w === LB.mode));
+  if (LB.simsFor === key) return;
+  LB.simsFor = key; $("lbsims").innerHTML = "";
+  if (LB.mode === "day" && x.undated) { $("lbsims").innerHTML = `<span class="status">no date on this one</span>`; return; }
   try {
-    const r = (await api("/api/search", { like: x.uuid, k: 16 })).results;
-    if (LB.simsFor !== x.uuid) return;
+    const q = LB.mode === "day" ? { after: x.date, before: nextDay(x.date), k: 60 } : { like: x.uuid, k: 16 };
+    let r = (await api("/api/search", q)).results;
+    if (LB.simsFor !== key) return;
+    r = r.filter(s => s.uuid !== x.uuid);
+    if (!r.length) { $("lbsims").innerHTML = `<span class="status">nothing else from that day</span>`; return; }
     LB.sims = r;
     $("lbsims").innerHTML = r.map((s, k) => `<img src="/thumb/${s.uuid}.jpg" data-k="${k}" style="width:${(76 * clampAr(s.ar)).toFixed(0)}px" alt="">`).join("");
   } catch {}
 }
 function lbOff() { $("lb").classList.remove("on"); LB.simsFor = null; }
 $("lbclose").onclick = lbOff;
+$("lbmode").onclick = e => {
+  const w = e.target.dataset.w; if (!w || w === LB.mode) return;
+  LB.mode = w; store.set("wander", w); loadSims(LB.list[LB.at]);
+};
 $("lbprev").onclick = () => LB.at > 0 && lightbox(LB.list, LB.at - 1, true);
 $("lbnext").onclick = () => LB.at < LB.list.length - 1 && lightbox(LB.list, LB.at + 1, true);
 $("lbstage").onclick = e => { if (e.target.id === "lbstage") lbOff(); };
@@ -802,7 +877,7 @@ $("lbtrail").onclick = e => {
   const back = LB.trail[k]; LB.trail = LB.trail.slice(0, +k);
   lightbox([back], 0, true);
 };
-$("lbppl").onclick = e => { const p = e.target.dataset.person; if (p) searchFor("", only({ person: p })); };
+$("lbppl").onclick = e => { const p = e.target.dataset.person; if (p) go("person/" + encodeURIComponent(p)); };
 $("lbplace").onclick = e => { const p = e.target.dataset.place; if (p) searchFor("", only({ place: p })); };
 $("lbshow").onclick = () => openFrame({ list: LB.list, start: LB.at, title: tab === "search" ? $("rtitle").textContent : "" });
 $("lbday").onclick = () => go("home/" + LB.list[LB.at].date.slice(5));
@@ -834,13 +909,16 @@ const CHIP = { person: v => "👤 " + v, place: v => "📍 " + v, after: v => "a
                season: v => ({ spring:"🌱", summer:"☀️", autumn:"🍂", winter:"❄️" }[v] || "") + " " + v, kind: v => v === "video" ? "🎞 videos" : "📷 photos only",
                exclude: v => "− " + v };
 function renderChips() {
-  $("fchips").innerHTML = $("rchips").innerHTML = FIELDS.filter(k => F[k]).map(k =>
+  const day = F.after && F.before && nextDay(F.after) === F.before;  // one day: one chip, not "after" and "before"
+  $("fchips").innerHTML = $("rchips").innerHTML = (day ? `<span class="fchip">📅 ${esc(longDate(F.after, { month:"short", day:"numeric", year:"numeric" }))}<button type="button" data-k="after,before" aria-label="remove">✕</button></span>` : "") +
+    FIELDS.filter(k => F[k] && !(day && (k === "after" || k === "before"))).map(k =>
     `<span class="fchip ${AUTO.has(k) ? "auto" : ""}" title="${AUTO.has(k) ? "✨ read from your words" : k}">${esc(CHIP[k](F[k]))}<button type="button" data-k="${k}" aria-label="remove">✕</button></span>`).join("");
   $("ftoggle").classList.toggle("set", FIELDS.some(k => F[k]));
 }
 $("fchips").onclick = $("rchips").onclick = e => {
   const k = e.target.dataset.k; if (!k) return;
-  F[k] = ""; AUTO.delete(k); renderChips();
+  for (const f of k.split(",")) { F[f] = ""; AUTO.delete(f); }
+  renderChips();
   if (tab === "search") searchFor($("q").value.trim(), {}, true);
 };
 function openPanel() {
@@ -917,7 +995,7 @@ function suggest() {
   });
   if (t.length >= 2) {
     OV.people.filter(([p]) => wordStart(p, t)).slice(0, 4).forEach(([p, n]) =>
-      add("People", `<span class="g">👤</span><span>${esc(p)}</span><small>${n.toLocaleString()} photos</small>`, () => { $("q").value = ""; searchFor("", only({ person: p })); }));
+      add("People", `<span class="g">👤</span><span>${esc(p)}</span><small>${n.toLocaleString()} photos</small>`, () => { $("q").value = ""; go("person/" + encodeURIComponent(p)); }));
     OV.places.filter(([p]) => wordStart(p, t)).slice(0, 3).forEach(([p, n]) =>
       add("Places", `<span class="g">📍</span><span>${esc(p)}</span><small>${n.toLocaleString()} photos</small>`, () => { $("q").value = ""; searchFor("", only({ place: p })); }));
     OV.stories.filter(s => wordStart(s.title || "", t) || (/^\d{4}$/.test(raw) && s.id === raw) || (s.kind === "trip" && s.start.startsWith(raw)))
@@ -976,6 +1054,7 @@ function title() {
   if (R.q) return `“${esc(R.q)}”`;
   if (F.person) return esc(F.person.split(",").join(" & "));
   if (F.place) return esc(F.place);
+  if (F.after && F.before && nextDay(F.after) === F.before) return longDate(F.after);
   if (F.after && F.before && F.after.endsWith("-01-01") && F.before.endsWith("-01-01") && +F.before.slice(0, 4) === +F.after.slice(0, 4) + 1) return "Best of " + F.after.slice(0, 4);
   return "Your best photos";
 }
@@ -983,9 +1062,10 @@ function showResults() {
   const r = R.meta; if (!r) return;
   const auto = [...AUTO].map(k => CHIP[k](F[k])).join(" · ");
   $("rtitle").innerHTML = title();
-  $("status").textContent = `${r.results.length} ${R.q || R.like ? "best matches" : "favourites, by how interesting they look"} · from ${r.total.toLocaleString()} photos · ${r.ms} ms`
+  const oneDay = !R.q && !R.like && F.after && nextDay(F.after) === F.before;
+  $("status").textContent = `${r.results.length} ${R.q || R.like ? "best matches" : oneDay ? `photo${r.results.length > 1 ? "s" : ""} from this day` : "favourites, by how interesting they look"} · from ${r.total.toLocaleString()} photos · ${r.ms} ms`
     + (auto ? ` · ✨ ${auto}` : "");
-  $("racts").innerHTML = `<button class="pill" id="rshow">▶ Slideshow</button>${R.q ? `<a class="pill" href="#time/${encodeURIComponent(R.q)}">⏳ Through the years</a><a class="pill" href="#galaxy/${encodeURIComponent(R.q)}">✦ In the galaxy</a>` : ""}
+  $("racts").innerHTML = `<button class="pill" id="rshow">▶ Slideshow</button>${F.person && !F.person.includes(",") ? `<a class="pill" href="#person/${encodeURIComponent(F.person)}">👤 ${esc(firstName(F.person))}'s page</a>` : ""}${R.q ? `<a class="pill" href="#time/${encodeURIComponent(R.q)}">⏳ Through the years</a><a class="pill" href="#galaxy/${encodeURIComponent(R.q)}">✦ In the galaxy</a>` : ""}
     <div class="seg"><button data-s="best" class="${R.sort === "best" ? "on" : ""}">Best match</button><button data-s="date" class="${R.sort === "date" ? "on" : ""}">By date</button></div>`;
   $("rshow").onclick = () => openFrame({ list: $("grid")._list || r.results, title: $("rtitle").textContent });
   $("more").innerHTML = r.results.length >= R.k && R.k < 480 ? `<button class="ghost" id="morebtn">Show ${Math.min(48, 480 - R.k)} more</button>` : "";
@@ -1079,6 +1159,8 @@ async function loadShelves() {
   $("asks").innerHTML = ASKS.map(a => `<a class="pill" href="#${searchHash(a, {}, new Set())}">${esc(a)}</a>`).join("");
   $("rediscover").innerHTML = skeleton(8); $("tripshelf").innerHTML = skeleton(6, .75); $("yearshelf").innerHTML = skeleton(8, 1);
   shuffle();
+  loadPeople().then(p => { $("peopleshelf").innerHTML = p.map(x => avatar(x)).join(""); }).catch(() => {});
+  showCal().catch(() => {});
   try {
     const s = await loadStories();
     $("tripshelf").innerHTML = s.filter(x => x.kind === "trip").map(x => poster(x)).join("") || `<p class="status">No trips found yet: they need photos with locations.</p>`;
@@ -1729,15 +1811,16 @@ views.world = async () => {
   L.control.zoom({ position: "bottomright" }).addTo(WM.map);
   WM.layer = L.layerGroup().addTo(WM.map);
   $("wstatus").textContent = "finding where your photos were taken…";
-  try { WM.cells = (await api("/api/world")).results; }
+  let w;
+  try { w = (await api("/api/world")).results; WM.cells = w.cells; }
   catch (e) { $("wstatus").textContent = e.message; return; }
   const n = WM.cells.reduce((a, c) => a + c.n, 0);
   $("wstatus").textContent = `${n.toLocaleString()} photos in ${WM.cells.length.toLocaleString()} places · tap one to see it`;
   WM.map.on("zoomend", drawWorld);
-  // open on the places that hold nearly all the photos; a lone faraway trip shouldn't zoom the map out to the whole world
-  const busiest = [...WM.cells].sort((a, b) => b.n - a.n), core = [];
-  for (let k = 0, sum = 0; k < busiest.length && sum < 0.97 * n; k++) { core.push(busiest[k]); sum += busiest[k].n; }
-  WM.map.fitBounds(L.latLngBounds(core.map(c => [c.lat, c.lon])).pad(0.2));
+  // open on home, the busiest region; the chips fly to the others
+  showRegions(w.regions);
+  const b = WM.regions[0].bounds;
+  WM.map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: [30, 30] });
   drawWorld();
 };
 // Places closer than a pin's width at this zoom merge into one pin, shown by the photo of the busiest of them.
@@ -1756,7 +1839,13 @@ function drawWorld() {
     L.marker([h.lat, h.lon], { icon, title: placeLabel(g), riseOnHover: true, zIndexOffset: g.n }).on("click", () => openPlace(g)).addTo(WM.layer);
   }
 }
-const placeLabel = g => [...new Set(g.cells.map(c => c.place).filter(Boolean))].slice(0, 3).join(", ") || "Somewhere";
+function placeLabel(g) {
+  const names = [...new Set(g.cells.map(c => c.place).filter(Boolean))].slice(0, 3);
+  if (names.length) return names.join(", ");
+  const h = g.head, named = WM.cells.filter(c => c.place);  // no name here: the nearest place that has one
+  const near = named.reduce((a, c) => km([h.lat, h.lon], [c.lat, c.lon]) < km([h.lat, h.lon], [a.lat, a.lon]) ? c : a, named[0]);
+  return near ? "Near " + near.place : "Somewhere";
+}
 async function openPlace(g) {
   const lats = g.cells.map(c => c.lat), lons = g.cells.map(c => c.lon);
   const spread = km([Math.min(...lats), Math.min(...lons)], [Math.max(...lats), Math.max(...lons)]);
@@ -1778,8 +1867,8 @@ async function openPlace(g) {
 /* ---------- photo frame: a slow, endless slideshow for a spare screen (or of any set of photos) ---------- */
 const FR = { list: [], at: -1, timer: 0, ambient: false, paused: false, lock: null, hide: 0 };
 const FRAME_MS = 9000;
-async function openFrame({ list = null, title = "", start = 0 } = {}) {
-  lbOff(); $("frame").classList.toggle("amb", !list);
+async function openFrame({ list = null, title = "", start = 0, ambient = false } = {}) {
+  lbOff(); $("frame").classList.toggle("amb", ambient || !list); $("fpick").hidden = true; FR.picking = false;
   FR.ambient = !list; FR.list = list ? [...list] : []; FR.at = start - 1; FR.paused = false; FR.title = title;
   $("frame").classList.add("on"); $("fslides").innerHTML = "";
   $("ftitle").textContent = title || "Photo frame";
@@ -1792,7 +1881,7 @@ function closeFrame() {
   $("frame").classList.remove("on"); clearTimeout(FR.timer); clearInterval(FR.clock);
   FR.lock?.release?.().catch(() => {}); FR.lock = null;
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  if (tab === "frame") history.length > 1 ? history.back() : go("home");
+  if (tab === "frame") location.hash = lastHash;
 }
 async function frameNext(step = 1) {
   if (FR.ambient && FR.at + step >= FR.list.length - 2) {  // the frame never runs out: fetch more
@@ -1827,7 +1916,7 @@ function tick() {
 }
 function frameUI() {  // the controls show on a touch or mouse move, then fade away
   $("frame").classList.add("ui"); clearTimeout(FR.hide);
-  FR.hide = setTimeout(() => $("frame").classList.remove("ui"), 2800);
+  FR.hide = setTimeout(() => { if (!FR.picking) $("frame").classList.remove("ui"); }, 2800);
 }
 function framePause(p = !FR.paused) {
   FR.paused = p; $("fpp").textContent = p ? "▶" : "❚❚";
@@ -1836,20 +1925,147 @@ function framePause(p = !FR.paused) {
 $("frame").addEventListener("pointermove", frameUI);
 $("frame").addEventListener("pointerdown", frameUI);
 $("fclose").onclick = closeFrame;
+$("fsrc").onclick = e => { e.stopPropagation(); framePick(); };
 $("fpp").onclick = () => framePause();
 $("fprev").onclick = () => frameNext(-1);
 $("fnext").onclick = () => frameNext(1);
 $("finfo").onclick = () => { const x = FR.list[FR.at]; if (x) { framePause(true); lightbox(FR.list, FR.at); } };
 addEventListener("keydown", e => {
   if (!$("frame").classList.contains("on") || $("lb").classList.contains("on")) return;
-  if (e.key === "Escape") closeFrame();
+  if (e.key === "Escape") return FR.picking ? framePickOff() : closeFrame();
+  if (FR.picking) return;
   if (e.key === " ") { e.preventDefault(); framePause(); }
   if (e.key === "ArrowRight") frameNext(1);
   if (e.key === "ArrowLeft") frameNext(-1);
   frameUI();
 });
-views.frame = () => openFrame();
 function frameOff() { if ($("frame").classList.contains("on")) { $("frame").classList.remove("on"); clearTimeout(FR.timer); clearInterval(FR.clock); FR.lock?.release?.().catch(() => {}); } }
+
+/* ---------- people: a page per person, with their best photo from every year ---------- */
+const loadPeople = once(async () => (await api("/api/people")).results);
+const firstName = n => n.split(" ")[0];
+const initials = n => n.split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
+const fmtN = n => n > 999 ? (n / 1000).toFixed(n > 9999 ? 0 : 1) + "k" : String(n);
+function avatar(p, note) {
+  return `<a class="avatar" href="#person/${encodeURIComponent(p.name)}" title="${esc(p.name)}">
+    ${p.cover ? `<img loading="lazy" src="/thumb/${p.cover}.jpg" alt="">` : `<span class="ini">${esc(initials(p.name))}</span>`}
+    <b>${esc(p.name)}</b><small>${note ?? p.n.toLocaleString() + " photos"}</small></a>`;
+}
+const PV = { name: null };
+views.person = async arg => {
+  const name = decodeURIComponent(arg || "");
+  if (!name) return go("home");
+  if (PV.name === name) return;
+  PV.name = name; scrollTo(0, 0);
+  $("pv").innerHTML = `<div class="phead"><div class="pportrait skel"></div><div><div class="kick">&nbsp;</div><h1>${esc(name)}</h1></div></div>`;
+  let r, best, ppl;
+  try {
+    [r, best, ppl] = await Promise.all([api("/api/person", { name }), api("/api/search", { person: name, k: 48 }), loadPeople().catch(() => [])]);
+  } catch (e) { $("pv").innerHTML += `<p class="status pad">${esc(e.message)}</p>`; return; }
+  if (PV.name !== name) return;
+  r = r.results;
+  const cover = new Map(ppl.map(p => [p.name, p.cover])), years = r.years, latest = years.at(-1);
+  const span = r.first.slice(0, 4) === r.last.slice(0, 4) ? r.first.slice(0, 4) : `${r.first.slice(0, 4)}–${r.last.slice(0, 4)}`;
+  const only1 = f => "#" + searchHash("", only(f), new Set());
+  $("pv").innerHTML = `
+    <div class="phead">
+      ${r.portrait || latest ? `<img class="pportrait" src="/thumb/${r.portrait || latest.uuid}.jpg" alt="">` : ""}
+      <div><div class="kick">${r.n.toLocaleString()} photos · ${span}</div><h1>${esc(name)}</h1>
+        <div class="pbtns">${years.length >= 3 ? `<button id="pgrow">▶ ${esc(firstName(name))} through the years</button>` : ""}
+          <a class="pill" href="#frame/?person=${encodeURIComponent(name)}">🖼 Photo frame</a>
+          <a class="pill" href="${only1({ person: name })}">All photos →</a></div></div>
+    </div>
+    ${years.length > 1 ? `<div class="hsec"><div class="shead"><h2>Through the years</h2><p>the best photo of ${esc(firstName(name))} from each year</p></div><div class="shelf tall" id="pyears"></div></div>` : ""}
+    ${r.together.length ? `<div class="hsec"><div class="shead"><h2>Often with</h2></div><div class="avatars">${r.together.map(([p, n]) => avatar({ name: p, cover: cover.get(p) }, `together in ${n.toLocaleString()}`)).join("")}</div></div>` : ""}
+    ${r.places.length ? `<div class="hsec"><div class="shead"><h2>Places</h2></div><div class="asks">${r.places.map(([p, n]) => `<a class="pill" href="${only1({ person: name, place: p })}">📍 ${esc(p)} <small class="status">${n.toLocaleString()}</small></a>`).join("")}</div></div>` : ""}
+    <div class="hsec"><div class="shead"><h2>Favourites</h2><p>the most striking photos of ${esc(firstName(name))}</p></div><div id="pbest"></div></div>`;
+  if ($("pyears")) bindShelf($("pyears"), years, x => x.year);
+  if ($("pgrow")) $("pgrow").onclick = () => openFrame({ list: years, title: `${firstName(name)} through the years` });
+  bindGrid($("pbest"), best.results);
+};
+
+/* ---------- calendar: a year of days, coloured by how many photos each has ---------- */
+const CAL = { year: null, years: [] };
+const nextDay = d => { const [y, m, dd] = d.split("-").map(Number); return new Date(Date.UTC(y, m - 1, dd + 1)).toISOString().slice(0, 10); };
+async function showCal(year) {
+  if (!CAL.years.length) CAL.years = (await loadStories()).filter(x => x.kind === "year").map(x => +x.id).sort((a, b) => a - b);
+  year = Math.min(Math.max(year ?? CAL.years.at(-1), CAL.years[0]), CAL.years.at(-1));
+  CAL.year = year; $("caly").textContent = year;
+  $("calprev").disabled = year <= CAL.years[0]; $("calnext").disabled = year >= CAL.years.at(-1);
+  const r = (await api("/api/days", { year })).results;
+  if (CAL.year !== year) return;
+  const by = new Map(r.days.map(x => [x.d, x])), max = Math.max(1, ...r.days.map(x => x.n));
+  const jan1 = new Date(Date.UTC(year, 0, 1)), lead = jan1.getUTCDay(), cells = [], months = [];
+  for (let k = 0; k < lead; k++) cells.push(`<i class="pad"></i>`);
+  for (let t = jan1; t.getUTCFullYear() === year; t = new Date(t.getTime() + 864e5)) {
+    const d = t.toISOString().slice(0, 10), x = by.get(d);
+    if (t.getUTCDate() === 1) months.push(`<span style="grid-column:${Math.floor(cells.length / 7) + 1}">${t.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" })}</span>`);
+    cells.push(x ? `<i data-d="${d}" style="--v:${(0.22 + 0.78 * Math.log(1 + x.n) / Math.log(1 + max)).toFixed(2)}"></i>` : `<i class="none" data-d="${d}"></i>`);
+  }
+  const busiest = [...r.days].sort((a, b) => b.n - a.n)[0], total = r.days.reduce((a, x) => a + x.n, 0);
+  $("calp").textContent = r.days.length ? `${total.toLocaleString()} photos on ${r.days.length} days · busiest: ${longDate(busiest.d, { month: "short", day: "numeric" })} (${busiest.n})` : "no photos this year";
+  $("cal").innerHTML = `<div class="calm">${months.join("")}</div><div class="calg">${cells.join("")}</div>`;
+  CAL.by = by;
+  if (year === new Date().getFullYear()) $("cal").scrollLeft = $("cal").scrollWidth;  // today's end of the year
+}
+$("calprev").onclick = () => showCal(CAL.year - 1);
+$("calnext").onclick = () => showCal(CAL.year + 1);
+$("cal").addEventListener("pointerover", e => {
+  const d = e.target.dataset?.d, x = d && CAL.by.get(d), tip = $("caltip");
+  if (!x) { tip.hidden = true; return; }
+  tip.innerHTML = `<img src="/thumb/${x.cover}.jpg" alt=""><div><b>${longDate(d, { weekday: "short", month: "short", day: "numeric" })}</b><br>${x.n} photo${x.n > 1 ? "s" : ""}</div>`;
+  const r = e.target.getBoundingClientRect(), hr = $("calbox").getBoundingClientRect();
+  tip.hidden = false;
+  tip.style.left = Math.min(r.left - hr.left, hr.width - 200) + "px"; tip.style.top = (r.bottom - hr.top + 8) + "px";
+});
+$("cal").addEventListener("pointerleave", () => { $("caltip").hidden = true; });
+$("cal").onclick = e => {
+  const d = e.target.dataset?.d; if (!d || !CAL.by.get(d)) return;
+  go(searchHash("", only({ after: d, before: nextDay(d) }), new Set()));
+};
+
+/* ---------- map regions: the places you've been, as chips to fly to ---------- */
+function showRegions(regions) {
+  WM.regions = [...regions].sort((a, b) => b.n - a.n);
+  $("wregions").innerHTML = WM.regions.slice(0, 16).map((r, k) =>
+    `<button class="pill" data-k="${k}">${k ? "" : "🏠 "}${esc(r.name)} <small>${fmtN(r.n)}</small></button>`).join("")
+    + `<button class="pill" data-k="all">🌍 Everywhere</button>`;
+  $("wregions").onclick = e => {
+    const k = e.target.closest("[data-k]")?.dataset.k; if (k == null) return;
+    $("wsheet").classList.remove("on");
+    const b = k === "all" ? WM.regions.reduce((a, r) => [Math.min(a[0], r.bounds[0]), Math.min(a[1], r.bounds[1]), Math.max(a[2], r.bounds[2]), Math.max(a[3], r.bounds[3])], [90, 180, -90, -180])
+                          : WM.regions[k].bounds;
+    WM.map.flyToBounds([[b[0], b[1]], [b[2], b[3]]], { padding: [40, 40], maxZoom: 14, duration: 1.1 });
+  };
+}
+
+/* ---------- photo frame: what to show ---------- */
+let lastHash = "#home";
+const shuffled = a => { a = [...a]; for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; };
+views.frame = async arg => {
+  const p = new URLSearchParams((arg || "").replace(/^\?/, ""));
+  let list = null, title = "";
+  try {
+    if (p.get("person")) { title = p.get("person"); list = shuffled((await api("/api/search", { person: title, k: 240 })).results); }
+    else if (p.get("q")) { title = `“${p.get("q")}”`; list = shuffled((await api("/api/search", { q: p.get("q"), k: 160 })).results); }
+    else if (p.get("day")) { title = "On this day"; list = (await api("/api/today", {})).results.years.flatMap(y => y.photos); }
+  } catch {}
+  openFrame({ list: list?.length ? list : null, title, ambient: true });
+};
+async function framePick() {
+  FR.picking = true; frameUI(); framePause(true);
+  const ppl = await loadPeople().catch(() => []);
+  $("fpick").innerHTML = `<div class="kick">Show in the frame</div>
+    <div class="fopts"><a href="#frame">✨ The best of everything</a><a href="#frame/?day=today">📅 On this day</a></div>
+    <div class="favs">${ppl.slice(0, 10).map(p => `<a href="#frame/?person=${encodeURIComponent(p.name)}"><img src="/thumb/${p.cover}.jpg" alt=""><span>${esc(firstName(p.name))}</span></a>`).join("")}</div>
+    <form id="fq"><input id="fqi" placeholder="or anything… e.g. sunsets at the beach"><button>Show</button></form>
+    <button class="ibtn" id="fpickx" title="close">✕</button>`;
+  $("fpick").hidden = false;
+  $("fq").onsubmit = e => { e.preventDefault(); const q = $("fqi").value.trim(); if (q) location.hash = "frame/?q=" + encodeURIComponent(q); };
+  $("fpickx").onclick = framePickOff;
+  $("fpick").onclick = e => { if (e.target.closest("a")) framePickOff(); };
+}
+function framePickOff() { FR.picking = false; $("fpick").hidden = true; framePause(false); frameUI(); }
 
 /* ---------- photo math ---------- */
 const M = { base: null };
