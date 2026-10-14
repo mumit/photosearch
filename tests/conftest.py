@@ -1,6 +1,6 @@
 """Every test runs against a fresh copy of a made-up library (tests/library.py), with a fake search model, and with
 everything that would touch the Photos app or iCloud replaced: nothing here reads or writes the real library."""
-import os, shutil, tempfile
+import os, shutil, sys, tempfile
 from pathlib import Path
 
 import numpy as np
@@ -8,6 +8,19 @@ import pytest
 
 WORK = Path(tempfile.mkdtemp(prefix="photosearch-test-"))
 os.environ["PHOTOSEARCH_DATA"] = str(WORK / "data")  # before photosearch is imported: all its paths hang off this
+
+
+class NoPhotosOrModel:
+    """The tests must pass on a fresh clone, for someone whose terminal can't read Photos and who hasn't downloaded the
+    model: so the libraries that read the Photos library or run the model can't even be imported here."""
+    BLOCKED = ("osxphotos", "photokit", "torch", "sentence_transformers", "transformers")
+
+    def find_spec(self, name, path=None, target=None):
+        if name.split(".")[0] in self.BLOCKED:
+            raise ImportError(f"{name} reads your Photos library or runs the model; tests use the stand-ins in conftest.py")
+
+
+sys.meta_path.insert(0, NoPhotosOrModel())
 
 from photosearch import config, dupes, embed, people, search, smartbox, store  # noqa: E402
 from photosearch import photos_app as photos  # noqa: E402  (the fixture below is called photos_app)

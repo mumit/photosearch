@@ -386,7 +386,9 @@ uv run pytest -m browser      # also tours every view in headless Chrome, deskto
 They run on a made-up library built fresh for each run (`tests/library.py`): 73 photos with vectors from a fake search
 model and generated thumbnails, including the cases the duplicate finder got wrong on a real library (different
 receipts, different screenshots, look-alikes years apart, a chain of shots that drifts). Nothing touches your library,
-the model, iCloud or Photos: a stand-in records what would have been added to which album. The phone tests connect
+the model, iCloud or Photos: the libraries that would (osxphotos, torch, sentence-transformers) can't even be imported
+during tests, and a stand-in records what would have been added to which album. So the tests pass on a fresh clone,
+before indexing, without Photos access or the model; the first run takes ~30 s longer while UMAP compiles itself. The phone tests connect
 through this Mac's Wi-Fi address, so the server sees a device other than itself; they're skipped when offline.
 
 ### Measurements

@@ -36,7 +36,7 @@ def test_every_api_answers(srv, lib, path):
 
 
 def test_galaxy(srv):
-    g = srv.json("/api/galaxy")
+    g = srv.json("/api/galaxy", timeout=300)  # UMAP compiles itself on its first run in a new environment: ~30 s
     assert len(g["uuids"]) == len(g["x"]) == 73 and all(0 <= x <= 1 for x in g["x"])
 
 

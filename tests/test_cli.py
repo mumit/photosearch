@@ -22,3 +22,10 @@ def test_help_lists_every_command():
 def test_trips_on_the_made_up_library():
     assert "trip-2025-03-10" in run("trips") and "Lisbon" in run("trips")
 
+
+
+def test_tests_cant_reach_photos_or_the_model():
+    import pytest
+    for name in ("osxphotos", "torch", "sentence_transformers"):
+        with pytest.raises(ImportError, match="stand-ins"):
+            __import__(name)

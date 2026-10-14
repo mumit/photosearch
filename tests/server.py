@@ -26,9 +26,9 @@ class Server:
             time.sleep(0.02)
         self.httpd = made[0]
 
-    def request(self, method, path, body=None, host=None, headers=None, via=None):
+    def request(self, method, path, body=None, host=None, headers=None, via=None, timeout=20):
         """(status, headers, body). via: the address to connect to (default this Mac's loopback)."""
-        c = http.client.HTTPConnection(via or self.host, self.port, timeout=20)
+        c = http.client.HTTPConnection(via or self.host, self.port, timeout=timeout)
         h = {"Host": host or f"localhost:{self.port}"}
         if body is not None:
             h["Content-Type"] = "application/json"
