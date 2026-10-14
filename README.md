@@ -4,8 +4,10 @@ Search your Apple Photos library by describing what's in a picture ("kids on a r
 or find photos that look like one you pick. Everything runs on your Mac using Google's open
 [EmbeddingGemma 2](https://huggingface.co/google/embeddinggemma-2) model. No photos leave the machine.
 
-It works with iCloud Photos and **"Optimize Mac Storage"**: it uses the preview images Photos already keeps
-on disk, so nothing is downloaded from iCloud.
+It works with iCloud Photos and **"Optimize Mac Storage"**: indexing and search use the preview images Photos
+already keeps on disk, so nothing is downloaded from iCloud for them. Those previews can be tiny (256 px for photos
+kept only in iCloud), so when a photo is shown big (opened full size, or in a story) Photos is asked for its
+full-size version, which is kept in `data/large/`. See [Photo quality](#photo-quality).
 
 ---
 
@@ -124,6 +126,8 @@ Each run also refreshes people, albums and places for photos already indexed, an
 
 ### Search and play in the browser
 
+This doesn't need Claude. From the `photosearch` folder, in any terminal:
+
 ```bash
 uv run python ps.py serve
 ```
@@ -157,7 +161,8 @@ Clicking any photo opens it large, with **More like this**, **Use in Photo Math*
 
 *Guess the Place* loads its map from OpenStreetMap, so it needs internet; only map tiles are fetched, never your photos.
 
-Stop the server with Ctrl-C.
+Stop the server with Ctrl-C. It only runs while that terminal window is open. Claude is only needed for the
+MCP features (asking about photos in chat, curated stories); everything in the web page works without it.
 
 ### Search from the command line
 
@@ -229,6 +234,22 @@ that changes your library.** It never deletes anything.
 
 ---
 
+### Photo quality
+
+With *Optimize Mac Storage*, Photos keeps only a small preview of most photos on the Mac (here 60% are 256–511 px;
+the rest about 2048 px). That's plenty for the model and for the grid, but blurry full screen. So:
+
+- **Opening a photo** (search, Time Machine, the games) shows the preview at once, then asks Photos for the full-size
+  version and swaps it in (about 1 s; longer if iCloud is slow).
+- **Stories** fetch theirs when you play one, save one, or Claude saves one; **⬇ Download** and `review --export`
+  wait for any still missing, so the file you send is sharp (1600 px, ~0.5 MB a photo).
+- `uv run python ps.py fetch trip-2024-05-02` (or `2025`, or photo uuids) fetches ahead of time, e.g. before
+  showing a story offline. `uv run python ps.py thumbs` rebuilds thumbnails after changing their size.
+
+Fetching uses Photos' own API (PhotoKit), in a separate process, and doesn't change the library. The first time,
+macOS may ask to let your terminal access Photos. To have everything sharp without fetching, turn on **Photos →
+Settings → iCloud → Download Originals to this Mac** (this needs disk space for the whole library).
+
 ## 4. Files and cleanup
 
 | Path | Contents |
@@ -240,7 +261,8 @@ that changes your library.** It never deletes anything.
 | `data/reviews/` | Saved story picks and captions, one JSON file per year (`2025.json`) or trip (`trip-2024-05-02.json`) |
 | `.env` | Optional `TYPESAFE_API_KEY` for ✨ smart search (git-ignored) |
 | `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector |
-| `data/thumbs/` | Small JPEG previews for the web page |
+| `data/thumbs/` | Small JPEG previews for the web page (512 px) |
+| `data/large/` | Full-size copies (up to 2560 px) of photos shown big whose local preview was small, fetched from iCloud. Safe to delete; they come back when needed |
 | `data/galaxy.json` | The Galaxy map layout (rebuilt automatically when the index grows by 10%) |
 
 `data/` holds previews of your photos, so treat it as private. It's in `.gitignore` and never committed.
@@ -268,6 +290,7 @@ package cache, but it affects all uv projects on the Mac.
 | Very slow (under 1 photo/s) | Check the Mac is Apple Silicon. Try `--vision-tokens 70`, and close other heavy apps. |
 | Out of memory | Lower the batch size: `index --batch 4`. |
 | Some photos "skipped" | They have no local preview yet (e.g. just synced). Re-run `index` later. |
+| Opened photos stay blurry | The full-size fetch failed: offline, iCloud slow, or Photos access not allowed for your terminal (**System Settings → Privacy & Security → Photos**). Try `ps.py fetch <uuid>` to see the error. |
 | Clicking a photo doesn't open Photos | Allow it in **System Settings → Privacy & Security → Automation**. |
 | `Could not get path to photo library database` | osxphotos couldn't work out the system library. It falls back to `~/Pictures/Photos Library.photoslibrary`; for another location pass `--library`. |
 | `index was built with vision_tokens=…` | The index remembers its settings so vectors don't get mixed. Use the same `--vision-tokens`, or delete `data/` and re-index. |

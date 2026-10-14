@@ -64,7 +64,7 @@ def view_photos(uuids: list[str], size: Literal["sheet", "large"] = "sheet") -> 
     missing = [u for u in uuids if u not in info]
     uuids = [u for u in uuids if u in info]
     if size == "large":
-        out = [Image(data=ps.photo_jpeg(con, u), format="jpeg") for u in uuids[:4]]
+        out = [Image(data=ps.photo_jpeg(con, u, 1024), format="jpeg") for u in uuids[:4]]
         return out + [json.dumps(tidy([info[u] for u in uuids[:4]]) + ([{"not indexed": missing}] if missing else []))]
     uuids = uuids[:SHEET_MAX]
     sheet = ps.contact_sheet(con, uuids, cell=CELL)
@@ -159,6 +159,8 @@ def save_story(story: str, title: str, intro: str, chapters: list[Chapter], outr
     if bad:
         raise ValueError(f"not in the index: {bad}")
     ps.save_review(dict(fields, title=title, intro=intro, outro=outro, made_by="claude", chapters=chapters))
+    # full-size copies from iCloud for photos whose local preview is tiny (~1 s each), so the slideshow is sharp
+    ps.fetch_in_subprocess(con, [p["uuid"] for c in chapters for p in c.get("photos", [])], wait=False)
     n = sum(len(c.get("photos", [])) for c in chapters)
     return (f"saved {n} photos in {len(chapters)} chapters. Slideshow: http://localhost:8765/review/{story} "
             f"(needs `ps.py serve`; also listed under Stories). One-file copy to share: "

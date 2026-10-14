@@ -265,6 +265,25 @@ const api = async (path, params = {}) => {
   if (r.error) throw new Error(r.error);
   return r;
 };
+const post = async (path, body) => {
+  const r = await (await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })).json();
+  if (r.error) throw new Error(r.error);
+  return r.results;
+};
+// A photo kept only in iCloud has a tiny local preview. Shown big, ask the server to fetch its full-size copy
+// (~1 s, or longer when iCloud is slow) and swap that in, unless the view has moved on to another photo by then.
+async function sharpen(img, uuid) {
+  const still = () => img.isConnected && img.src.includes(uuid);
+  try {
+    let st = (await post("/api/sharp", { uuids: [uuid] }))[uuid];
+    if (st !== "fetching") return;
+    for (let i = 0; i < 40 && st === "fetching" && still(); i++) {
+      await new Promise(ok => setTimeout(ok, 1500));
+      st = (await api("/api/sharp", { uuids: uuid })).results[uuid];
+    }
+    if (st === "sharp" && still()) img.src = `/photo/${uuid}.jpg?sharp`;
+  } catch {}  // the preview stays: fine
+}
 const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
                 set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
@@ -300,7 +319,7 @@ let lbList = [], lbAt = 0;
 function lightbox(list, i) {
   lbList = list; lbAt = i;
   const x = list[i];
-  $("lbimg").src = `/photo/${x.uuid}.jpg`;
+  $("lbimg").src = `/photo/${x.uuid}.jpg`; sharpen($("lbimg"), x.uuid);
   $("lbinfo").innerHTML = `<div style="font-size:18px;color:#fff">${x.undated ? "Date unknown" : x.date}</div>
     <div>${esc(x.place) || "<i>no place</i>"}</div><div>${esc(x.persons.join(", "))}</div>`;
   $("lb").classList.add("on");
@@ -564,7 +583,7 @@ function showYear(i) {
   if (i < 0 || i >= T.years.length) return;
   T.at = i; const y = T.years[i];
   $("timg").style.opacity = 0;
-  setTimeout(() => { $("timg").src = `/photo/${y.uuid}.jpg`; }, 150);
+  setTimeout(() => { $("timg").src = `/photo/${y.uuid}.jpg`; sharpen($("timg"), y.uuid); }, 150);
   $("tyear").textContent = y.year;
   $("tmeta").innerHTML = `${y.date}<br>${esc(y.place)}<br>${esc(y.persons.join(", "))}`;
   document.querySelectorAll("#strip > div").forEach((d, j) => d.classList.toggle("cur", j === i));
@@ -630,6 +649,7 @@ async function nextRound() {
         <div class="reveal" id="reveal"></div>
       </div>
     </div>`;
+  sharpen($("play-photo"), c.uuid);
   $("quit").onclick = e => { e.preventDefault(); playMenu(); };
   if (P.mode === "year") {
     $("yr").oninput = () => { $("bigyear").textContent = $("yr").value; };

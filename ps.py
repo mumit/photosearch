@@ -12,7 +12,7 @@
 Nothing is downloaded from iCloud: with "Optimize Mac Storage" on we embed the
 local preview Photos keeps (the model only sees ~280 visual tokens anyway).
 """
-import argparse, calendar, functools, io, json, math, os, random, re, sqlite3, sys, time, unicodedata
+import argparse, calendar, functools, io, json, math, os, random, re, sqlite3, sys, threading, time, unicodedata
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -25,7 +25,10 @@ DB = DATA / "index.sqlite"
 THUMBS = DATA / "thumbs"
 MODEL = "google/embeddinggemma-2"
 DIM = 768
-THUMB_PX = 360
+THUMB_PX = 512     # grid tiles and cards are ~250 px wide, so this is sharp on a Retina screen
+LARGE = DATA / "large"  # full-size copies fetched from iCloud, for photos whose local preview is tiny
+DISPLAY_PX = 2560  # the most a full-screen view needs
+SHARP_PX = 1600    # local previews smaller than this get fetched from iCloud when shown big
 LIBRARY = Path.home() / "Pictures" / "Photos Library.photoslibrary"  # fallback if the system library can't be found
 
 
@@ -129,13 +132,14 @@ def best_local_image(p):
     return None
 
 
-def open_image(path):
+def open_image(path, px=1024):
+    """The image, upright, in RGB, at most px on its long side (1024 is plenty for the model)."""
     from PIL import Image, ImageOps
     import pillow_heif
     pillow_heif.register_heif_opener()
     im = Image.open(path)
     im = ImageOps.exif_transpose(im).convert("RGB")
-    im.thumbnail((1024, 1024))
+    im.thumbnail((px, px))
     return im
 
 
@@ -199,7 +203,7 @@ def cmd_index(a):
                         normalize_embeddings=True).astype(np.float32)
         for (p, im, src), v in zip(batch, vecs):
             th = im.copy(); th.thumbnail((THUMB_PX, THUMB_PX))
-            th.save(THUMBS / f"{p.uuid}.jpg", quality=80)
+            th.save(THUMBS / f"{p.uuid}.jpg", quality=82)
             con.execute(f"insert or replace into photos (uuid, {META_COLS}, src, vec) values ({','.join('?' * (N_META + 3))})",
                         (p.uuid, *meta(p), src, v.tobytes()))
         con.commit()
@@ -484,13 +488,162 @@ def photo_math(con, base, plus="", minus="", w=1.0, k=24):
     return [r for r in rank(con, (q / np.linalg.norm(q)).astype(np.float32), k + 1) if r["uuid"] != skip][:k]
 
 
-def photo_jpeg(con, uuid):
+def photo_jpeg(con, uuid, px=DISPLAY_PX, quality=85):
+    """The photo as a JPEG at most px on its long side: from its full-size copy if one was fetched, else from the
+    best local preview (which, for photos kept only in iCloud, can be as small as 256 px)."""
     row = con.execute("select src from photos where uuid=?", (uuid,)).fetchone()
     if not row:
         raise LookupError(uuid)
+    big = LARGE / f"{uuid}.jpg"
+    if big.exists() and px >= DISPLAY_PX:
+        return big.read_bytes()
     buf = io.BytesIO()
-    open_image(row[0]).save(buf, "JPEG", quality=85)
+    open_image(big if big.exists() else row[0], px).save(buf, "JPEG", quality=quality)
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------- full-size copies from iCloud
+
+_fetch_lock, _pdb = threading.Lock(), None
+
+
+def needs_fetch(con, uuid):
+    """True if a photo would look soft shown big: no full-size copy yet, and its local preview is under SHARP_PX."""
+    from PIL import Image
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+    if (LARGE / f"{uuid}.jpg").exists():
+        return False
+    row = con.execute("select src, kind from photos where uuid=?", (uuid,)).fetchone()
+    if not row or row[1] != "photo":
+        return False
+    try:
+        return max(Image.open(row[0]).size) < SHARP_PX
+    except Exception:
+        return True
+
+
+def fetch_large(con, uuids, log=None):
+    """Download full-size versions of photos that need them (see needs_fetch) from iCloud, through Photos with
+    PhotoKit (~1 s each), into data/large/ at DISPLAY_PX, and rebuild their thumbnails from them. One fetch at a
+    time across threads. Returns how many were fetched. Nothing in the Photos library changes."""
+    global _pdb
+    import tempfile
+    from osxphotos import ExportOptions, PhotoExporter
+    n = 0
+    for u in dict.fromkeys(uuids):
+        with _fetch_lock:
+            if not needs_fetch(con, u):
+                continue
+            if _pdb is None or _pdb.get_photo(u) is None:  # opened once; again if the photo is newer than that
+                _pdb = photos_db()
+            p = _pdb.get_photo(u)
+            if not p:
+                continue
+            with tempfile.TemporaryDirectory() as tmp:
+                try:
+                    r = PhotoExporter(p).export(tmp, options=ExportOptions(download_missing=True, use_photokit=True,
+                                                                           edited=p.hasadjustments, timeout=120))
+                    files = [f for f in r.exported if Path(f).suffix.lower() not in (".mov", ".mp4", ".aae")]
+                    if not files:
+                        raise RuntimeError(r.error or "nothing exported")
+                    im = open_image(files[0], DISPLAY_PX)
+                except Exception as ex:  # offline, or iCloud says no: keep showing the preview
+                    if log:
+                        log(f"  couldn't fetch {u}: {ex.__class__.__name__}: {ex}")
+                    continue
+            LARGE.mkdir(parents=True, exist_ok=True)
+            tmp_jpg = LARGE / f"{u}.part"
+            im.save(tmp_jpg, "JPEG", quality=88)
+            tmp_jpg.rename(LARGE / f"{u}.jpg")  # atomic: a reader never sees half a file
+            im.thumbnail((THUMB_PX, THUMB_PX)); im.save(THUMBS / f"{u}.jpg", quality=82)
+            n += 1
+            if log:
+                log(f"  fetched {n}: {u}")
+    return n
+
+
+def fetch_in_subprocess(con, uuids, wait=True):
+    """fetch_large in a `ps.py fetch` process. PhotoKit hangs on its second request when its first came from a
+    worker thread (seen with the web server's), so fetches run on a process's main thread, which can also be
+    killed if iCloud stalls. Returns the uuids still needing a fetch afterwards (all of them if not waiting)."""
+    import subprocess
+    todo = [u for u in dict.fromkeys(uuids) if needs_fetch(con, u)]
+    if not todo:
+        return []
+    cmd = [sys.executable, str(HERE / "ps.py"), "fetch", *todo]
+    if not wait:
+        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return todo
+    try:
+        subprocess.run(cmd, timeout=30 + 10 * len(todo), capture_output=True)
+    except subprocess.TimeoutExpired:
+        pass
+    return [u for u in todo if needs_fetch(con, u)]
+
+
+class Fetcher:
+    """A background thread working through fetch requests in batches, so pages never wait on iCloud."""
+    def __init__(self, con):
+        import queue
+        self.con, self.q, self.failed = con, queue.Queue(), set()
+        threading.Thread(target=self.run, daemon=True).start()
+
+    def add(self, uuids):
+        for u in uuids:
+            self.q.put(u)
+
+    def run(self):
+        import queue
+        while True:
+            batch = [self.q.get()]
+            try:
+                while len(batch) < 100:
+                    batch.append(self.q.get_nowait())
+            except queue.Empty:
+                pass
+            try:
+                left = fetch_in_subprocess(self.con, batch)
+            except Exception as ex:
+                print(f"fetch: {ex}", file=sys.stderr); left = batch
+            self.failed.update(left)
+
+    def status(self, u):
+        return "sharp" if (LARGE / f"{u}.jpg").exists() else "failed" if u in self.failed else \
+               "fetching" if needs_fetch(self.con, u) else "sharp"
+
+
+def story_uuids(review):
+    return [p["uuid"] for c in review["chapters"] for p in c["photos"]]
+
+
+def cmd_fetch(a):
+    """Full-size copies from iCloud for photos (uuids) or every photo in stories (2025, trip-2024-05-02)."""
+    con = db()
+    uuids = [u for x in a.what for u in (story_uuids(load_review(con, x, make=True)) if STORY_ID.fullmatch(x) else [x])]
+    need = [u for u in dict.fromkeys(uuids) if needs_fetch(con, u)]
+    print(f"{len(uuids)} photos, {len(need)} need a full-size copy")
+    print(f"fetched {fetch_large(con, need, log=print)}")
+
+
+def cmd_thumbs(a):
+    """Rebuild thumbnails at THUMB_PX where the photo's source is bigger than its current thumbnail."""
+    from PIL import Image
+    con, n, t0 = db(), 0, time.time()
+    rows = con.execute("select uuid, src from photos").fetchall()
+    for i, (u, src) in enumerate(rows):
+        th, big = THUMBS / f"{u}.jpg", LARGE / f"{u}.jpg"
+        try:
+            have = max(Image.open(th).size) if th.exists() else 0
+            source = big if big.exists() else src
+            if have >= THUMB_PX or (have and max(Image.open(source).size) <= have):
+                continue
+            im = open_image(source, THUMB_PX); im.save(th, quality=82); n += 1
+        except Exception as ex:
+            print(f"\n  skip {u}: {ex.__class__.__name__}: {ex}")
+        if i % 200 == 0:
+            print(f"\r{i}/{len(rows)}  rebuilt {n}", end="", flush=True)
+    print(f"\rrebuilt {n} of {len(rows)} thumbnails in {(time.time() - t0) / 60:.1f} min")
 
 
 def contact_sheet(con, uuids, cols=6, cell=200):
@@ -813,7 +966,8 @@ def render_review(con, review, embed=False):
     import base64
     info = photo_info(con, [p["uuid"] for c in review["chapters"] for p in c["photos"]])
     def src(u):
-        return "data:image/jpeg;base64," + base64.b64encode(photo_jpeg(con, u)).decode() if embed else f"/photo/{u}.jpg"
+        # 1600 px: sharp on a laptop or TV, and a 27-photo story is ~13 MB, under email attachment limits
+        return "data:image/jpeg;base64," + base64.b64encode(photo_jpeg(con, u, 1600, 80)).decode() if embed else f"/photo/{u}.jpg"
     kicker = date_range(review["start"], review["end"]) if review.get("kind") == "trip" else "Year in review"
     data = dict(review, kicker=kicker,
                 chapters=[dict(title=c["title"], text=c.get("text", ""),
@@ -841,6 +995,9 @@ def cmd_review(a):
     print(f"{r['title']}: {sum(len(c['photos']) for c in r['chapters'])} photos in {len(r['chapters'])} chapters "
           f"(made by {r['made_by']})")
     if a.export:
+        if need := [u for u in story_uuids(r) if needs_fetch(con, u)]:
+            print(f"fetching full-size copies of {len(need)} photos from iCloud…")
+            fetch_large(con, need, log=print)
         Path(a.export).write_text(render_review(con, r, embed=True))
         print(f"wrote {a.export} ({Path(a.export).stat().st_size / 1e6:.1f} MB): one file, opens in any browser")
 
@@ -894,6 +1051,7 @@ def cmd_serve(a):
     from urllib.parse import urlparse, parse_qs
     con = db()
     model()  # warm up before first request
+    fetcher = Fetcher(con)
 
     split = lambda v: [x.strip() for x in (v or "").split(",") if x.strip()]
 
@@ -926,6 +1084,7 @@ def cmd_serve(a):
         return info[q["uuid"]]
 
     api = {"/api/today": lambda q: on_this_day(con, q.get("day")), "/api/stories": lambda q: stories(con), "/api/story": lambda q: story_for_editor(con, q.get("id", "")),
+           "/api/sharp": lambda q: {u: fetcher.status(u) for u in q.get("uuids", "").split(",") if u},
            "/api/story_photos": lambda q: story_candidates(con, q.get("id", ""), q.get("q"), q.get("like")),
            "/api/search": api_search, "/api/open": api_open, "/api/info": api_info, "/api/parse": api_parse,
            "/api/galaxy": lambda q: galaxy(con),
@@ -954,6 +1113,10 @@ def cmd_serve(a):
                     return self.send(photo_jpeg(con, name.removesuffix(".jpg")), "image/jpeg")
                 if u.path.startswith("/review/") and STORY_ID.fullmatch(name):
                     r = load_review(con, name, make=True)
+                    if "download" in q:  # the file goes to family: wait for full-size copies (~1 s per missing one)
+                        fetch_in_subprocess(con, story_uuids(r))
+                    else:  # the player shows ~5 s per photo, so queued copies arrive ahead of their slides
+                        fetcher.add(story_uuids(r))
                     page = render_review(con, r, embed="download" in q).encode()
                     if "download" in q:  # one self-contained file to send to family
                         self.send_response(200); self.send_header("content-type", "text/html; charset=utf-8")
@@ -970,7 +1133,7 @@ def cmd_serve(a):
                 return self.send(json.dumps(dict(error=str(ex))).encode(), "application/json", 404)
             self.send(b"not found", "text/plain", 404)
 
-        def do_POST(self):  # saving an edited story: the only request that writes
+        def do_POST(self):  # the requests that write: saving an edited story, fetching full-size copies
             # Only this page may write. Other sites can't send JSON here without a CORS preflight, which we never
             # answer; checking Host too stops DNS rebinding (a site whose name resolves to 127.0.0.1).
             here = {f"localhost:{a.port}", f"127.0.0.1:{a.port}"}
@@ -978,10 +1141,17 @@ def cmd_serve(a):
             if (self.headers.get("host") not in here or (origin and urlparse(origin).netloc not in here)
                     or self.headers.get("content-type", "").split(";")[0].strip() != "application/json"):
                 return self.send(b"forbidden", "text/plain", 403)
-            if urlparse(self.path).path != "/api/story":
+            path = urlparse(self.path).path
+            if path not in ("/api/story", "/api/sharp"):
                 return self.send(b"not found", "text/plain", 404)
             try:
-                res = edit_review(con, json.loads(self.rfile.read(int(self.headers.get("content-length") or 0))))
+                body = json.loads(self.rfile.read(int(self.headers.get("content-length") or 0)))
+                if path == "/api/sharp":  # fetch full-size copies of these photos from iCloud, in the background
+                    uuids = [str(u)[:64] for u in body.get("uuids", [])][:200]
+                    fetcher.add(uuids)
+                    return self.send(json.dumps(dict(results={u: fetcher.status(u) for u in uuids})).encode(), "application/json")
+                res = edit_review(con, body)
+                fetcher.add(story_uuids(load_review(con, body["id"])))
             except (ValueError, LookupError, AttributeError, TypeError) as ex:
                 return self.send(json.dumps(dict(error=str(ex))).encode(), "application/json", 400)
             self.send(json.dumps(dict(results=res)).encode(), "application/json")
@@ -1010,6 +1180,10 @@ def main():
     p = sub.add_parser("similar"); p.add_argument("uuid"); filters(p); p.set_defaults(fn=cmd_similar)
     p = sub.add_parser("album"); p.add_argument("name"); p.add_argument("query"); filters(p); p.set_defaults(fn=cmd_album)
     p = sub.add_parser("serve"); p.add_argument("--port", type=int, default=8765); p.set_defaults(fn=cmd_serve)
+    p = sub.add_parser("fetch", help="full-size copies from iCloud for photos whose local preview is small")
+    p.add_argument("what", nargs="+", help="story ids (2025, trip-2024-05-02) or photo uuids"); p.set_defaults(fn=cmd_fetch)
+    p = sub.add_parser("thumbs", help="rebuild thumbnails at the current size, where the source allows")
+    p.set_defaults(fn=cmd_thumbs)
     p = sub.add_parser("today", help="photos from this day in earlier years")
     p.add_argument("--day", help="MM-DD instead of today"); p.set_defaults(fn=cmd_today)
     p = sub.add_parser("trips", help="trips, found from where photos were taken"); p.set_defaults(fn=cmd_trips)
