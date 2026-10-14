@@ -412,6 +412,357 @@ def cmd_album(a):
     print(f"added {len(photos)} photos to album '{a.name}'")
 
 
+def add_to_photos_album(name, uuids):
+    """Add photos to an album in the Photos app (made if needed), in a `ps.py add-to-album` process: Photos is driven
+    by AppleScript, which is happiest on a process's main thread. Only ever adds. Returns how many were added."""
+    import subprocess
+    uuids = list(dict.fromkeys(uuids))
+    if not uuids:
+        return 0
+    r = subprocess.run([sys.executable, str(HERE / "ps.py"), "add-to-album", name, *uuids], capture_output=True, text=True,
+                       timeout=120 + len(uuids))
+    m = re.search(r"added (\d+)", r.stdout)
+    if r.returncode or not m:
+        raise LookupError("Photos didn't take them: " + (r.stderr.strip().splitlines() or ["no reply"])[-1][:200])
+    return int(m.group(1))
+
+
+def cmd_add_to_album(a):
+    from osxphotos.photosalbum import PhotosAlbum
+    order = {u: i for i, u in enumerate(a.uuids)}
+    photos = sorted(photos_db().photos(uuid=list(order)), key=lambda p: order[p.uuid])
+    PhotosAlbum(a.name).add_list(photos)
+    print(f"added {len(photos)} photos to album '{a.name}'")
+
+
+# ---------------------------------------------------------------- smart albums: a saved search that keeps itself up to date
+
+ALBUMS = DATA / "albums"
+FILTER_KEYS = ("person", "place", "after", "before", "season", "kind")
+
+def album_filters(a):
+    f = a.get("filters") or {}
+    return dict(person=[x.strip() for x in (f.get("person") or "").split(",") if x.strip()], place=f.get("place") or None,
+                after=f.get("after") or None, before=f.get("before") or None, kind=f.get("kind") or None,
+                months=SEASONS.get(f.get("season") or ""))
+
+
+def album_vector(con, a):
+    """What the album looks for: its words (minus what it should leave out), nudged towards the photos pinned into it
+    and away from the ones taken out, so every removal teaches it. None for an album of filters only."""
+    _, M, pos = vectors(con)
+    pinned = [M[pos[u]] for u in a.get("pinned", []) if u in pos]
+    removed = [M[pos[u]] for u in a.get("removed", []) if u in pos]
+    if not a.get("q") and not pinned:
+        return None
+    v = np.zeros(DIM, np.float32)
+    if a.get("q"):
+        v = embed_query(a["q"])
+        for x in a.get("exclude") or []:
+            v = v - EXCLUDE_W * embed_query(x)
+        v = v / np.linalg.norm(v)
+    if pinned:
+        v = v + 0.5 * np.mean(pinned, 0)
+    if removed:
+        v = v - 0.3 * np.mean(removed, 0)
+    return (v / np.linalg.norm(v)).astype(np.float32)
+
+
+def album_rank(con, a, k=400):
+    """The candidates, best first, with scores: (uuid, score). Taken-out photos never appear."""
+    keep, M = filtered(con, **album_filters(a))
+    out = set(a.get("removed", []))
+    v = album_vector(con, a)
+    if v is None:  # filters only (a person, a place): all of them, most interesting first
+        _, _, pos = vectors(con)
+        score = interest(con)
+        return [(u, float(score[pos[u]])) for u in sorted(keep, key=lambda u: -score[pos[u]]) if u not in out][:k]
+    s = M @ v
+    return [(keep[i], float(s[i])) for i in np.argsort(-s) if keep[i] not in out][:k]
+
+
+def album_members(con, a):
+    """Everything that scores at least the album's threshold, plus what's pinned: new photos that match join by
+    themselves. An album of filters only holds every photo that passes them."""
+    ranked = album_rank(con, a, k=100000)
+    t, scored = a.get("threshold"), album_vector(con, a) is not None
+    ids = [u for u, sc in ranked if not scored or t is None or sc >= t]
+    have, out = set(ids), set(a.get("removed", []))
+    return ids + [u for u in a.get("pinned", []) if u not in have and u not in out]
+
+
+def load_album(aid):
+    f = ALBUMS / f"{aid}.json"
+    if not re.fullmatch(r"[a-z0-9-]{1,60}", aid or "") or not f.exists():
+        raise LookupError(f"no album {aid!r}")
+    return json.loads(f.read_text())
+
+
+def albums(con):
+    out = []
+    for f in sorted(ALBUMS.glob("*.json"), key=lambda f: -f.stat().st_mtime) if ALBUMS.exists() else []:
+        a = json.loads(f.read_text())
+        ids = album_members(con, a)
+        synced = a.get("photos_album", {}).get("synced")
+        out.append(dict(id=a["id"], name=a["name"], q=a.get("q", ""), filters=a.get("filters", {}), n=len(ids), cover=ids[0] if ids else None,
+                        new=None if synced is None else len(set(ids) - set(synced))))
+    return out
+
+
+def album_view(con, aid):
+    a = load_album(aid)
+    ids = album_members(con, a)
+    info = photo_info(con, ids)
+    return dict(album=a, photos=[info[u] for u in ids if u in info])
+
+
+def album_preview(con, a, k=400):
+    """For the album page: the ranked candidates with scores, so a slider can choose where the album ends."""
+    ranked = album_rank(con, a, k)
+    info = photo_info(con, [u for u, _ in ranked])
+    pinned = set(a.get("pinned", []))
+    extra = [u for u in pinned if u not in {u for u, _ in ranked}]
+    info.update(photo_info(con, extra))
+    return dict(ranked=[dict(info[u], score=sc, pinned=u in pinned) for u, sc in ranked if u in info],
+                pinned=[info[u] for u in extra if u in info], scored=album_vector(con, a) is not None)
+
+
+def save_album(con, body):
+    """Create or update an album from the page. Validates everything; the id comes from the name."""
+    if not isinstance(body, dict):
+        raise ValueError("expected an album")
+    name = str(body.get("name") or "").strip()[:80]
+    if not name:
+        raise ValueError("an album needs a name")
+    q = str(body.get("q") or "").strip()[:300]
+    f = {k: str((body.get("filters") or {}).get(k) or "").strip()[:100] for k in FILTER_KEYS}
+    if not q and not any(f.values()):
+        raise ValueError("an album needs words or a filter to look for")
+    clean = lambda xs: [str(u)[:64] for u in (xs or []) if re.fullmatch(r"[0-9A-Fa-f-]{8,64}", str(u))][:2000]
+    aid = str(body.get("id") or "") or slug(name)[:50] or "album"
+    if not body.get("id"):  # a new album: don't overwrite one with the same name
+        base, n = aid, 2
+        while (ALBUMS / f"{aid}.json").exists():
+            aid = f"{base}-{n}"; n += 1
+    old = json.loads((ALBUMS / f"{aid}.json").read_text()) if (ALBUMS / f"{aid}.json").exists() else {}
+    a = dict(old, id=aid, name=name, q=q, exclude=[x.strip() for x in str(body.get("exclude") or "").split(",") if x.strip()][:5],
+             filters={k: v for k, v in f.items() if v}, pinned=clean(body.get("pinned")), removed=clean(body.get("removed")),
+             created=old.get("created", date.today().isoformat()))
+    # Where the album ends: the page sends how many to keep (n), and the threshold is that photo's score under the
+    # album's current vector. Teaching moves every score, so a threshold kept from before would be meaningless.
+    a["threshold"] = None
+    if album_vector(con, a) is not None:
+        ranked = album_rank(con, a, k=2000)
+        n = body.get("n")
+        if not isinstance(n, int) or n < 1:  # no choice made: the photos close to the best match
+            n = min(150, max(10, sum(sc >= ranked[0][1] - 0.07 for _, sc in ranked))) if ranked else 0
+        a["threshold"] = ranked[min(n, len(ranked)) - 1][1] if ranked else None
+    ALBUMS.mkdir(parents=True, exist_ok=True)
+    (ALBUMS / f"{aid}.json").write_text(json.dumps(a, indent=1, ensure_ascii=False))
+    return dict(id=aid, n=len(album_members(con, a)))
+
+
+def delete_album(aid):
+    load_album(aid)
+    (ALBUMS / f"{aid}.json").unlink()
+    return {}
+
+
+def album_to_photos(con, aid):
+    """Copy the album into the Photos app (an album of the same name). Adds only what isn't there yet."""
+    a = load_album(aid)
+    ids = album_members(con, a)
+    done = set(a.get("photos_album", {}).get("synced", []))
+    n = add_to_photos_album(a["name"], [u for u in ids if u not in done])
+    a["photos_album"] = dict(name=a["name"], synced=sorted(done | set(ids)), at=datetime.now().isoformat(timespec="seconds"))
+    (ALBUMS / f"{aid}.json").write_text(json.dumps(a, indent=1, ensure_ascii=False))
+    return dict(added=n, total=len(ids))
+
+
+# ---------------------------------------------------------------- tidying up: near-duplicates
+
+CLEANUP = DATA / "cleanup.json"   # choices: groups that aren't duplicates, which photo to keep, what went to Photos
+MAYBE_DELETE = "Photosearch · maybe delete"
+# Calibrated by eye on sample pairs: 0.93-0.95 is the same scene at another moment (a different smile); 0.95-0.97
+# similar shots worth choosing between; 0.97+ near-identical bursts; 0.985+ the same picture (also caught across time,
+# for copies imported twice).
+DUP_LEVELS = {"same": (0.97, 600), "similar": (0.95, 120)}
+COPY_SIM = 0.985
+# The search model sees every receipt, ID card or game screenshot as nearly the same picture. So:
+# - copies far apart in time must also match on a 256-bit difference hash, within 24 bits (measured: real copies
+#   3-23, different receipts and IDs 79-149; bursts can't be held to it, people move: 0-134);
+# - anything document-like (interest under DOC_LIKE: receipts, IDs; or screen-shaped, narrower than 0.6 or wider
+#   than 1.9, like phone screenshots, which can look "interesting" when colourful) only counts when it's practically
+#   the same pixels: a mean difference of at most PIXEL_MAX out of 255 at 96x128, and under CHANGED_MAX of the
+#   thumbnail's pixels changed by more than 48 (a game screen whose scores changed: 0.2%; real copies: at most 0.04%,
+#   though their averages are alike). Missing a duplicate is fine; suggesting a real document for deletion isn't.
+HASH_MAX, DOC_LIKE, PIXEL_MAX, CHANGED_MAX = 24, 0.03, 1.0, 0.0005
+_dupes, _sharp, _hash, _px = {}, {}, {}, {}
+
+def tiny(u):
+    if u not in _px:
+        from PIL import Image
+        try:
+            _px[u] = np.asarray(Image.open(THUMBS / f"{u}.jpg").convert("L").resize((96, 128), Image.LANCZOS), np.float32)
+        except Exception:
+            _px[u] = np.full((128, 96), -999, np.float32)
+    return _px[u]
+
+
+def same_pixels(a, b):
+    if float(np.abs(tiny(a) - tiny(b)).mean()) > PIXEL_MAX:
+        return False
+    from PIL import Image
+    A = Image.open(THUMBS / f"{a}.jpg").convert("L")
+    B = Image.open(THUMBS / f"{b}.jpg").convert("L").resize(A.size, Image.LANCZOS)
+    return float((np.abs(np.asarray(A, np.float32) - np.asarray(B, np.float32)) > 48).mean()) < CHANGED_MAX
+
+def dhash(u):
+    if u not in _hash:
+        from PIL import Image
+        try:
+            a = np.asarray(Image.open(THUMBS / f"{u}.jpg").convert("L").resize((17, 16), Image.LANCZOS), np.int16)
+            _hash[u] = (a[:, 1:] > a[:, :-1]).flatten()
+        except Exception:
+            _hash[u] = np.zeros(256, bool)
+    return _hash[u]
+
+def sharpness(uuids):
+    """Detail in the thumbnail (variance of its Laplacian, at a common 256 px): the sharper of two near-identical
+    shots has more. Cached in data/sharpness.json."""
+    f = DATA / "sharpness.json"
+    if not _sharp and f.exists():
+        _sharp.update(json.loads(f.read_text()))
+    todo = [u for u in uuids if u not in _sharp]
+    if todo:
+        from PIL import Image
+        for u in todo:
+            try:
+                im = Image.open(THUMBS / f"{u}.jpg").convert("L"); im.thumbnail((256, 256))
+                g = np.asarray(im, np.float32)
+                lap = g[1:-1, 1:-1] * 4 - g[:-2, 1:-1] - g[2:, 1:-1] - g[1:-1, :-2] - g[1:-1, 2:]
+                _sharp[u] = round(float(lap.var()), 1)
+            except Exception:
+                _sharp[u] = 0.0
+        f.write_text(json.dumps(_sharp))
+    return {u: _sharp[u] for u in uuids}
+
+
+def cleanup_state():
+    st = json.loads(CLEANUP.read_text()) if CLEANUP.exists() else {}
+    return dict(dict(nope=[], keep={}, sent=[]), **st)
+
+
+def dupe_groups(con, level="same"):
+    """Groups of near-duplicate photos, newest first: runs of shots taken close together that look almost the same,
+    plus identical copies wherever they are in time. Each has a pick to keep: the sharpest (then the more
+    interesting), unless you chose another."""
+    sim, window = DUP_LEVELS[level]
+    uuids, M, pos = vectors(con)
+    stamp = (len(uuids), level)
+    if _dupes.get(level, (None,))[0] != stamp:
+        rows = sorted(((u, datetime.fromisoformat(d).timestamp()) for u, d in
+                       con.execute(f"select uuid, date from photos where kind='photo' and {DATED}") if u in pos), key=lambda r: r[1])
+        ids = [u for u, _ in rows]; ts = np.array([t for _, t in rows]); V = M[[pos[u] for u in ids]]
+        parent = list(range(len(ids)))
+        def root(i):
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]; i = parent[i]
+            return i
+        for k in range(1, 9):  # the next few shots in time
+            s = (V[:-k] * V[k:]).sum(1)
+            for i in np.where((s >= sim) & (ts[k:] - ts[:-k] <= window))[0]:
+                parent[root(i)] = root(i + k)
+        for a in range(0, len(ids), 2000):  # the same picture, any time apart
+            S = V[a:a + 2000] @ V.T
+            for i, j in zip(*np.where(S >= COPY_SIM)):
+                if j > i + a:
+                    parent[root(i + a)] = root(j)
+        comps = defaultdict(list)
+        for i in range(len(ids)):
+            comps[root(i)].append(i)
+        score = interest(con)
+        doc = lambda i: score[pos[ids[i]]] < DOC_LIKE or not 0.6 <= aspect(ids[i]) <= 1.9
+        def alike(i, seed):  # no chains drifting across a whole afternoon: everyone must resemble the first
+            if float(V[i] @ V[seed]) < sim - 0.015:
+                return False
+            if i == seed:
+                return True
+            if doc(i) or doc(seed):
+                return same_pixels(ids[i], ids[seed])
+            if abs(ts[i] - ts[seed]) > window:
+                return int((dhash(ids[i]) != dhash(ids[seed])).sum()) <= HASH_MAX
+            return True
+        groups = []
+        for c in comps.values():
+            while len(c) > 1:
+                seed = c[0]
+                g = [i for i in c if alike(i, seed)]
+                if len(g) > 1:
+                    groups.append(g)
+                c = [i for i in c if i not in set(g)] if len(g) > 1 else c[1:]
+        out = []
+        for g in groups:
+            us = [ids[i] for i in g]
+            far = ts[g].max() - ts[g].min() > window
+            out.append(dict(key="|".join(sorted(us)), uuids=us, kind="copy" if far else "burst", t=float(ts[g].max())))
+        out.sort(key=lambda g: -g["t"])
+        _dupes[level] = (stamp, out)
+    return _dupes[level][1]
+
+
+def dupe_keeper(con, g, st):
+    """(the photo to keep, why): the one you picked, else the sharpest, with interest as a tie-breaker."""
+    if st["keep"].get(g["key"]) in g["uuids"]:
+        return st["keep"][g["key"]], "your pick"
+    score = interest(con); _, _, pos = vectors(con)
+    sh = sharpness(g["uuids"]); top = max(sh.values()) or 1
+    return max(g["uuids"], key=lambda u: sh[u] / top + 2 * score[pos[u]]), "the sharpest"
+
+
+def dupes(con, level="same", offset=0, limit=24):
+    st = cleanup_state()
+    sent = set(st["sent"])
+    groups = [g for g in dupe_groups(con, level) if g["key"] not in set(st["nope"])]
+    keeper = lambda g: dupe_keeper(con, g, st)
+    page = groups[offset:offset + limit]
+    info = photo_info(con, [u for g in page for u in g["uuids"]])
+    out = []
+    for g in page:
+        keep, why = keeper(g)
+        out.append(dict(key=g["key"], kind=g["kind"], keep=keep, why=why,
+                        photos=[dict(info[u], sent=u in sent) for u in g["uuids"] if u in info]))
+    return dict(groups=out, total=len(groups), extra=sum(len(g["uuids"]) - 1 for g in groups),
+                sent=len(sent), level=level, album=MAYBE_DELETE)
+
+
+def dupes_choose(con, body):
+    st = cleanup_state()
+    key = str(body.get("key") or "")
+    if body.get("action") == "keep":
+        st["keep"][key] = str(body.get("uuid"))[:64]
+    elif body.get("action") == "nope":
+        st["nope"] = sorted(set(st["nope"]) | {key})
+    else:
+        raise ValueError("action is keep or nope")
+    CLEANUP.write_text(json.dumps(st))
+    return {}
+
+
+def dupes_send(con, level="same"):
+    """Every extra (all but each group's keeper) that isn't in the maybe-delete album yet goes there, in Photos."""
+    st = cleanup_state(); sent = set(st["sent"])
+    nope = set(st["nope"])
+    extras = []
+    for g in dupe_groups(con, level):
+        if g["key"] not in nope:
+            keep = dupe_keeper(con, g, st)[0]  # by the same rule the page shows
+            extras += [u for u in g["uuids"] if u != keep and u not in sent]
+    n = add_to_photos_album(MAYBE_DELETE, extras)
+    st = cleanup_state(); st["sent"] = sorted(set(st["sent"]) | set(extras)); CLEANUP.write_text(json.dumps(st))
+    return dict(added=n, album=MAYBE_DELETE)
+
+
 # ---------------------------------------------------------------- fun
 
 def galaxy(con):
@@ -1380,6 +1731,9 @@ def cmd_serve(a):
            "/api/galaxy": lambda q: galaxy(con), "/api/overview": lambda q: overview(con),
            "/api/rediscover": lambda q: rediscover(con, min(60, int(q.get("n", 24)))),
            "/api/world": lambda q: world(con), "/api/people": lambda q: people(con),
+           "/api/albums": lambda q: albums(con), "/api/album": lambda q: album_view(con, q.get("id", "")),
+           "/api/dupes": lambda q: dupes(con, q.get("level", "same") if q.get("level") in DUP_LEVELS else "same",
+                                         int(q.get("offset", 0)), min(60, int(q.get("limit", 24)))),
            "/api/person": lambda q: person(con, q.get("name", "")), "/api/days": lambda q: days(con, int(q.get("year", date.today().year))),
            "/api/near": lambda q: near(con, float(q["lat"]), float(q["lon"]), min(500.0, float(q.get("km", 2))), min(120, int(q.get("k", 60)))),
            "/api/timeline": lambda q: timeline(con, q.get("q", ""), int(q.get("per", 1)), q.get("person")),
@@ -1477,6 +1831,19 @@ def cmd_serve(a):
                 self.send_header("content-length", "2"); self.end_headers(); return self.wfile.write(b"{}")
             if not self.gate(page=False):
                 return
+            writes = {"/api/album": lambda b: save_album(con, b), "/api/album_preview": lambda b: album_preview(con, b), "/api/album_delete": lambda b: delete_album(str(b.get("id", ""))),
+                      "/api/album_photos": lambda b: album_to_photos(con, str(b.get("id", ""))),
+                      "/api/dupes": lambda b: dupes_choose(con, b),
+                      "/api/dupes_send": lambda b: dupes_send(con, b.get("level") if b.get("level") in DUP_LEVELS else "same")}
+            if path in writes:
+                if path in ("/api/album_photos", "/api/dupes_send") and not self.local():
+                    return self.send(json.dumps(dict(error="copying into Photos only works on the Mac")).encode(), "application/json", 403)
+                try:
+                    body = json.loads(self.rfile.read(min(1 << 20, int(self.headers.get("content-length") or 0))))
+                    res = writes[path](body if isinstance(body, dict) else {})
+                except (ValueError, LookupError, AttributeError, TypeError) as ex:
+                    return self.send(json.dumps(dict(error=str(ex))).encode(), "application/json", 400)
+                return self.send(json.dumps(dict(results=res)).encode(), "application/json")
             if path not in ("/api/story", "/api/sharp"):
                 return self.send(b"not found", "text/plain", 404)
             try:
@@ -1517,6 +1884,8 @@ def main():
     filters(p); p.set_defaults(fn=cmd_search)
     p = sub.add_parser("similar"); p.add_argument("uuid"); filters(p); p.set_defaults(fn=cmd_similar)
     p = sub.add_parser("album"); p.add_argument("name"); p.add_argument("query"); filters(p); p.set_defaults(fn=cmd_album)
+    p = sub.add_parser("add-to-album", help="add photos (by uuid) to an album in Photos; used by the web page")
+    p.add_argument("name"); p.add_argument("uuids", nargs="+"); p.set_defaults(fn=cmd_add_to_album)
     p = sub.add_parser("serve"); p.add_argument("--port", type=int, default=8765)
     p.add_argument("--lan", action="store_true", help="also let phones and tablets on this network in, with a passcode")
     p.add_argument("--new-passcode", action="store_true", help="with --lan: a new passcode, and every device signs in again")

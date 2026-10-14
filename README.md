@@ -148,6 +148,8 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 | **Galaxy** | Your whole library on one zoomable map, with similar photos next to each other and colored by year. Scroll to zoom, drag to pan, hover to peek. Type in the search box to see where, say, "beach" lives, and the map glides there; the faces along the bottom light up everyone's photos of one person. **▶** plays the years: the library grows from the first photo, each year's new ones standing out. The first visit takes a minute to lay out the map. |
 | **Time Machine** | Pick something that happens every year ("birthday cake", "christmas tree") and flip through the best match from each year, or follow one person (👤): their best photo each year, or just their birthdays. ▶ or space plays them in turn, slowly dissolving or as a quick **Flipbook**. |
 | **Play** | *Guess the Year*, *Guess the Place* and *Which Came First?* (two photos: tap the older one). Play alone (10 rounds, best scores kept) or add players to pass the phone around: everyone gets 5 turns and the end shows who won. **Photo Math** lives here too: start from a photo or words, then add and take away ideas, *this photo + snow − summer*. |
+| **Albums** | Smart albums: **＋ Album** on any search (words, a person, a place, dates) saves it as an album that keeps itself up to date: new photos that match as well as the ones in it join by themselves. A slider sets how strict it is. ✕ takes a photo out *and teaches the album* to find fewer like it; ☆ keeps one in for good (both nudge what the album looks for). **Copy to Photos** (on the Mac) makes or updates an album of the same name in the Photos app, adding only what's new. Kept in `data/albums/`. |
+| **Tidy up** | Under Albums: near-duplicates, as groups of bursts and copies of the same picture. Each group has a suggested keeper (the sharpest, judged from the detail in its thumbnail); tap another to keep that instead, or **Not duplicates** to stop suggesting the group. **Send the extras** adds every non-keeper to an album in Photos called *Photosearch · maybe delete*, so you can look through it and delete there. Nothing is ever deleted by Photosearch. *Near-identical* is the default; *Also similar shots* includes shots of the same moment that differ a little more. Receipts, ID cards and screenshots only count when they're practically the same pixels, so two different receipts are never paired. |
 | **Photo frame** | `#frame`, or from Home: a slow, endless full-screen slideshow of your best photos with the time and date, for a spare iPad or TV. It keeps the screen awake. **⚙ What to show** picks everything, on this day, one person, or any search (`#frame/?person=…`, `#frame/?q=…`). **▶ Slideshow** on any search, place or open photo plays just those. |
 | **Stories** | Every trip (found automatically from where photos were taken) and every year as a slideshow of its best, most varied moments, with chapters and captions. **⤓** saves one as a single HTML file (photos included) you can send to family; **✎** edits it. |
 
@@ -298,6 +300,9 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 | `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector |
 | `data/thumbs/` | Small JPEG previews for the web page (512 px) |
 | `data/large/` | Full-size copies (up to 2560 px) of photos shown big whose local preview was small, fetched from iCloud. Safe to delete; they come back when needed |
+| `data/albums/` | Smart albums, one JSON file each: the words and filters, the threshold, what's been pinned or taken out |
+| `data/cleanup.json`, `data/sharpness.json` | Tidy-up choices (keepers you picked, groups that aren't duplicates, what went to *maybe delete*), and a cache of how sharp each thumbnail is |
+| `data/lan.json` | With `serve --lan`: the passcode and the signed-in devices (readable only by you) |
 | `data/galaxy.json` | The Galaxy map layout (rebuilt automatically when the index grows by 10%) |
 
 `data/` holds previews of your photos, so treat it as private. It's in `.gitignore` and never committed.
@@ -378,7 +383,9 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
   confidence are ignored.
 
 **Status:** full library indexed (16,975 items in 140 min on an M3 Pro; 42 skipped for lack of a local preview). Every web tab checked in headless
-Chrome. `album` / `make_album` have not been run yet. 1,042 photos carry a placeholder date (2002-01-01 00:00); they are treated as undated.
+Chrome. Nothing that writes to the Photos app has been run yet: `album`, `make_album`, **Copy to Photos** and **Send the
+extras** all use the same add-only path (osxphotos' PhotosAlbum), so try one on a small album first. 1,042 photos carry a
+placeholder date (2002-01-01 00:00); they are treated as undated. Tidy up finds 2,370 near-identical groups (5,290
+extras) on this library.
 
-**Ideas next:** smart albums you teach with a few examples; duplicate cleanup;
-index the audio track of videos.
+**Ideas next:** index the audio track of videos; video previews on hover; a "use as portrait" choice for people pages.
