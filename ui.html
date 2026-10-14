@@ -1,245 +1,481 @@
 <!doctype html>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Photo Search</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Photosearch</title>
+<meta name="theme-color" content="#0f0e0c">
 <style>
-  :root { --bg:#fafaf9; --fg:#1c1917; --mut:#78716c; --card:#fff; --line:#e7e5e4; --acc:#2563eb; --good:#16a34a; color-scheme: light dark; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#141414; --fg:#f5f5f4; --mut:#a8a29e; --card:#1f1f1f; --line:#333; --acc:#60a5fa; --good:#4ade80; } }
-  * { box-sizing: border-box; }
-  html, body { height:100%; }
-  body { margin:0; font:15px/1.4 -apple-system, system-ui, sans-serif; background:var(--bg); color:var(--fg); display:flex; flex-direction:column; }
-  header { position:sticky; top:0; z-index:5; background:var(--bg); padding:12px 20px 10px; border-bottom:1px solid var(--line); }
-  nav { display:flex; gap:4px; align-items:center; margin-bottom:10px; overflow-x:auto; }
-  nav b { margin-right:12px; white-space:nowrap; }
-  nav a { padding:6px 12px; border-radius:999px; color:var(--mut); text-decoration:none; white-space:nowrap; }
-  nav a.on { background:var(--fg); color:var(--bg); }
-  @media (max-width: 600px) {  /* phones: every tab in sight (wrapping) rather than a sideways scroll that hides some */
-    header { padding:10px 12px 8px; }
-    nav { flex-wrap:wrap; overflow:visible; gap:2px; }
-    nav b { margin-right:4px; } nav b span { display:none; }
-    nav a { padding:5px 10px; }
+  /* A darkroom: near-black and warm, so the photos carry the colour; editorial serif headings, amber like the story player */
+  :root { --bg:#0f0e0c; --bg2:#181614; --card:#1d1b18; --line:#2f2b27; --fg:#f4efe6; --mut:#a39c90; --acc:#f2b33d; --on-acc:#1a1408;
+          --good:#7bd88f; --shade:rgba(10,9,8,.72); --hh:64px; --dock:0px; color-scheme:dark;
+          --serif: ui-serif, "New York", "Iowan Old Style", Georgia, serif; --sans: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f5f1ea; --bg2:#ebe5da; --card:#fffdf9; --line:#e0d8cb; --fg:#1d1914; --mut:#6e6559; --acc:#b06f12; --on-acc:#fff;
+            --good:#1f8a3b; --shade:rgba(245,241,234,.8); color-scheme:light; }
   }
-  form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0; }
-  input, select, button { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
-  input[type=range] { padding:0; border:0; background:none; }
-  .grow { flex:1 1 280px; font-size:17px; }
-  button { background:var(--acc); color:#fff; border-color:var(--acc); cursor:pointer; }
-  button.ghost { background:var(--card); color:var(--fg); border-color:var(--line); }
-  .small { width:9.5em; }
-  #filters { display:contents; }
-  #ftoggle { display:none; }
-  @media (max-width: 600px) {  /* phones: the description and Search on one row; filters fold away behind a button */
-    #f .grow { flex:1 1 0; min-width:0; font-size:16px; }
-    #ftoggle { display:block; padding:8px; }
-    #ftoggle.set { border-color:var(--acc); color:var(--acc); }
-    #filters { display:none; order:9; flex:1 1 100%; grid-template-columns:1fr 1fr; gap:8px; }
-    #filters.open { display:grid; }
-    #filters .small, #filters select { width:auto; min-width:0; }
-    #filters #exclude, #filters #person, #filters #smartbox { grid-column:1 / -1; }
-  }
-  .auto { border-color:var(--acc); box-shadow:0 0 0 2px color-mix(in srgb, var(--acc) 25%, transparent); }
-  .status { color:var(--mut); font-size:13px; margin-top:8px; min-height:1.2em; }
-  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-  .chips a { font-size:13px; padding:3px 10px; border:1px solid var(--line); border-radius:999px; color:var(--fg); cursor:pointer; text-decoration:none; }
-  main { flex:1; min-height:0; }
-  section { display:none; height:100%; }
-  section.on { display:block; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:10px; padding:16px 20px 40px; }
-  figure { margin:0; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
-  figure img { display:block; width:100%; aspect-ratio:1; object-fit:cover; cursor:zoom-in; }
-  figcaption { padding:6px 8px; font-size:12px; color:var(--mut); display:flex; justify-content:space-between; gap:6px; }
-  .tag { background:var(--line); border-radius:4px; padding:0 4px; }
-  .pad { padding:16px 20px; }
-
-  /* on this day */
-  #today { max-width:1400px; }
-  .otdhead { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-  .otdhead h2 { margin:0; font-size:22px; }
-  .ty { margin:18px 0 6px; }
-  .ty h3 { margin:0 0 8px; font-size:16px; font-weight:600; }
-  .ty h3 span { color:var(--mut); font-weight:400; }
-  .ty .grid { padding:0; }
-
-  /* galaxy */
-  #galaxy { position:relative; overflow:hidden; }
-  #gcanvas { position:absolute; inset:0; width:100%; height:100%; cursor:grab; touch-action:none; background:#0b0b10; }
-  #gbar { position:absolute; top:12px; left:12px; right:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; pointer-events:none; }
-  #gbar > * { pointer-events:auto; }
-  #gbar input { background:rgba(20,20,28,.85); color:#fff; border-color:#333; }
-  #glegend { margin-left:auto; color:#ccc; font-size:12px; background:rgba(20,20,28,.85); padding:6px 10px; border-radius:8px; display:flex; gap:8px; align-items:center; }
-  #glegend i { display:inline-block; width:120px; height:8px; border-radius:4px; }
-  #gstatus { position:absolute; bottom:12px; left:12px; color:#aaa; font-size:12px; }
-  #gtip { position:absolute; pointer-events:none; display:none; background:#000; color:#ddd; border-radius:8px; padding:4px; font-size:12px; box-shadow:0 4px 20px #0008; }
-  #gtip img { display:block; width:180px; height:180px; object-fit:cover; border-radius:6px; }
-
-  /* time machine */
-  #stage { position:relative; display:flex; justify-content:center; align-items:center; height:min(62vh, 640px); background:#000; }
-  #stage img { max-width:100%; max-height:100%; transition:opacity .35s; cursor:zoom-in; }
-  #stage .year { position:absolute; left:24px; bottom:18px; font-size:64px; font-weight:800; color:#fff; text-shadow:0 2px 16px #000a; letter-spacing:-2px; }
-  #stage .meta { position:absolute; right:20px; bottom:22px; color:#ddd; font-size:13px; text-align:right; text-shadow:0 1px 6px #000; }
-  #strip { display:flex; gap:6px; overflow-x:auto; padding:10px 20px; }
-  #strip div { flex:0 0 auto; text-align:center; font-size:12px; color:var(--mut); cursor:pointer; }
-  #strip img { width:76px; height:76px; object-fit:cover; border-radius:6px; display:block; border:2px solid transparent; }
-  #strip .weak img { opacity:.35; }
-  #strip .cur img { border-color:var(--acc); }
-  #strip .cur { color:var(--fg); font-weight:600; }
-
-  /* games */
-  .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; max-width:760px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; cursor:pointer; }
-  .card h3 { margin:0 0 6px; font-size:20px; }
-  .card p { margin:0; color:var(--mut); }
-
-  /* stories */
-  #stories .cards { max-width:none; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); }
-  #stories h3.sec { margin:28px 0 12px; font-size:15px; color:var(--mut); text-transform:uppercase; letter-spacing:.08em; }
-  .story { cursor:default; padding:0; overflow:hidden; }
-  .story img { display:block; width:100%; aspect-ratio:4/3; object-fit:cover; background:#000; }
-  .story .body { padding:12px 14px 14px; }
-  .story h3 { font-size:18px; }
-  .story .go { margin-top:8px; }
-
-  /* story editor */
-  #edit .pad { max-width:1100px; padding-bottom:80px; }
-  .edtop { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
+  html { background:var(--bg); }
+  body { margin:0; min-height:100dvh; font:15px/1.45 var(--sans); background:var(--bg); color:var(--fg); display:flex; flex-direction:column;
+         -webkit-font-smoothing:antialiased; padding-bottom:var(--dock); }
+  a { color:inherit; }
+  h1, h2, h3 { font-family:var(--serif); font-weight:600; letter-spacing:-.01em; margin:0; }
+  svg.i { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+  input, select, button, textarea { font:inherit; color:var(--fg); }
+  input, select { padding:9px 12px; border:1px solid var(--line); border-radius:10px; background:var(--card); }
+  input:focus, select:focus, textarea:focus { outline:none; border-color:var(--acc); }
+  input[type=range] { padding:0; border:0; background:none; accent-color:var(--acc); }
+  button { cursor:pointer; padding:9px 16px; border-radius:999px; border:1px solid var(--acc); background:var(--acc); color:var(--on-acc); font-weight:600; }
+  button:disabled { opacity:.4; cursor:default; }
+  button.ghost { background:transparent; color:var(--fg); border-color:var(--line); font-weight:500; }
+  button.ghost:hover:not(:disabled) { border-color:var(--mut); }
+  .ibtn { width:36px; height:36px; padding:0; display:inline-grid; place-items:center; border-radius:50%; background:transparent; border:1px solid transparent; color:var(--fg); font-weight:400; }
+  .ibtn:hover { background:var(--bg2); }
+  .tiny { padding:4px 10px; font-size:13px; }
+  .status { color:var(--mut); font-size:13px; min-height:1.2em; }
   .sp { flex:1; }
-  .btn { padding:8px 14px; border-radius:8px; background:var(--acc); color:#fff; text-decoration:none; }
-  #ed > input { display:block; width:100%; margin:6px 0; }
-  #edtitle { font-size:26px; font-weight:700; }
-  .ch { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin:16px 0; }
+  .pad { padding:24px clamp(16px, 4vw, 48px); }
+  .kick { font:600 12px/1 var(--sans); letter-spacing:.18em; text-transform:uppercase; color:var(--acc); }
+  .pill { display:inline-flex; align-items:center; gap:6px; font-size:14px; padding:7px 14px; border:1px solid var(--line); border-radius:999px;
+          color:var(--fg); text-decoration:none; cursor:pointer; background:var(--card); white-space:nowrap; }
+  .pill:hover { border-color:var(--acc); }
+  .pill.on { background:var(--fg); color:var(--bg); border-color:var(--fg); }
+
+  /* ---------- header: brand, the one search box, the modes ---------- */
+  header { position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:18px; padding:10px clamp(16px, 3vw, 32px);
+           background:color-mix(in srgb, var(--bg) 84%, transparent); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4);
+           border-bottom:1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+  .brand { font:italic 600 22px/1 var(--serif); text-decoration:none; letter-spacing:-.02em; white-space:nowrap; display:flex; align-items:center; gap:8px; }
+  .brand i { width:22px; height:22px; border-radius:6px; background:conic-gradient(from 200deg, #f2b33d, #e8664a, #8f5bd6, #3e8fd6, #4fc08d, #f2b33d); display:block; }
+  nav#tabs { display:flex; gap:2px; }
+  nav#tabs a { display:flex; align-items:center; gap:7px; padding:8px 12px; border-radius:999px; color:var(--mut); text-decoration:none; font-size:14px; white-space:nowrap; }
+  nav#tabs a:hover { color:var(--fg); }
+  nav#tabs a.on { color:var(--fg); background:var(--bg2); }
+  @media (max-width: 1180px) { nav#tabs a span { display:none; } nav#tabs a { padding:8px 10px; } }
+
+  #omni { position:relative; flex:1; max-width:780px; margin:0 auto; }
+  #f { display:flex; align-items:center; gap:6px; background:var(--card); border:1px solid var(--line); border-radius:999px; padding:4px 5px 4px 14px; min-height:46px; margin:0; }
+  #f:focus-within { border-color:var(--acc); box-shadow:0 0 0 4px color-mix(in srgb, var(--acc) 16%, transparent); }
+  #f > svg { color:var(--mut); }
+  #fchips { display:flex; gap:4px; overflow-x:auto; scrollbar-width:none; max-width:55%; flex:none; }
+  #fchips:empty { display:none; }
+  #rchips { display:none; }
+  .fchip { display:inline-flex; align-items:center; gap:4px; font-size:13px; padding:3px 4px 3px 10px; border-radius:999px; background:var(--bg2); white-space:nowrap; }
+  .fchip.auto { color:var(--acc); background:color-mix(in srgb, var(--acc) 14%, transparent); }
+  .fchip button { all:unset; cursor:pointer; width:18px; height:18px; display:grid; place-items:center; border-radius:50%; color:var(--mut); font-size:13px; }
+  .fchip button:hover { background:var(--line); color:var(--fg); }
+  #q { flex:1; min-width:60px; border:0; background:none; font-size:16px; padding:8px 4px; }
+  #q:focus { border:0; }
+  #ftoggle.set { color:var(--acc); }
+  #omni.bare #fchips, #omni.bare #ftoggle { display:none; }  /* galaxy and time machine take words only */
+  #gobtn { width:36px; height:36px; padding:0; display:grid; place-items:center; }
+  #f.busy #gobtn { animation:pulse .8s ease-in-out infinite alternate; }
+  @keyframes pulse { to { opacity:.35; } }
+  #sugg, #fpanel { position:absolute; top:calc(100% + 8px); left:0; right:0; background:var(--card); border:1px solid var(--line); border-radius:16px;
+                   box-shadow:0 18px 50px rgba(0,0,0,.35); padding:6px; display:none; z-index:40; }
+  #sugg.on, #fpanel.on { display:block; }
+  #sugg a { display:flex; align-items:center; gap:12px; padding:9px 12px; border-radius:10px; text-decoration:none; cursor:pointer; }
+  #sugg a img { width:34px; height:34px; border-radius:8px; object-fit:cover; flex:none; }
+  #sugg a .g { width:34px; height:34px; border-radius:8px; display:grid; place-items:center; background:var(--bg2); flex:none; font-size:16px; }
+  #sugg a small { color:var(--mut); margin-left:auto; padding-left:12px; white-space:nowrap; }
+  #sugg a.cur, #sugg a:hover { background:var(--bg2); }
+  #sugg .sh { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--mut); padding:10px 12px 4px; }
+  #fpanel { padding:16px; display:none; grid-template-columns:1fr 1fr; gap:10px 12px; }
+  #fpanel.on { display:grid; }
+  #fpanel label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--mut); }
+  #fpanel label.w { grid-column:1 / -1; }
+  #fpanel .row { grid-column:1 / -1; display:flex; gap:8px; align-items:center; }
+
+  @media (max-width: 760px) {  /* phones: the box on top, the modes in a dock at the bottom, in reach of a thumb */
+    :root { --dock:calc(62px + env(safe-area-inset-bottom)); }
+    header { padding:8px 12px; gap:10px; background:var(--bg); backdrop-filter:none; -webkit-backdrop-filter:none; }  /* a filter here would pin the dock to the header */
+    .brand span { display:none; }
+    #f { min-width:0; }
+    #f #fchips { display:none; }
+    #rchips { display:flex; flex-wrap:wrap; gap:6px; padding:12px 12px 0; }
+    #rchips:empty { display:none; }
+    nav#tabs { position:fixed; left:0; right:0; bottom:0; height:var(--dock); padding:4px 4px env(safe-area-inset-bottom); display:grid; grid-template-columns:repeat(6, 1fr);
+               background:color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); border-top:1px solid var(--line); }
+    nav#tabs a { flex-direction:column; gap:3px; padding:6px 0; font-size:10px; border-radius:12px; justify-content:center; }
+    nav#tabs a span { display:block; }
+    nav#tabs a.on { background:none; color:var(--acc); }
+    #fpanel { position:fixed; top:auto; left:8px; right:8px; bottom:calc(var(--dock) + 8px); }
+  }
+
+  main { flex:1; min-height:0; display:flex; flex-direction:column; }
+  section { display:none; }
+  section.on { display:block; }
+  .full { height:calc(100dvh - var(--hh) - var(--dock)); position:relative; overflow:hidden; }
+
+  /* ---------- photo tiles: justified rows (each photo keeps its shape) and shelves ---------- */
+  .jrow { display:flex; gap:6px; margin-bottom:6px; }
+  .tile { position:relative; margin:0; overflow:hidden; border-radius:6px; background:var(--bg2); cursor:zoom-in; min-width:0; }
+  .tile img { display:block; width:100%; height:100%; object-fit:cover; transition:transform .5s cubic-bezier(.2,.7,.2,1), opacity .4s; opacity:0; }
+  .tile img.ok { opacity:1; }
+  .tile:hover img { transform:scale(1.04); }
+  .tile figcaption { position:absolute; left:0; right:0; bottom:0; padding:22px 10px 8px; font-size:12px; color:#fff; display:flex; gap:8px; justify-content:space-between;
+                     background:linear-gradient(transparent, rgba(0,0,0,.7)); opacity:0; transition:opacity .2s; pointer-events:none; }
+  .tile:hover figcaption { opacity:1; }
+  @media (hover:none) { .tile figcaption { display:none; } }
+  .tile .vid { position:absolute; top:8px; right:8px; font-size:11px; padding:2px 7px; border-radius:999px; background:rgba(0,0,0,.6); color:#fff; }
+  .tile .badge { position:absolute; left:8px; top:8px; font:600 13px/1 var(--serif); padding:5px 8px; border-radius:7px; background:rgba(0,0,0,.55); color:#fff;
+                 backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+  .shelf { display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x proximity; padding:4px clamp(16px, 4vw, 48px) 14px; scrollbar-width:thin;
+           scroll-padding-inline:clamp(16px, 4vw, 48px);
+           --sh:clamp(150px, 22vw, 240px); }
+  .shelf > * { scroll-snap-align:start; flex:none; }
+  .shelf .tile { height:var(--sh); aspect-ratio:var(--ar); border-radius:10px; }
+  .skel { background:linear-gradient(90deg, var(--bg2), var(--card), var(--bg2)); background-size:200% 100%; animation:sk 1.4s infinite; }
+  @keyframes sk { to { background-position:-200% 0; } }
+
+  /* ---------- home ---------- */
+  #hero { position:relative; height:min(74vh, 760px); min-height:380px; overflow:hidden; background:#000; cursor:zoom-in; }
+  .hs { position:absolute; inset:0; opacity:0; transition:opacity 1.4s ease; }
+  .hs.on { opacity:1; }
+  .hs .hb { position:absolute; inset:-60px; background-size:cover; background-position:center; filter:blur(50px) brightness(.5) saturate(1.2); }
+  .hs img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .hs img.contain { object-fit:contain; }
+  .hs.on img { animation:kb 11s ease-out forwards; }
+  @keyframes kb { from { transform:scale(1.0) translate(0, 0); } to { transform:scale(1.09) translate(var(--kx, 0), var(--ky, 0)); } }
+  .hshade { position:absolute; inset:0; pointer-events:none;
+            background:linear-gradient(180deg, rgba(0,0,0,.25), transparent 30%, transparent 45%, rgba(0,0,0,.78)),
+                       linear-gradient(90deg, rgba(0,0,0,.45), transparent 60%); }
+  .htext { position:absolute; left:clamp(16px, 4vw, 48px); right:clamp(16px, 4vw, 48px); bottom:clamp(64px, 9vh, 96px); color:#fff; pointer-events:none; }
+  .htext h1 { font-size:clamp(44px, 8vw, 104px); line-height:.95; letter-spacing:-.03em; margin:12px 0 10px; text-shadow:0 2px 30px rgba(0,0,0,.4); }
+  .htext p { margin:0; font-size:clamp(15px, 1.6vw, 19px); color:#e8e2d8; }
+  .htext p a { pointer-events:auto; color:#fff; text-decoration-color:var(--acc); text-underline-offset:3px; }
+  .hctl { position:absolute; left:clamp(16px, 4vw, 48px); right:clamp(16px, 4vw, 48px); bottom:22px; display:flex; align-items:center; gap:10px; color:#fff; }
+  .hctl .ibtn { color:#fff; border-color:rgba(255,255,255,.3); background:rgba(0,0,0,.25); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+  .hctl .ibtn:hover { background:rgba(0,0,0,.5); }
+  #hdots { display:flex; gap:5px; flex-wrap:wrap; }
+  #hdots i { width:22px; height:3px; border-radius:2px; background:rgba(255,255,255,.3); cursor:pointer; overflow:hidden; }
+  #hdots i.on::after { content:""; display:block; height:100%; background:#fff; animation:dot var(--hd, 7s) linear forwards; }
+  @keyframes dot { from { width:0; } to { width:100%; } }
+  #hday a { color:#fff; }
+  .hsec { margin-top:34px; }
+  .shead { display:flex; align-items:baseline; gap:14px; padding:0 clamp(16px, 4vw, 48px) 12px; flex-wrap:wrap; }
+  .shead h2 { font-size:clamp(22px, 2.6vw, 30px); }
+  .shead p { margin:0; color:var(--mut); font-size:14px; }
+  .shead .sp { min-width:10px; }
+  .shead a, .shead button { font-size:14px; }
+  .poster { position:relative; width:clamp(180px, 20vw, 250px); aspect-ratio:3/4; border-radius:14px; overflow:hidden; background:var(--bg2); color:#fff; text-decoration:none; display:block; }
+  .poster img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:transform .6s cubic-bezier(.2,.7,.2,1); }
+  .poster:hover img { transform:scale(1.05); }
+  .poster::after { content:""; position:absolute; inset:0; background:linear-gradient(transparent 40%, rgba(0,0,0,.85)); }
+  .poster .pt { position:absolute; z-index:1; left:14px; right:14px; bottom:14px; }
+  .poster h3 { font-size:22px; line-height:1.1; }
+  .poster small { display:block; margin-top:4px; color:#ddd; font-size:12px; }
+  .poster .by { position:absolute; z-index:1; top:12px; left:12px; font-size:11px; padding:3px 8px; border-radius:999px; background:rgba(0,0,0,.5); backdrop-filter:blur(6px); }
+  .poster.year { aspect-ratio:1; width:clamp(140px, 14vw, 180px); }
+  .poster.year h3 { font-size:40px; letter-spacing:-.03em; }
+  .asks { display:flex; flex-wrap:wrap; gap:8px; padding:0 clamp(16px, 4vw, 48px); }
+  .modes { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:14px; padding:0 clamp(16px, 4vw, 48px); }
+  .mode { position:relative; min-height:150px; border-radius:16px; padding:18px; text-decoration:none; color:#fff; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; cursor:pointer; }
+  .mode::before { content:""; position:absolute; inset:0; background:var(--art); transition:transform .6s; }
+  .mode:hover::before { transform:scale(1.06); }
+  .mode > * { position:relative; }
+  .mode b { font:600 22px/1.1 var(--serif); }
+  .mode span { font-size:13px; opacity:.85; margin-top:4px; }
+  .mode .glyph { position:absolute; top:14px; right:16px; font-size:34px; opacity:.9; }
+  footer { padding:40px clamp(16px, 4vw, 48px) 48px; color:var(--mut); font-size:13px; }
+
+  /* ---------- search results ---------- */
+  #rhead { display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap; padding:28px clamp(16px, 4vw, 48px) 16px; }
+  #rhead h1 { font-size:clamp(28px, 4vw, 48px); line-height:1.05; letter-spacing:-.02em; }
+  #rhead h1 img { width:64px; height:64px; border-radius:10px; object-fit:cover; vertical-align:middle; margin-right:12px; }
+  #rhead .meta { color:var(--mut); font-size:14px; margin-top:6px; }
+  #rhead .acts { display:flex; gap:8px; flex-wrap:wrap; margin-left:auto; }
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:999px; padding:3px; background:var(--card); }
+  .seg button { background:none; border:0; color:var(--mut); padding:5px 12px; font-weight:500; font-size:13px; }
+  .seg button.on { background:var(--fg); color:var(--bg); }
+  #grid { padding:0 clamp(16px, 4vw, 48px) 48px; }
+  .ygroup h2 { font-size:30px; margin:22px 0 10px; display:flex; align-items:baseline; gap:10px; }
+  .ygroup h2 small { font:13px var(--sans); color:var(--mut); }
+
+  /* ---------- galaxy ---------- */
+  #gcanvas { position:absolute; inset:0; width:100%; height:100%; cursor:grab; touch-action:none; background:#0b0b10; }
+  #gbar { position:absolute; top:14px; left:14px; right:14px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; pointer-events:none; }
+  #gbar > * { pointer-events:auto; }
+  #glit { background:rgba(242,179,61,.18); color:#f2b33d; border-color:rgba(242,179,61,.5); }
+  #glegend { margin-left:auto; color:#ccc; font-size:12px; background:rgba(20,20,28,.8); padding:7px 12px; border-radius:999px; display:flex; gap:8px; align-items:center; backdrop-filter:blur(8px); }
+  #glegend i { display:inline-block; width:120px; height:6px; border-radius:3px; }
+  #gstatus { position:absolute; bottom:14px; left:14px; right:14px; color:#aaa; font-size:12px; pointer-events:none; }
+  #gtip { position:absolute; pointer-events:none; display:none; background:#000; color:#ddd; border-radius:10px; padding:4px; font-size:12px; box-shadow:0 8px 30px #000a; }
+  #gtip img { display:block; width:180px; height:180px; object-fit:cover; border-radius:7px; }
+
+  /* ---------- time machine ---------- */
+  #time { background:#000; color:#fff; }
+  #stage { position:absolute; inset:0 0 120px 0; display:flex; justify-content:center; align-items:center; overflow:hidden; }
+  #stage .hb { position:absolute; inset:-60px; background-size:cover; background-position:center; filter:blur(50px) brightness(.4); transition:background-image .6s; }
+  #stage img { position:relative; max-width:100%; max-height:100%; transition:opacity .35s; cursor:zoom-in; box-shadow:0 20px 60px rgba(0,0,0,.6); }
+  #tyear { position:absolute; left:clamp(16px, 4vw, 48px); bottom:136px; font:600 clamp(72px, 14vw, 180px)/.85 var(--serif); letter-spacing:-.05em;
+           text-shadow:0 4px 40px rgba(0,0,0,.6); pointer-events:none; }
+  #tmeta { position:absolute; right:clamp(16px, 4vw, 48px); bottom:146px; color:#ddd; font-size:13px; text-align:right; text-shadow:0 1px 8px #000; }
+  #tq-head { position:absolute; top:16px; left:clamp(16px, 4vw, 48px); right:clamp(16px, 4vw, 48px); display:flex; align-items:center; gap:10px; z-index:2; }
+  #tq-head h2 { font-size:22px; }
+  #tq-head > * { text-shadow:0 1px 10px #000, 0 0 2px #000; }
+  #tq-head .ghost { color:#fff; border-color:rgba(255,255,255,.3); background:rgba(0,0,0,.35); }
+  #strip { position:absolute; left:0; right:0; bottom:0; height:120px; display:flex; gap:6px; overflow-x:auto; padding:12px clamp(16px, 4vw, 48px); background:#0a0a0a; align-items:center; }
+  #strip div { flex:0 0 auto; text-align:center; font-size:12px; color:#888; cursor:pointer; }
+  #strip img { width:72px; height:72px; object-fit:cover; border-radius:8px; display:block; border:2px solid transparent; margin-bottom:3px; }
+  #strip .weak img { opacity:.3; }
+  #strip .cur img { border-color:var(--acc); }
+  #strip .cur { color:#fff; font-weight:600; }
+  #tempty { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:24px; gap:18px;
+            background:radial-gradient(ellipse at center, #1d1810, #000 70%); }
+  #tempty h1 { font-size:clamp(34px, 6vw, 64px); letter-spacing:-.03em; max-width:900px; line-height:1.02; }
+  #tempty p { color:#bbb; margin:0; max-width:520px; }
+  #tempty .asks .pill { background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.18); color:#fff; }
+
+  /* ---------- games ---------- */
+  .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; max-width:820px; }
+  .card { position:relative; border-radius:18px; padding:22px; cursor:pointer; color:#fff; min-height:200px; display:flex; flex-direction:column; justify-content:flex-end; overflow:hidden; }
+  .card::before { content:""; position:absolute; inset:0; background:var(--art); transition:transform .6s; }
+  .card:hover::before { transform:scale(1.05); }
+  .card > * { position:relative; }
+  .card h3 { font-size:28px; margin:0 0 6px; }
+  .card p { margin:0; opacity:.85; }
+  .card .glyph { position:absolute; top:16px; right:18px; font-size:44px; }
+  #play h1 { font-size:clamp(32px, 5vw, 54px); margin-bottom:6px; letter-spacing:-.02em; }
+  #play-area { display:grid; grid-template-columns:minmax(0, 1.4fr) minmax(280px, 1fr); gap:20px; }
+  @media (max-width: 800px) { #play-area { grid-template-columns:1fr; } }
+  #play-photo { width:100%; max-height:70vh; object-fit:contain; background:#000; border-radius:16px; }
+  #guess { display:flex; flex-direction:column; gap:14px; }
+  #bigyear { font:600 96px/1 var(--serif); letter-spacing:-.04em; text-align:center; color:var(--acc); }
+  #map { height:min(52vh, 460px); border-radius:16px; }
+  .score { display:flex; justify-content:space-between; color:var(--mut); gap:12px; }
+  .reveal { font-size:18px; }
+  .reveal b { color:var(--good); }
+
+  /* ---------- photo math ---------- */
+  #mf { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:0; }
+  #mathbase { display:flex; gap:10px; align-items:center; }
+  #mathbase img { width:76px; height:76px; object-fit:cover; border-radius:12px; }
+  #mf input:not([type]) { font-size:17px; padding:12px 16px; border-radius:14px; }
+  .op { font:600 34px/1 var(--serif); color:var(--acc); }
+  #mf label { display:flex; align-items:center; gap:6px; color:var(--mut); }
+  #math h1 { font-size:clamp(30px, 4vw, 46px); margin-bottom:6px; }
+  #mchips { display:flex; flex-wrap:wrap; gap:6px; margin:14px 0 4px; }
+  #mgrid { padding:14px 0 48px; }
+
+  /* ---------- stories ---------- */
+  #stories h1 { font-size:clamp(34px, 5vw, 60px); letter-spacing:-.03em; }
+  #stories .lede { color:var(--mut); max-width:680px; margin:10px 0 0; }
+  #stories h2.sec { font-size:26px; margin:36px 0 14px; }
+  .pgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:16px; }
+  .pgrid .poster { width:auto; }
+  .pgrid .poster.year { width:auto; }
+  .pacts { position:absolute; z-index:2; top:10px; right:10px; display:flex; gap:6px; opacity:0; transition:opacity .2s; }
+  .poster:hover .pacts, .poster:focus-within .pacts { opacity:1; }
+  @media (hover:none) { .pacts { opacity:1; } }
+  .pacts span { width:32px; height:32px; display:grid; place-items:center; border-radius:50%; background:rgba(0,0,0,.55); color:#fff; text-decoration:none; font-size:14px; backdrop-filter:blur(6px); }
+
+  /* ---------- story editor ---------- */
+  #edit .pad { max-width:1140px; padding-bottom:80px; }
+  .edtop { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .btn { padding:9px 16px; border-radius:999px; background:var(--acc); color:var(--on-acc); text-decoration:none; font-weight:600; }
+  #ed > input { display:block; width:100%; margin:6px 0; background:transparent; border-color:transparent; padding-left:0; }
+  #ed > input:hover { border-color:var(--line); padding-left:12px; }
+  #ed > input:focus { border-color:var(--acc); padding-left:12px; }
+  #edtitle { font:600 clamp(30px, 4vw, 46px)/1.1 var(--serif); letter-spacing:-.02em; }
+  #edintro { font-size:18px; color:var(--mut); }
+  .ch { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:14px 16px; margin:18px 0; }
   .chhead { display:flex; gap:6px; align-items:center; }
-  .chhead input { flex:1; min-width:0; font-weight:600; font-size:17px; }
-  .ch > input { width:100%; margin-top:6px; }
-  .tiny { padding:4px 9px; }
-  .strip { display:flex; gap:10px; overflow-x:auto; padding:10px 2px 4px; align-items:flex-start; min-height:120px; }
-  .strip figure { flex:0 0 160px; position:relative; cursor:grab; }
-  .strip figure img { cursor:grab; }
+  .chhead input { flex:1; min-width:0; font:600 20px var(--serif); background:transparent; border-color:transparent; }
+  .chhead input:hover { border-color:var(--line); }
+  .ch > input { width:100%; margin-top:6px; background:transparent; }
+  .strip { display:flex; gap:10px; overflow-x:auto; padding:12px 2px 4px; align-items:flex-start; min-height:120px; }
+  .strip figure { margin:0; flex:0 0 170px; position:relative; cursor:grab; background:var(--bg2); border-radius:12px; overflow:hidden; border:1px solid var(--line); }
+  .strip figure img { display:block; width:100%; aspect-ratio:1; object-fit:cover; cursor:grab; }
   .strip figure.drag { opacity:.35; }
   .strip figure.over { outline:3px solid var(--acc); }
-  .strip.over { outline:2px dashed var(--acc); border-radius:10px; }
+  .strip.over { outline:2px dashed var(--acc); border-radius:12px; }
   .tools { position:absolute; top:6px; left:6px; right:6px; display:flex; gap:4px; opacity:0; transition:opacity .15s; }
   .tools .sp { flex:1; }
   .strip figure:hover .tools, .strip figure:focus-within .tools { opacity:1; }
   @media (hover:none) { .tools { opacity:1; } }
-  .tools button { padding:2px 8px; font-size:13px; background:rgba(0,0,0,.65); border:0; color:#fff; border-radius:6px; }
-  .strip textarea { display:block; width:100%; border:0; border-top:1px solid var(--line); font:inherit; font-size:13px; line-height:1.3;
-                    resize:vertical; background:var(--card); color:var(--fg); padding:6px 8px; }
-  .strip small { display:block; padding:0 8px 6px; color:var(--mut); font-size:11px; }
-  .strip .add { flex:0 0 120px; align-self:stretch; border-style:dashed; background:var(--card); color:var(--mut); }
+  .tools button { padding:2px 8px; font-size:13px; background:rgba(0,0,0,.65); border:0; color:#fff; border-radius:7px; font-weight:400; }
+  .strip textarea { display:block; width:100%; border:0; border-top:1px solid var(--line); font-size:13px; line-height:1.3;
+                    resize:vertical; background:var(--bg2); padding:7px 9px; }
+  .strip small { display:block; padding:0 9px 7px; color:var(--mut); font-size:11px; }
+  .strip .add { flex:0 0 120px; align-self:stretch; border-style:dashed; background:transparent; color:var(--mut); border-color:var(--line); border-radius:12px; font-weight:500; }
   .strip .empty { color:var(--mut); font-size:13px; align-self:center; }
-  #edpick { position:fixed; top:0; right:0; bottom:0; width:min(440px, 100%); z-index:15; background:var(--bg); border-left:1px solid var(--line);
-            box-shadow:-8px 0 30px #0003; padding:14px; display:flex; flex-direction:column; gap:10px;
-            transform:translateX(105%); transition:transform .2s; }
+  #edpick { position:fixed; top:0; right:0; bottom:0; width:min(460px, 100%); z-index:45; background:var(--bg); border-left:1px solid var(--line);
+            box-shadow:-10px 0 40px rgba(0,0,0,.35); padding:16px; display:flex; flex-direction:column; gap:10px;
+            transform:translateX(105%); transition:transform .25s cubic-bezier(.2,.7,.2,1); }
   #edpick.on { transform:none; }
+  #pickf { display:flex; gap:8px; margin:0; }
   #pickf input { flex:1; min-width:0; }
-  #pickgrid { overflow-y:auto; display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; align-content:start; }
-  #pickgrid figure { cursor:pointer; }
-  #pickgrid figure img { cursor:pointer; }
+  #pickgrid { overflow-y:auto; display:grid; grid-template-columns:repeat(3, 1fr); grid-auto-rows:max-content; gap:6px; align-content:start; }
+  #pickgrid figure { margin:0; cursor:pointer; background:var(--bg2); border-radius:8px; overflow:hidden; }
+  #pickgrid figure img { display:block; width:100%; aspect-ratio:1; object-fit:cover; }
   #pickgrid .used { opacity:.3; cursor:default; }
   #pickgrid small { display:block; padding:3px 5px; font-size:11px; color:var(--mut); }
-  #play-area { display:grid; grid-template-columns:minmax(0, 1.3fr) minmax(280px, 1fr); gap:16px; }
-  @media (max-width: 800px) { #play-area { grid-template-columns:1fr; } }
-  #play-photo { width:100%; max-height:70vh; object-fit:contain; background:#000; border-radius:12px; }
-  #guess { display:flex; flex-direction:column; gap:12px; }
-  #bigyear { font-size:56px; font-weight:800; letter-spacing:-2px; text-align:center; }
-  #map { height:min(52vh, 460px); border-radius:12px; }
-  .score { display:flex; justify-content:space-between; color:var(--mut); }
-  .reveal { font-size:18px; }
-  .reveal b { color:var(--good); }
 
-  /* math */
-  #mathbase { display:flex; gap:12px; align-items:center; }
-  #mathbase img { width:84px; height:84px; object-fit:cover; border-radius:8px; }
-  .op { font-size:22px; font-weight:700; color:var(--mut); }
-
-  /* lightbox */
-  #lb { position:fixed; inset:0; z-index:20; background:rgba(0,0,0,.9); display:none; align-items:center; justify-content:center; gap:20px; padding:20px; }
-  #lb.on { display:flex; }
-  #lb img { max-width:min(100%, 1100px); max-height:88vh; border-radius:6px; }
-  #lb aside { color:#ddd; width:240px; flex:0 0 240px; display:flex; flex-direction:column; gap:8px; }
-  #lb aside button { text-align:left; }
-  @media (max-width: 800px) { #lb { flex-direction:column; } #lb aside { width:100%; flex:none; } #lb img { max-height:60vh; } }
+  /* ---------- lightbox: the photo on its own blurred light, with a trail of look-alikes to wander along ---------- */
+  #lb { position:fixed; inset:0; z-index:60; background:#000; color:#fff; display:none; overflow:hidden; touch-action:pan-y; }
+  #lb.on { display:block; animation:fadein .2s; }
+  @keyframes fadein { from { opacity:0; } }
+  #lbbg { position:absolute; inset:-80px; background-size:cover; background-position:center; filter:blur(60px) brightness(.38) saturate(1.3); transition:background-image .4s; }
+  #lbstage { position:absolute; inset:0 0 132px 0; display:flex; align-items:center; justify-content:center; padding:56px 72px 0; }
+  #lbimg { max-width:100%; max-height:100%; border-radius:4px; box-shadow:0 30px 80px rgba(0,0,0,.6); transition:opacity .25s; }
+  #lb .ibtn { color:#fff; background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.12); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+  #lb .ibtn:hover { background:rgba(255,255,255,.18); }
+  #lbclose { position:absolute; top:14px; right:14px; z-index:2; }
+  .lbnav { position:absolute; top:calc(50% - 86px); z-index:2; width:46px !important; height:46px !important; font-size:22px; }
+  #lbprev { left:14px; } #lbnext { right:14px; }
+  #lbinfo { position:absolute; top:14px; left:16px; right:70px; z-index:2; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  #lbinfo .d { font:600 20px/1.1 var(--serif); }
+  #lbinfo .p { color:#ccc; font-size:13px; }
+  #lbinfo .p a, #lbppl a { cursor:pointer; text-decoration:none; }
+  #lbinfo .p a:hover { color:#fff; text-decoration:underline; }
+  #lbppl { display:flex; gap:6px; flex-wrap:wrap; }
+  #lbppl a { font-size:12px; padding:4px 10px; border-radius:999px; background:rgba(255,255,255,.1); color:#fff; }
+  #lbppl a:hover { background:rgba(255,255,255,.2); }
+  #lbacts { margin-left:auto; display:flex; gap:6px; }
+  #lbacts button { background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.14); color:#fff; font-weight:500; font-size:13px; padding:7px 13px; backdrop-filter:blur(10px); }
+  #lbacts button:hover { background:rgba(255,255,255,.18); }
+  #lbwander { position:absolute; left:0; right:0; bottom:0; height:132px; padding:10px 16px 16px; background:linear-gradient(transparent, rgba(0,0,0,.6)); z-index:2; }
+  #lbwander .lw { display:flex; align-items:center; gap:10px; font-size:12px; color:#bbb; margin-bottom:8px; }
+  #lbtrail { display:flex; gap:4px; align-items:center; }
+  #lbtrail img { width:22px; height:22px; border-radius:50%; object-fit:cover; cursor:pointer; border:1px solid rgba(255,255,255,.4); }
+  #lbtrail img:hover { transform:scale(1.25); }
+  #lbsims { display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; }
+  #lbsims img { height:76px; width:auto; min-width:40px; border-radius:6px; cursor:pointer; opacity:.75; transition:opacity .2s, transform .2s; flex:none; }
+  #lbsims img:hover { opacity:1; transform:translateY(-3px); }
+  @media (max-width: 760px) {
+    #lbstage { padding:96px 0 0; }
+    .lbnav { display:none !important; }
+    #lbinfo { right:60px; gap:8px; }
+    #lbacts { margin-left:0; width:100%; }
+    #lbacts button { flex:1; padding:7px 6px; }
+  }
 </style>
 
 <header>
+  <a class="brand" href="#home"><i></i><span>photosearch</span></a>
+  <div id="omni">
+    <form id="f" autocomplete="off">
+      <svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <div id="fchips"></div>
+      <input id="q" placeholder="Search your photos…" enterkeyhint="search" aria-label="search">
+      <button type="button" class="ibtn" id="ftoggle" title="filters" aria-expanded="false"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg></button>
+      <button id="gobtn" title="search (↵)"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </form>
+    <div id="sugg" role="listbox"></div>
+    <div id="fpanel">
+      <label class="w">Who's in it <input id="fperson" placeholder="names, comma-separated" list="people"></label>
+      <label class="w">Where <input id="fplace" placeholder="a place, e.g. Lisbon" list="places"></label>
+      <label>After <input id="fafter" type="date"></label>
+      <label>Before <input id="fbefore" type="date"></label>
+      <label>Season <select id="fseason"><option value="">any</option><option>spring</option><option>summer</option><option>autumn</option><option>winter</option></select></label>
+      <label>Kind <select id="fkind"><option value="">photos & videos</option><option value="photo">photos</option><option value="video">videos</option></select></label>
+      <label class="w">Without <input id="fexclude" placeholder="e.g. selfies, screenshots"></label>
+      <div class="row"><label id="smartbox" hidden style="flex-direction:row;align-items:center;gap:6px;font-size:13px" title="Let Jev read filters out of your description">
+        <input type="checkbox" id="smart" checked> ✨ understand filters in my words</label><span class="sp"></span>
+        <button type="button" class="ghost tiny" id="fclear">Clear</button><button type="button" class="tiny" id="fapply">Apply</button></div>
+      <datalist id="people"></datalist><datalist id="places"></datalist>
+    </div>
+  </div>
   <nav id="tabs">
-    <b>📷<span> Photosearch</span></b>
-    <a href="#search">Search</a><a href="#galaxy">Galaxy</a><a href="#time">Time Machine</a><a href="#play">Play</a><a href="#math">Photo Math</a><a href="#stories">Stories</a>
+    <a href="#home"><svg class="i" viewBox="0 0 24 24"><path d="M4 11l8-6.5 8 6.5v8.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
+    <a href="#galaxy"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M18.5 16.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg><span>Galaxy</span></a>
+    <a href="#time"><svg class="i" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"/><path d="M3 4v4h4"/><path d="M12 8v4.5l3 2"/></svg><span>Time</span></a>
+    <a href="#play"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="9" cy="9" r=".9" fill="currentColor"/><circle cx="15" cy="9" r=".9" fill="currentColor"/><circle cx="9" cy="15" r=".9" fill="currentColor"/><circle cx="15" cy="15" r=".9" fill="currentColor"/></svg><span>Play</span></a>
+    <a href="#math"><svg class="i" viewBox="0 0 24 24"><path d="M4.5 8h6M7.5 5v6M13.5 8h6M4.5 16.5h6M13.5 15h6M13.5 18h6"/></svg><span>Math</span></a>
+    <a href="#stories"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M10 9.3v5.4l4.5-2.7z"/></svg><span>Stories</span></a>
   </nav>
-  <div id="head-search">
-    <form id="f">
-      <input id="q" class="grow" placeholder="Describe a photo… e.g. “birthday cake with candles at night”">
-      <button type="button" class="ghost" id="ftoggle" aria-expanded="false" title="filters">Filters</button>
-      <div id="filters">
-      <input id="exclude" class="small" placeholder="without… e.g. selfies">
-      <input id="person" class="small" placeholder="people, comma-separated">
-      <input id="after" class="small" type="date" title="after">
-      <input id="before" class="small" type="date" title="before">
-      <select id="season" title="season"><option value="">any season</option><option>spring</option><option>summer</option><option>autumn</option><option>winter</option></select>
-      <select id="kind"><option value="">all</option><option>photo</option><option>video</option></select>
-      <label id="smartbox" hidden title="Let Jev fill in the filters from your description"><input type="checkbox" id="smart" checked> ✨ smart</label>
-      </div>
-      <button>Search</button>
-    </form>
-    <div class="status" id="status"></div>
-  </div>
-  <div id="head-time" hidden>
-    <form id="tf">
-      <input id="tq" class="grow" placeholder="Something that happens every year… e.g. “birthday cake”">
-      <button>Go</button>
-      <button type="button" class="ghost" id="tplay">▶ Play</button>
-    </form>
-    <div class="chips" id="tchips"></div>
-    <div class="status" id="tstatus"></div>
-  </div>
-  <div id="head-math" hidden>
-    <form id="mf">
-      <div id="mathbase"></div>
-      <span class="op">+</span><input id="mplus" placeholder="add… e.g. snow" style="flex:1 1 140px">
-      <span class="op">−</span><input id="mminus" placeholder="take away… e.g. summer" style="flex:1 1 140px">
-      <label title="how hard to push">×<input id="mw" type="range" min="0" max="3" step="0.1" value="1"> <span id="mwv">1.0</span></label>
-      <button>Compute</button>
-    </form>
-    <div class="chips" id="mchips"></div>
-    <div class="status" id="mstatus"></div>
-  </div>
 </header>
 
 <main>
-  <section id="search"><div class="pad" id="today" hidden></div><div class="grid" id="grid"></div></section>
+  <section id="home">
+    <div id="hero">
+      <div id="hslides"></div>
+      <div class="hshade"></div>
+      <div class="htext"><div class="kick" id="hkick">On this day</div><h1 id="hago">&nbsp;</h1><p id="hsub"></p></div>
+      <div class="hctl">
+        <button class="ibtn" id="hprev" title="the day before">‹</button>
+        <button class="ibtn" id="hnext" title="the day after">›</button>
+        <span class="status" id="hday" style="color:#ddd"></span><span class="sp"></span>
+        <div id="hdots"></div>
+      </div>
+    </div>
+    <div class="hsec" id="hmore" hidden><div class="shead"><h2 id="hmoreh">More from this day</h2><p id="hmorep"></p></div><div class="shelf" id="todayshelf"></div></div>
+    <div class="hsec"><div class="shead"><h2>Rediscover</h2><p>moments you may have forgotten</p><span class="sp"></span><button class="ghost tiny" id="shuffle">↻ Shuffle</button></div>
+      <div class="shelf" id="rediscover"></div></div>
+    <div class="hsec"><div class="shead"><h2>Trips</h2><p>found from where the photos were taken</p><span class="sp"></span><a href="#stories">All stories →</a></div>
+      <div class="shelf" id="tripshelf"></div></div>
+    <div class="hsec"><div class="shead"><h2>Ask your library</h2><p>describe a moment in your own words</p></div><div class="asks" id="asks"></div></div>
+    <div class="hsec"><div class="shead"><h2>Play with it</h2></div>
+      <div class="modes">
+        <a class="mode" href="#galaxy" style="--art:radial-gradient(circle at 70% 30%, #6d4bd8, transparent 55%), radial-gradient(circle at 20% 80%, #1f8fd6, transparent 50%), #0b0b18"><span class="glyph">✦</span><b>Galaxy</b><span>Every photo on one map, look-alikes side by side</span></a>
+        <a class="mode" href="#time" style="--art:linear-gradient(135deg, #b4541f, #3d1d0d)"><span class="glyph">⏳</span><b>Time Machine</b><span>One thing, every year: watch it change</span></a>
+        <a class="mode" href="#play" style="--art:linear-gradient(135deg, #1e7d5a, #0d2c22)"><span class="glyph">🎲</span><b>Guess the year or place</b><span>Family game night with your own photos</span></a>
+        <a class="mode" href="#math" style="--art:linear-gradient(135deg, #a8326e, #2c0d1f)"><span class="glyph">∑</span><b>Photo Math</b><span>This photo + snow − summer = ?</span></a>
+      </div></div>
+    <div class="hsec"><div class="shead"><h2>Your years</h2><p>each one as a story</p></div><div class="shelf" id="yearshelf"></div></div>
+    <footer id="hfoot"></footer>
+  </section>
 
-  <section id="galaxy">
+  <section id="search">
+    <div id="rchips"></div>
+    <div id="rhead"><div><h1 id="rtitle"></h1><div class="meta" id="status"></div></div>
+      <div class="acts" id="racts"></div></div>
+    <div id="grid"></div>
+  </section>
+
+  <section id="galaxy" class="full">
     <canvas id="gcanvas"></canvas>
     <div id="gbar">
-      <input id="gq" placeholder="Light up… e.g. beach" style="width:240px">
-      <button class="ghost" id="gclear" hidden>clear</button>
+      <button class="ghost tiny" id="glit" hidden>✦ <span id="glitq"></span> ✕</button>
       <div id="glegend"><span id="gy0"></span><i id="ggrad"></i><span id="gy1"></span></div>
     </div>
     <div id="gtip"></div>
     <div id="gstatus">scroll to zoom · drag to pan · click a photo</div>
   </section>
 
-  <section id="time">
-    <div id="stage"><img id="timg" alt=""><div class="year" id="tyear"></div><div class="meta" id="tmeta"></div></div>
+  <section id="time" class="full">
+    <div id="stage"><div class="hb" id="tbg"></div><img id="timg" alt=""></div>
+    <div id="tyear"></div><div id="tmeta"></div>
+    <div id="tq-head"><h2 id="tq"></h2><span class="status" id="tstatus" style="color:#bbb"></span><span class="sp"></span>
+      <button class="ghost tiny" id="tplay">▶ Play</button></div>
     <div id="strip"></div>
+    <div id="tempty">
+      <div class="kick">Time Machine</div>
+      <h1>Pick something that happens every year.</h1>
+      <p>The best match from each year, one after another. Type your own in the search box, or try one of these:</p>
+      <div class="asks" id="tchips"></div>
+    </div>
   </section>
 
   <section id="play"><div class="pad" id="playroot"></div></section>
 
-  <section id="math"><div class="grid" id="mgrid"></div></section>
+  <section id="math"><div class="pad">
+    <div class="kick">Photo Math</div>
+    <h1>Add and take away ideas</h1>
+    <p class="status" id="mstatus" style="margin:0 0 18px"></p>
+    <form id="mf">
+      <div id="mathbase"></div>
+      <span class="op">+</span><input id="mplus" placeholder="add… e.g. snow" style="flex:1 1 160px">
+      <span class="op">−</span><input id="mminus" placeholder="take away… e.g. summer" style="flex:1 1 160px">
+      <label title="how hard to push">×<input id="mw" type="range" min="0" max="3" step="0.1" value="1"> <span id="mwv">1.0</span></label>
+      <button>= Compute</button>
+    </form>
+    <div id="mchips"></div>
+    <div id="mgrid"></div>
+  </div></section>
 
   <section id="stories"><div class="pad">
-    <h2 style="margin-top:0">Stories</h2>
-    <p class="status" style="max-width:680px">Each trip and each year as a slideshow of its best, most varied moments. Trips are
-      found from where photos were taken (a run of days 75+ km from home). Without a story yet, one is made automatically
-      (by day for trips, by month for years) the first time you play it. For a nicer one, ask Claude:
-      <i>“make a story of our Lisbon trip”</i>. It picks the best photos and writes chapters and captions.</p>
-    <h3 class="sec">Trips</h3><div class="cards" id="trips"></div>
-    <h3 class="sec">Years</h3><div class="cards" id="years"></div>
+    <div class="kick">Stories</div>
+    <h1>Trips and years, told in photos</h1>
+    <p class="lede">Each one plays as a slideshow of its best, most varied moments. Trips are found from where photos were taken
+      (a run of days 75+ km from home). Without a story yet, one is made automatically the first time you play it. For a nicer one,
+      ask Claude: <i>“make a story of our Lisbon trip”</i>. It picks the photos and writes the chapters and captions.</p>
+    <h2 class="sec">Trips</h2><div class="pgrid" id="trips"></div>
+    <h2 class="sec">Years</h2><div class="pgrid" id="years"></div>
   </div></section>
 
   <section id="edit"><div class="pad" id="ed">
     <div class="edtop">
-      <a href="#stories">← Stories</a><span class="status" id="edstatus" style="margin:0"></span><span class="sp"></span>
+      <a href="#stories">← Stories</a><span class="status" id="edstatus"></span><span class="sp"></span>
       <button class="ghost" id="edundo" disabled title="undo (⌘Z)">↶ Undo</button>
       <a class="btn" id="edplay" target="_blank">▶ Play</a>
     </div>
@@ -252,23 +488,32 @@
       ↻ swaps a photo for a similar one from the same days.</p>
   </div>
   <aside id="edpick">
-    <div class="edtop" style="margin:0"><b id="pickt"></b><span class="sp"></span><button class="ghost tiny" id="pickclose">✕</button></div>
+    <div class="edtop" style="margin:0"><b id="pickt"></b><span class="sp"></span><button class="ibtn" id="pickclose">✕</button></div>
     <form id="pickf"><input id="pickq" placeholder="search these days… e.g. tacos"><button>Find</button></form>
-    <div class="status" id="pickstatus" style="margin:0"></div>
+    <div class="status" id="pickstatus"></div>
     <div id="pickgrid"></div>
   </aside></section>
 </main>
 
 <div id="lb">
-  <img id="lbimg" alt="">
-  <aside>
-    <div id="lbinfo"></div>
-    <button class="ghost" id="lblike">More like this</button>
-    <button class="ghost" id="lbmath">Use in Photo Math</button>
-    <button class="ghost" id="lbopen">Open in Photos</button>
-    <button class="ghost" id="lbclose">Close (Esc)</button>
-    <div class="status">← → to browse</div>
-  </aside>
+  <div id="lbbg"></div>
+  <div id="lbstage"><img id="lbimg" alt=""></div>
+  <div id="lbinfo">
+    <div><div class="d" id="lbdate"></div><div class="p" id="lbplace"></div></div>
+    <div id="lbppl"></div>
+    <div id="lbacts">
+      <button id="lbday" title="this day in other years">📅 This day</button>
+      <button id="lbmath" title="use in Photo Math">∑ Math</button>
+      <button id="lbopen" title="show it in the Photos app">Open in Photos</button>
+    </div>
+  </div>
+  <button class="ibtn" id="lbclose" title="close (Esc)">✕</button>
+  <button class="ibtn lbnav" id="lbprev" title="previous (←)">‹</button>
+  <button class="ibtn lbnav" id="lbnext" title="next (→)">›</button>
+  <div id="lbwander">
+    <div class="lw"><span>✦ Looks like this: tap one to wander</span><div id="lbtrail"></div><span class="sp"></span><span id="lbpos"></span></div>
+    <div id="lbsims"></div>
+  </div>
 </div>
 
 <script>
@@ -300,443 +545,404 @@ async function sharpen(img, uuid) {
 }
 const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
                 set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+const once = fn => { let p; return () => p ??= fn().catch(e => { p = null; throw e; }); };
+const short = place => (place || "").split(",")[0];
+const longDate = (d, opt = { weekday:"long", month:"long", day:"numeric", year:"numeric" }) => {
+  const [y, m, day] = d.split("-").map(Number); return new Date(y, m - 1, day).toLocaleDateString(undefined, opt);
+};
+const ago = n => !n ? "Earlier this year" : n === 1 ? "A year ago" : `${n} years ago`;
+// the header's height, for the full-screen modes to fit under it
+new ResizeObserver(([e]) => document.documentElement.style.setProperty("--hh", e.target.offsetHeight + "px")).observe(document.querySelector("header"));
 
-/* ---------- tabs ---------- */
-const views = {};
+/* ---------- routing: #mode or #mode/argument, so back and forward work everywhere ---------- */
+const views = {}, leave = {};
+let tab = null;
 function route() {
-  const [tab, arg] = (location.hash || "#search").slice(1).split("/");
-  lbOff?.();
-  if (tab !== "edit") leaveEdit();
-  document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.hash === "#" + (tab === "edit" ? "stories" : tab)));
+  const h = location.hash.slice(1) || "home", k = h.indexOf("/");
+  const next = k < 0 ? h : h.slice(0, k), arg = k < 0 ? "" : h.slice(k + 1);
+  lbOff(); closeSugg(); closePanel();
+  if (tab && tab !== next) leave[tab]?.();
+  tab = views[next] ? next : "home";
+  document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.hash === "#" + ({ edit: "stories" }[tab] || tab)));
   document.querySelectorAll("main section").forEach(s => s.classList.toggle("on", s.id === tab));
-  $("head-search").hidden = tab !== "search"; $("head-time").hidden = tab !== "time"; $("head-math").hidden = tab !== "math";
-  views[tab]?.(arg && decodeURIComponent(arg));
+  $("q").placeholder = PLACEHOLDER[tab] || PLACEHOLDER.home;
+  $("omni").classList.toggle("bare", tab === "galaxy" || tab === "time");
+  if (tab !== "search" && FIELDS.some(k => F[k])) { for (const k of FIELDS) F[k] = ""; AUTO = new Set(); renderChips(); }  // chips describe the results on show
+  views[tab](arg);
 }
 addEventListener("hashchange", route);
-const go = tab => { if (location.hash !== "#" + tab) location.hash = tab; else route(); };
+const go = h => { if (location.hash !== "#" + h) location.hash = h; else route(); };
+const PLACEHOLDER = { home: "Search your photos… e.g. “kids in the snow”", galaxy: "Light up the galaxy… e.g. beach",
+                      time: "Something that happens every year… e.g. birthday cake" };
+addEventListener("keydown", e => {  // "/" or ⌘K: to the search box from anywhere
+  if ((e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) || ((e.metaKey || e.ctrlKey) && e.key === "k")) {
+    e.preventDefault(); lbOff(); $("q").focus(); $("q").select();
+  }
+});
 
-/* ---------- shared: photo grid + lightbox ---------- */
-function gridHTML(results) {
-  return results.map((x, i) => `
-    <figure>
-      <img loading="lazy" src="/thumb/${x.uuid}.jpg" data-i="${i}" title="${esc(x.place)} ${esc(x.persons.join(", "))}">
-      <figcaption>${x.score == null ? `<span>${esc((x.place || "").split(",")[0])}</span>` :  /* on this day: the year's in the heading */
-        `<span>${x.undated ? "date unknown" : x.date}${x.kind === "video" ? ' <span class="tag">video</span>' : ""}</span><span>${x.score.toFixed(2)}</span>`}</figcaption>
-    </figure>`).join("");
+/* ---------- photo tiles ---------- */
+const clampAr = ar => Math.min(2.4, Math.max(0.55, ar || 1));
+const loaded = "this.classList.add('ok')";
+function tileHTML(x, i, { badge, caption = true } = {}) {
+  return `<figure class="tile" data-i="${i}" style="--ar:${clampAr(x.ar)}">
+    <img loading="lazy" src="/thumb/${x.uuid}.jpg" alt="" onload="${loaded}">
+    ${badge ? `<b class="badge">${esc(badge)}</b>` : ""}${x.kind === "video" ? `<span class="vid">▶ video</span>` : ""}
+    ${caption ? `<figcaption><span>${x.undated ? "date unknown" : longDate(x.date, { month:"short", day:"numeric", year:"numeric" })}</span><span>${esc(short(x.place))}</span></figcaption>` : ""}
+  </figure>`;
 }
-function bindGrid(el, results) {
-  el.innerHTML = gridHTML(results);
-  el.onclick = e => { if (e.target.dataset.i) lightbox(results, +e.target.dataset.i); };
+// Justified rows, like a photo book: each row fills the width and every photo keeps its shape.
+const innerW = el => { const c = getComputedStyle(el); return el.clientWidth - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight); };
+function justify(el, items, base = 0) {
+  const W = innerW(el), gap = 6, h = innerWidth < 760 ? 140 : 230;
+  if (!W) return "";
+  let html = "", row = [], sum = 0;
+  const flush = last => {
+    if (!row.length) return;
+    const rh = Math.min((W - gap * (row.length - 1)) / sum, last ? h * 1.1 : Infinity);
+    const fill = !last || rh < h * 1.1;
+    html += `<div class="jrow" style="height:${rh.toFixed(1)}px">` + row.map(([x, i]) =>
+      tileHTML(x, i).replace('style="', `style="flex:${fill ? clampAr(x.ar) + " 1 0" : "none"};width:${(clampAr(x.ar) * rh).toFixed(1)}px;`)).join("") + "</div>";
+    row = []; sum = 0;
+  };
+  items.forEach((x, i) => {
+    row.push([x, base + i]); sum += clampAr(x.ar);
+    if (sum * h + gap * (row.length - 1) >= W) flush(false);
+  });
+  flush(true);
+  return html;
 }
+// A grid of photos: clicking one opens it big, and the layout redoes itself when the width changes.
+function bindGrid(el, results, render = () => justify(el, results)) {
+  el._render = render; el.innerHTML = render();
+  el.onclick = e => { const t = e.target.closest(".tile"); if (t) lightbox(el._list || results, +t.dataset.i); };
+  if (!el._ro) { let w = el.clientWidth; el._ro = new ResizeObserver(() => { if (el.clientWidth !== w) { w = el.clientWidth; el.innerHTML = el._render(); } }); el._ro.observe(el); }
+}
+function bindShelf(el, list, badge) {
+  el.innerHTML = list.map((x, i) => tileHTML(x, i, { badge: badge?.(x) })).join("");
+  el.onclick = e => { const t = e.target.closest(".tile"); if (t) lightbox(list, +t.dataset.i); };
+}
+const skeleton = (n, w = 1.3) => Array.from({ length: n }, () => `<div class="tile skel" style="aspect-ratio:${w}"></div>`).join("");
 
-let lbList = [], lbAt = 0;
-function lightbox(list, i) {
-  lbList = list; lbAt = i;
+/* ---------- lightbox ---------- */
+const LB = { list: [], at: 0, trail: [], simsFor: null, timer: 0 };
+function lightbox(list, i, keepTrail = false) {
+  if (!keepTrail) LB.trail = [];
+  LB.list = list; LB.at = i;
   const x = list[i];
   $("lbimg").src = `/photo/${x.uuid}.jpg`; sharpen($("lbimg"), x.uuid);
-  $("lbinfo").innerHTML = `<div style="font-size:18px;color:#fff">${x.undated ? "Date unknown" : x.date}</div>
-    <div>${esc(x.place) || "<i>no place</i>"}</div><div>${esc(x.persons.join(", "))}</div>`;
+  $("lbbg").style.backgroundImage = `url(/thumb/${x.uuid}.jpg)`;
+  $("lbdate").textContent = x.undated ? "Date unknown" : longDate(x.date);
+  $("lbplace").innerHTML = x.place ? `<a data-place="${esc(short(x.place))}" title="more from here">${esc(x.place)}</a>` : "";
+  $("lbppl").innerHTML = (x.persons || []).map(p => `<a data-person="${esc(p)}" title="more of ${esc(p)}">${esc(p)}</a>`).join("");
+  $("lbday").hidden = !!x.undated;
+  $("lbprev").style.visibility = i > 0 ? "" : "hidden"; $("lbnext").style.visibility = i < list.length - 1 ? "" : "hidden";
+  $("lbpos").textContent = list.length > 1 ? `${i + 1} of ${list.length}` : "";
+  $("lbtrail").innerHTML = LB.trail.map((t, k) => `<img src="/thumb/${t.uuid}.jpg" data-k="${k}" title="back to here">`).join("");
   $("lb").classList.add("on");
+  clearTimeout(LB.timer); LB.timer = setTimeout(() => loadSims(x), 220);  // not on every arrow press while flicking through
 }
-const lbOff = () => $("lb").classList.remove("on");
+async function loadSims(x) {
+  if (LB.simsFor === x.uuid) return;
+  LB.simsFor = x.uuid; $("lbsims").innerHTML = "";
+  try {
+    const r = (await api("/api/search", { like: x.uuid, k: 16 })).results;
+    if (LB.simsFor !== x.uuid) return;
+    LB.sims = r;
+    $("lbsims").innerHTML = r.map((s, k) => `<img src="/thumb/${s.uuid}.jpg" data-k="${k}" style="width:${(76 * clampAr(s.ar)).toFixed(0)}px" alt="">`).join("");
+  } catch {}
+}
+function lbOff() { $("lb").classList.remove("on"); LB.simsFor = null; }
 $("lbclose").onclick = lbOff;
-$("lb").onclick = e => { if (e.target.id === "lb") lbOff(); };
-$("lblike").onclick = () => { lbOff(); go("search"); runSearch({ like: lbList[lbAt].uuid }); };
-$("lbmath").onclick = () => { lbOff(); setMathBase(lbList[lbAt]); go("math"); };
-$("lbopen").onclick = () => fetch("/api/open?uuid=" + lbList[lbAt].uuid);
+$("lbprev").onclick = () => LB.at > 0 && lightbox(LB.list, LB.at - 1, true);
+$("lbnext").onclick = () => LB.at < LB.list.length - 1 && lightbox(LB.list, LB.at + 1, true);
+$("lbstage").onclick = e => { if (e.target.id === "lbstage") lbOff(); };
+$("lbsims").onclick = e => {  // wander: hop to a look-alike, leaving a trail back
+  const k = e.target.dataset.k; if (k == null) return;
+  LB.trail.push(LB.list[LB.at]); if (LB.trail.length > 12) LB.trail.shift();
+  lightbox(LB.sims, +k, true);
+};
+$("lbtrail").onclick = e => {
+  const k = e.target.dataset.k; if (k == null) return;
+  const back = LB.trail[k]; LB.trail = LB.trail.slice(0, +k);
+  lightbox([back], 0, true);
+};
+$("lbppl").onclick = e => { const p = e.target.dataset.person; if (p) searchFor("", only({ person: p })); };
+$("lbplace").onclick = e => { const p = e.target.dataset.place; if (p) searchFor("", only({ place: p })); };
+$("lbday").onclick = () => go("home/" + LB.list[LB.at].date.slice(5));
+$("lbmath").onclick = () => { setMathBase(LB.list[LB.at]); go("math"); };
+$("lbopen").onclick = () => fetch("/api/open?uuid=" + LB.list[LB.at].uuid);
 addEventListener("keydown", e => {
   if (!$("lb").classList.contains("on")) return;
   if (e.key === "Escape") lbOff();
-  if (e.key === "ArrowRight" && lbAt < lbList.length - 1) lightbox(lbList, lbAt + 1);
-  if (e.key === "ArrowLeft" && lbAt > 0) lightbox(lbList, lbAt - 1);
+  if (e.key === "ArrowRight") $("lbnext").click();
+  if (e.key === "ArrowLeft") $("lbprev").click();
 });
-
-/* ---------- search ---------- */
-/* smart search: Jev fills in the filter fields from the description; filled fields are highlighted and
-   cleared again on the next search, while anything typed by hand is left alone */
-const FIELDS = ["person", "after", "before", "season", "kind", "exclude"];
-const SMART = { enabled: false, auto: new Set() };
-api("/api/parse").then(r => { SMART.enabled = r.results.enabled; $("smartbox").hidden = !SMART.enabled; }).catch(() => {});
-FIELDS.forEach(k => $(k).addEventListener("input", () => { SMART.auto.delete(k); $(k).classList.remove("auto"); }));
-// phones: filters sit behind a button that counts the ones set
-function countFilters() {
-  const n = FIELDS.filter(k => $(k).value).length;
-  $("ftoggle").textContent = n ? `Filters · ${n}` : "Filters";
-  $("ftoggle").classList.toggle("set", n > 0);
-}
-$("ftoggle").onclick = () => {
-  const open = $("filters").classList.toggle("open");
-  $("ftoggle").setAttribute("aria-expanded", open);
-};
-FIELDS.forEach(k => $(k).addEventListener("change", countFilters));
-async function smartFill(q) {
-  for (const k of SMART.auto) { $(k).value = ""; $(k).classList.remove("auto"); }
-  SMART.auto.clear();
-  const r = (await api("/api/parse", { q })).results;
-  if (r.error) return "smart search unavailable (" + r.error + ")";
-  const got = [];
-  for (const [k, v] of Object.entries(r.filters || {}))
-    if (v && !$(k).value) { $(k).value = v; $(k).classList.add("auto"); SMART.auto.add(k); got.push(k === "exclude" ? "without " + v : v); }
-  return got.length ? "✨ " + got.join(" · ") : "";
-}
-
-async function runSearch(params) {
-  let note = "";
-  if (params.q && SMART.enabled && $("smart").checked) {
-    $("status").textContent = "understanding…";
-    note = await smartFill(params.q).catch(e => "smart search unavailable (" + e.message + ")");
-  }
-  countFilters();
-  for (const k of FIELDS.slice(0, 5)) if ($(k).value) params[k] = $(k).value;
-  if ($("exclude").value && params.q) params.exclude = $("exclude").value;
-  $("status").textContent = "searching…";
-  const r = await api("/api/search", params);
-  $("status").textContent = `${r.results.length} results from ${r.total.toLocaleString()} indexed · ${r.ms} ms` +
-    (params.like ? " · showing photos similar to the one you picked" : "") + (note ? " · " + note : "");
-  $("today").hidden = true;
-  bindGrid($("grid"), r.results);
-  scrollTo(0, 0);
-}
-// an empty search goes back to "on this day"
-$("f").onsubmit = e => { e.preventDefault(); $("q").value.trim() ? runSearch({ q: $("q").value }) : showToday(); };
-views.search = () => { $("q").focus(); if (!$("grid").innerHTML && !OTD.shown) showToday(); };
-
-/* ---------- on this day: the landing view of the search tab ---------- */
-const OTD = { shown: false };
-const md = d => `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const shiftDay = (day, n) => { const [m, d] = day.split("-").map(Number); return md(new Date(2000, m - 1, d + n)); };  // 2000: has Feb 29
-async function showToday(day) {
-  OTD.shown = true;
-  $("grid").innerHTML = ""; $("status").textContent = "";
-  let r;
-  try { r = (await api("/api/today", day ? { day } : {})).results; }
-  catch (e) { $("today").hidden = false; $("today").innerHTML = `<p class="status">${esc(e.message)}</p>`; return; }
-  const [m, d] = r.day.split("-").map(Number), name = new Date(2000, m - 1, d).toLocaleDateString(undefined, { month:"long", day:"numeric" });
-  const isToday = r.day === md(new Date());
-  const ago = y => !y.ago ? "Earlier this year" : y.ago === 1 ? "A year ago" : `${y.ago} years ago`;
-  $("today").hidden = false;
-  $("today").innerHTML = `
-    <div class="otdhead">
-      <button class="ghost tiny" data-day="${shiftDay(r.day, -1)}" title="the day before">‹</button>
-      <h2>${isToday ? "On this day" : name}</h2>
-      <button class="ghost tiny" data-day="${shiftDay(r.day, 1)}" title="the day after">›</button>
-      <span class="status" style="margin:0">${isToday ? name : `<a href="#search" data-day="">back to today</a>`}</span>
-    </div>
-    ${r.window ? `<p class="status">No photos on ${name} itself in any year, so here's the week around it.</p>` : ""}
-    ${r.years.map((y, k) => `<div class="ty">
-      <h3>${ago(y)} <span>· ${y.year}${y.trip ? ` · on the <a href="/review/${y.trip.id}" target="_blank">${esc(y.trip.name)} trip ▶</a>` : ""}</span></h3>
-      <div class="grid" data-k="${k}"></div></div>`).join("") || `<p class="status">No photos from around ${name} in earlier years.</p>`}`;
-  r.years.forEach((y, k) => bindGrid($("today").querySelector(`.grid[data-k="${k}"]`), y.photos));
-}
-$("today").addEventListener("click", e => {
-  const b = e.target.closest("[data-day]"); if (!b) return;
-  e.preventDefault(); showToday(b.dataset.day || undefined);
-});
-
-/* ---------- galaxy ---------- */
-const G = { data: null, s: 1, ox: 0, oy: 0, hi: null, imgs: new Map(), vis: [], raf: 0 };
-const yearColor = (y, a = 1) => {
-  if (!y) return `rgba(150,150,160,${a * 0.6})`;  // undated
-  const t = (y - G.y0) / Math.max(1, G.y1 - G.y0);
-  return `hsla(${250 - 215 * t}, 85%, ${55 + 8 * t}%, ${a})`;
-};
-const cv = $("gcanvas"), cx = cv.getContext("2d");
-
-views.galaxy = async () => {
-  resizeGalaxy();
-  if (G.data || G.loading) return;
-  G.loading = true;
-  $("gstatus").textContent = "mapping your library… (the first time takes a minute)";
-  try {
-    G.data = (await api("/api/galaxy")).results;
-  } catch (e) { $("gstatus").textContent = "couldn't map: " + e.message; G.loading = false; return; }
-  G.y0 = Math.min(...G.data.year.filter(Boolean)); G.y1 = Math.max(...G.data.year);
-  $("gy0").textContent = G.y0; $("gy1").textContent = G.y1;
-  $("ggrad").style.background = `linear-gradient(90deg, ${[0, .25, .5, .75, 1].map(t => yearColor(G.y0 + t * (G.y1 - G.y0))).join(",")})`;
-  $("gstatus").textContent = `${G.data.uuids.length.toLocaleString()} photos · similar photos sit together · scroll to zoom · drag to pan · click a photo`;
-  fitGalaxy();
-};
-function resizeGalaxy() {
-  const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1;
-  cv.width = r.width * d; cv.height = r.height * d; cx.setTransform(d, 0, 0, d, 0, 0);
-  G.w = r.width; G.h = r.height; draw();
-}
-function fitGalaxy() {
-  G.s0 = G.s = Math.min(G.w, G.h) * 0.88 / 1000;
-  G.ox = (G.w - 1000 * G.s) / 2; G.oy = (G.h - 1000 * G.s) / 2 + 16; draw();
-}
-addEventListener("resize", () => { if ($("galaxy").classList.contains("on")) resizeGalaxy(); });
-function draw() { if (!G.raf) G.raf = requestAnimationFrame(render); }
-function render() {
-  G.raf = 0;
-  cx.clearRect(0, 0, G.w, G.h);
-  const d = G.data; if (!d) return;
-  const n = d.uuids.length, zoom = G.s / G.s0;
-  const vis = [];
-  for (let i = 0; i < n; i++) {
-    const sx = d.x[i] * 1000 * G.s + G.ox, sy = d.y[i] * 1000 * G.s + G.oy;
-    if (sx > -60 && sx < G.w + 60 && sy > -60 && sy < G.h + 60) vis.push([i, sx, sy]);
-  }
-  const ts = Math.min(110, 4 * zoom);  // thumbnails grow as you zoom in
-  const thumbs = ts >= 12 && vis.length <= 1500;
-  G.vis = vis; G.ts = thumbs ? ts : 0;
-  const lit = G.hi;
-  for (const [i, sx, sy] of vis) {
-    const on = !lit || lit.has(d.uuids[i]);
-    if (thumbs) {
-      const im = thumb(d.uuids[i]);
-      cx.globalAlpha = on ? 1 : 0.12;
-      if (im.complete && im.naturalWidth) {
-        const r = Math.min(im.naturalWidth, im.naturalHeight);
-        cx.drawImage(im, (im.naturalWidth - r) / 2, (im.naturalHeight - r) / 2, r, r, sx - ts / 2, sy - ts / 2, ts, ts);
-      } else { cx.fillStyle = yearColor(d.year[i]); cx.fillRect(sx - ts / 2, sy - ts / 2, ts, ts); }
-    } else {
-      if (lit && on) continue;  // drawn on top below
-      cx.globalAlpha = 1;
-      cx.fillStyle = on ? yearColor(d.year[i], 0.85) : "rgba(120,120,140,.18)";
-      const r = Math.min(6, 2.2 * Math.sqrt(zoom));
-      cx.fillRect(sx - r / 2, sy - r / 2, r, r);
-    }
-  }
-  cx.globalAlpha = 1;
-  if (lit && !thumbs) {  // matches glow on top of the dimmed map
-    for (const [i, sx, sy] of vis) {
-      if (!lit.has(d.uuids[i])) continue;
-      cx.beginPath(); cx.arc(sx, sy, 4.5, 0, 7);
-      cx.fillStyle = yearColor(d.year[i]); cx.shadowColor = cx.fillStyle; cx.shadowBlur = 10; cx.fill();
-    }
-    cx.shadowBlur = 0;
-  }
-  if (zoom < 4 && !lit) {  // region names, biggest first, skipping any that would overlap one already drawn
-    cx.textAlign = "center"; cx.textBaseline = "middle";
-    const placed = [];
-    for (const g of [...d.regions].sort((a, b) => b.n - a.n)) {
-      if (!g.name) continue;
-      const sx = g.x * 1000 * G.s + G.ox, sy = g.y * 1000 * G.s + G.oy;
-      cx.font = `600 ${Math.round(11 + Math.min(6, g.n / 120))}px -apple-system, system-ui`;
-      const w = cx.measureText(g.name).width / 2 + 6, h = 11;
-      if (placed.some(([x, y, pw]) => Math.abs(x - sx) < w + pw && Math.abs(y - sy) < 2 * h)) continue;
-      placed.push([sx, sy, w]);
-      cx.lineWidth = 4; cx.strokeStyle = "rgba(0,0,0,.75)"; cx.strokeText(g.name, sx, sy);
-      cx.fillStyle = "rgba(255,255,255,.92)"; cx.fillText(g.name, sx, sy);
-    }
-  }
-}
-function thumb(u) {
-  let im = G.imgs.get(u);
-  if (!im) { im = new Image(); im.onload = draw; im.src = `/thumb/${u}.jpg`; G.imgs.set(u, im); }
-  return im;
-}
-function pick(mx, my) {
-  let best = -1, bd = Math.max(8, G.ts / 2) ** 2;
-  for (const [i, sx, sy] of G.vis) {
-    const dd = (sx - mx) ** 2 + (sy - my) ** 2;
-    if (dd < bd) { bd = dd; best = i; }
-  }
-  return best;
-}
-const pointers = new Map(); let dragged = false, pinch0 = 0;
-cv.onpointerdown = e => { cv.setPointerCapture(e.pointerId); pointers.set(e.pointerId, [e.offsetX, e.offsetY]); dragged = false;
-  if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); } };
-cv.onpointermove = e => {
-  const prev = pointers.get(e.pointerId);
-  if (!prev) {  // hover
-    const i = G.data ? pick(e.offsetX, e.offsetY) : -1, tip = $("gtip");
-    if (i < 0) { tip.style.display = "none"; return; }
-    tip.innerHTML = `<img src="/thumb/${G.data.uuids[i]}.jpg"><div style="padding:3px 2px 0">${G.data.year[i] || "date unknown"}</div>`;
-    tip.style.display = "block";
-    tip.style.left = Math.min(e.offsetX + 14, G.w - 200) + "px"; tip.style.top = Math.min(e.offsetY + 14, G.h - 220) + "px";
-    return;
-  }
-  pointers.set(e.pointerId, [e.offsetX, e.offsetY]);
-  if (pointers.size === 2) {
-    const [a, b] = [...pointers.values()], dd = Math.hypot(a[0] - b[0], a[1] - b[1]);
-    zoomAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, dd / pinch0); pinch0 = dd; dragged = true; return;
-  }
-  const dx = e.offsetX - prev[0], dy = e.offsetY - prev[1];
-  if (Math.abs(dx) + Math.abs(dy) > 2) dragged = true;
-  G.ox += dx; G.oy += dy; $("gtip").style.display = "none"; draw();
-};
-cv.onpointerup = e => {
-  pointers.delete(e.pointerId);
-  if (!dragged && G.data) {
-    const i = pick(e.offsetX, e.offsetY);
-    if (i >= 0) galaxyOpen(i);
-  }
-};
-cv.onpointerleave = () => { $("gtip").style.display = "none"; };
-function zoomAt(mx, my, f) {
-  const s = Math.max(G.s0 * 0.5, Math.min(G.s0 * 200, G.s * f)); f = s / G.s;
-  G.ox = mx - (mx - G.ox) * f; G.oy = my - (my - G.oy) * f; G.s = s; draw();
-}
-cv.onwheel = e => { e.preventDefault(); zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0022)); };
-cv.ondblclick = e => zoomAt(e.offsetX, e.offsetY, 2.5);
-async function galaxyOpen(i) {
-  lightbox([(await api("/api/info", { uuid: G.data.uuids[i] })).results], 0);
-}
-$("gq").onkeydown = async e => {
-  if (e.key !== "Enter") return;
-  const q = $("gq").value.trim(); if (!q) return clearHi();
-  const r = await api("/api/search", { q, k: 250 });
-  G.hi = new Set(r.results.map(x => x.uuid)); $("gclear").hidden = false;
-  $("gstatus").textContent = `lit: the 250 best matches for “${q}”`;
-  draw();
-};
-function clearHi() { G.hi = null; $("gq").value = ""; $("gclear").hidden = true; draw(); }
-$("gclear").onclick = clearHi;
-
-/* ---------- time machine ---------- */
-const T = { years: [], at: 0, timer: 0 };
-const T_PRESETS = ["birthday cake", "christmas tree", "beach", "snow", "first day of school", "family dinner",
-                   "halloween costume", "fireworks", "hiking in the mountains", "a selfie"];
-$("tchips").innerHTML = T_PRESETS.map(p => `<a>${p}</a>`).join("");
-$("tchips").onclick = e => { if (e.target.tagName === "A") { $("tq").value = e.target.textContent; runTime(); } };
-$("tf").onsubmit = e => { e.preventDefault(); runTime(); };
-views.time = () => { if (!T.years.length) $("tq").focus(); };
-async function runTime() {
-  const q = $("tq").value.trim(); if (!q) return;
-  stopPlay();
-  $("tstatus").textContent = "travelling…";
-  const r = await api("/api/timeline", { q });
-  const best = Math.max(...r.results.map(y => y.results[0].score));
-  T.years = r.results.map(y => ({ ...y.results[0], year: y.year, weak: y.results[0].score < best - 0.08 }));
-  $("tstatus").textContent = `${T.years.length} years · faded years are weak matches · ← → or ▶`;
-  $("strip").innerHTML = T.years.map((y, i) =>
-    `<div data-i="${i}" class="${y.weak ? "weak" : ""}"><img src="/thumb/${y.uuid}.jpg" data-i="${i}">${y.year}</div>`).join("");
-  showYear(T.years.findIndex(y => !y.weak));
-}
-function showYear(i) {
-  if (i < 0 || i >= T.years.length) return;
-  T.at = i; const y = T.years[i];
-  $("timg").style.opacity = 0;
-  setTimeout(() => { $("timg").src = `/photo/${y.uuid}.jpg`; sharpen($("timg"), y.uuid); }, 150);
-  $("tyear").textContent = y.year;
-  $("tmeta").innerHTML = `${y.date}<br>${esc(y.place)}<br>${esc(y.persons.join(", "))}`;
-  document.querySelectorAll("#strip > div").forEach((d, j) => d.classList.toggle("cur", j === i));
-  document.querySelector("#strip .cur")?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
-  const nx = T.years[i + 1]; if (nx) new Image().src = `/photo/${nx.uuid}.jpg`;  // preload
-}
-$("timg").onload = () => { $("timg").style.opacity = 1; };
-$("timg").onclick = () => lightbox(T.years, T.at);
-$("strip").onclick = e => { const i = e.target.closest("[data-i]")?.dataset.i; if (i != null) { stopPlay(); showYear(+i); } };
-function stopPlay() { clearInterval(T.timer); T.timer = 0; $("tplay").textContent = "▶ Play"; }
-$("tplay").onclick = () => {
-  if (T.timer) return stopPlay();
-  if (!T.years.length) return;
-  $("tplay").textContent = "❚❚ Pause";
-  const strong = () => T.years.map((y, i) => i).filter(i => !T.years[i].weak);
-  T.timer = setInterval(() => { const s = strong(); showYear(s[(s.indexOf(T.at) + 1) % s.length]); }, 1600);
-};
-addEventListener("keydown", e => {
-  if (!$("time").classList.contains("on") || $("lb").classList.contains("on") || e.target.tagName === "INPUT") return;
-  if (e.key === "ArrowRight") { stopPlay(); showYear(T.at + 1); }
-  if (e.key === "ArrowLeft") { stopPlay(); showYear(T.at - 1); }
-});
-
-/* ---------- games ---------- */
-const ROUNDS = 10;
-const P = { mode: null, round: 0, total: 0, cur: null, guess: null, map: null, layers: [] };
-views.play = () => { if (!P.mode) playMenu(); };
-function playMenu() {
-  P.mode = null;
-  const best = store.get("best", {});
-  $("playroot").innerHTML = `
-    <h2 style="margin-top:0">Play with your photos</h2>
-    <div class="cards">
-      <div class="card" data-mode="year"><h3>📅 Guess the Year</h3><p>A random photo. When was it taken?</p>
-        <p style="margin-top:8px">Best: ${best.year ?? "–"} / ${ROUNDS * 100}</p></div>
-      <div class="card" data-mode="place"><h3>📍 Guess the Place</h3><p>Drop a pin where you think it was taken.</p>
-        <p style="margin-top:8px">Best: ${best.place ?? "–"} / ${ROUNDS * 100}</p></div>
-    </div>
-    <p class="status">${ROUNDS} rounds · up to 100 points each · pass the device around for family game night</p>`;
-  $("playroot").querySelectorAll(".card").forEach(c => c.onclick = () => startGame(c.dataset.mode));
-}
-async function startGame(mode) {
-  P.mode = mode; P.round = 0; P.total = 0;
-  if (mode === "place") await loadLeaflet();
-  nextRound();
-}
-async function nextRound() {
-  if (P.round >= ROUNDS) return endGame();
-  P.round++; P.guess = null;
-  try { P.cur = (await api("/api/game", { mode: P.mode })).results; }
-  catch (e) { $("playroot").innerHTML = `<p>${esc(e.message)}</p>`; return; }
-  const c = P.cur;
-  $("playroot").innerHTML = `
-    <div class="score"><span>Round ${P.round} / ${ROUNDS}</span><span>Score <span id="total">${P.total}</span></span><a href="#play" id="quit">quit</a></div>
-    <div id="play-area" style="margin-top:10px">
-      <img id="play-photo" src="/photo/${c.uuid}.jpg" alt="">
-      <div id="guess">${P.mode === "year" ? `
-        <div id="bigyear">${Math.round((c.first + c.last) / 2)}</div>
-        <input type="range" id="yr" min="${c.first}" max="${c.last}" value="${Math.round((c.first + c.last) / 2)}">
-        <div class="score"><span>${c.first}</span><span>${c.last}</span></div>` : `
-        <div id="map"></div><div class="status">tap the map to drop your pin</div>`}
-        <button id="go">Guess</button>
-        <div class="reveal" id="reveal"></div>
-      </div>
-    </div>`;
-  sharpen($("play-photo"), c.uuid);
-  $("quit").onclick = e => { e.preventDefault(); playMenu(); };
-  if (P.mode === "year") {
-    $("yr").oninput = () => { $("bigyear").textContent = $("yr").value; };
-  } else {
-    P.map = L.map("map", { worldCopyJump: true }).setView([20, 0], 1);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(P.map);
-    P.map.on("click", ev => {
-      if (P.revealed) return;
-      P.guess = ev.latlng; P.layers.forEach(l => l.remove());
-      P.layers = [L.circleMarker(ev.latlng, { radius: 8, color: "#2563eb" }).addTo(P.map)];
-    });
-  }
-  P.revealed = false;
-  $("go").onclick = reveal;
-}
-function km(a, b) {
-  const R = 6371, r = Math.PI / 180, dLat = (b[0] - a[0]) * r, dLon = (b[1] - a[1]) * r;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-function reveal() {
-  if (P.revealed) return nextRound();
-  const c = P.cur; let pts, msg;
-  if (P.mode === "year") {
-    const g = +$("yr").value, real = +c.date.slice(0, 4), off = Math.abs(g - real);
-    pts = Math.round(100 * Math.exp(-off / 2.5));
-    msg = off === 0 ? `Exactly ${real}!` : `It was <b>${real}</b> (${c.date}) — ${off} year${off > 1 ? "s" : ""} off.`;
-  } else {
-    if (!P.guess) return;
-    const d = km([P.guess.lat, P.guess.lng], [c.lat, c.lon]);
-    pts = Math.round(100 * Math.exp(-d / 600));
-    P.layers.push(L.marker([c.lat, c.lon]).addTo(P.map), L.polyline([P.guess, [c.lat, c.lon]], { dashArray: "6" }).addTo(P.map));
-    P.map.fitBounds(L.latLngBounds([P.guess, [c.lat, c.lon]]).pad(0.4));
-    msg = `${esc(c.place) || "Here"} — ${d < 1 ? "spot on" : Math.round(d).toLocaleString() + " km away"}.`;
-  }
-  P.total += pts; P.revealed = true;
-  $("reveal").innerHTML = `${msg}<br><b>+${pts}</b>${c.persons.length ? `<div class="status">${esc(c.persons.join(", "))}</div>` : ""}`;
-  $("go").textContent = P.round >= ROUNDS ? "See score" : "Next photo →";
-  $("total").textContent = P.total;
-}
-function endGame() {
-  const best = store.get("best", {}), was = best[P.mode] ?? 0;
-  if (P.total > was) { best[P.mode] = P.total; store.set("best", best); }
-  const mode = P.mode;
-  $("playroot").innerHTML = `<h2>${P.total} / ${ROUNDS * 100}</h2>
-    <p>${P.total > was ? "🎉 New best!" : `Best so far: ${was}`}</p>
-    <button id="again">Play again</button> <button class="ghost" id="menu">Other game</button>`;
-  $("again").onclick = () => startGame(mode);
-  $("menu").onclick = playMenu;
-}
-function loadLeaflet() {
-  if (window.L) return Promise.resolve();
-  const css = document.createElement("link");
-  css.rel = "stylesheet"; css.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
-  document.head.append(css);
-  return new Promise((ok, fail) => {
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"; s.onload = ok; s.onerror = fail;
-    document.head.append(s);
+{ // swipe: sideways to browse, down to close
+  let p0 = null;
+  $("lbstage").addEventListener("pointerdown", e => { p0 = [e.clientX, e.clientY]; });
+  $("lbstage").addEventListener("pointerup", e => {
+    if (!p0) return; const dx = e.clientX - p0[0], dy = e.clientY - p0[1]; p0 = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) (dx < 0 ? $("lbnext") : $("lbprev")).click();
+    else if (dy > 90) lbOff();
   });
 }
+
+/* ---------- the search box: filters as chips, suggestions as you type, and what ↵ does depends on the mode ---------- */
+const FIELDS = ["person", "place", "after", "before", "season", "kind", "exclude"];
+const F = Object.fromEntries(FIELDS.map(k => [k, ""]));
+let AUTO = new Set();  // filters Jev read out of the description: dropped again on the next search
+const SMART = { enabled: false };
+api("/api/parse").then(r => { SMART.enabled = r.results.enabled; $("smartbox").hidden = !SMART.enabled; }).catch(() => {});
+const CHIP = { person: v => "👤 " + v, place: v => "📍 " + v, after: v => "after " + v, before: v => "before " + v,
+               season: v => ({ spring:"🌱", summer:"☀️", autumn:"🍂", winter:"❄️" }[v] || "") + " " + v, kind: v => v === "video" ? "🎞 videos" : "📷 photos only",
+               exclude: v => "− " + v };
+function renderChips() {
+  $("fchips").innerHTML = $("rchips").innerHTML = FIELDS.filter(k => F[k]).map(k =>
+    `<span class="fchip ${AUTO.has(k) ? "auto" : ""}" title="${AUTO.has(k) ? "✨ read from your words" : k}">${esc(CHIP[k](F[k]))}<button type="button" data-k="${k}" aria-label="remove">✕</button></span>`).join("");
+  $("ftoggle").classList.toggle("set", FIELDS.some(k => F[k]));
+}
+$("fchips").onclick = $("rchips").onclick = e => {
+  const k = e.target.dataset.k; if (!k) return;
+  F[k] = ""; AUTO.delete(k); renderChips();
+  if (tab === "search") searchFor($("q").value.trim(), {}, true);
+};
+function openPanel() {
+  for (const k of FIELDS) $("f" + k).value = F[k];
+  closeSugg(); $("fpanel").classList.add("on"); $("ftoggle").setAttribute("aria-expanded", true);
+  loadOverview().catch(() => {});
+}
+function closePanel() { $("fpanel").classList.remove("on"); $("ftoggle").setAttribute("aria-expanded", false); }
+$("ftoggle").onclick = () => $("fpanel").classList.contains("on") ? closePanel() : openPanel();
+$("fapply").onclick = () => {
+  for (const k of FIELDS) { const v = $("f" + k).value.trim(); if (v !== F[k]) AUTO.delete(k); F[k] = v; }
+  closePanel(); renderChips(); submit();
+};
+$("fclear").onclick = () => { for (const k of FIELDS) $("f" + k).value = ""; };
+$("fpanel").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.tagName === "INPUT") { e.preventDefault(); $("fapply").click(); } });
+document.addEventListener("pointerdown", e => { if (!$("omni").contains(e.target)) { closeSugg(); closePanel(); } });
+
+// search: the hash carries the words and the filters, so results survive back/forward and a reload
+function searchHash(q, f = F, auto = AUTO) {
+  const p = new URLSearchParams(Object.entries(f).filter(([k, v]) => v && FIELDS.includes(k)));
+  const a = [...auto].filter(k => f[k]); if (a.length) p.set("auto", a.join(","));
+  return "search/" + encodeURIComponent(q) + (p.size ? "?" + p : "");
+}
+const only = f => Object.fromEntries(FIELDS.map(k => [k, f[k] || ""]));
+function searchFor(q, extra = {}, keep = false) {
+  if (!keep) { for (const k of AUTO) F[k] = ""; AUTO = new Set(); }
+  Object.assign(F, extra); renderChips();
+  go(searchHash(q));
+}
+async function submit(how) {
+  const q = $("q").value.trim(); closeSugg(); closePanel();
+  how ||= { galaxy: "galaxy", time: "time" }[tab] || "search";
+  if (how === "galaxy") return go("galaxy/" + encodeURIComponent(q));
+  if (how === "time") return q && go("time/" + encodeURIComponent(q));
+  for (const k of AUTO) F[k] = ""; AUTO = new Set();
+  if (!q && !FIELDS.some(k => F[k])) return go("home");
+  if (q && SMART.enabled && $("smart").checked) {
+    $("status").textContent = "understanding…"; $("f").classList.add("busy");
+    try {
+      const r = (await api("/api/parse", { q })).results;
+      for (const [k, v] of Object.entries(r.filters || {})) if (v && FIELDS.includes(k) && !F[k]) { F[k] = v; AUTO.add(k); }
+    } catch {}  // search still works without it
+    $("f").classList.remove("busy");
+  }
+  renderChips(); go(searchHash(q));
+}
+$("f").onsubmit = e => {
+  e.preventDefault();
+  const cur = $("sugg").querySelector("a.cur");
+  if ($("sugg").classList.contains("on") && cur) return cur.click();
+  submit();
+};
+
+// suggestions: people, places, trips and years from the library, plus the other modes for the same words
+const loadOverview = once(async () => {
+  const [o, s] = await Promise.all([api("/api/overview"), loadStories()]);
+  Object.assign(OV, o.results, { stories: s });
+  $("people").innerHTML = OV.people.map(([p]) => `<option value="${esc(p)}">`).join("");
+  $("places").innerHTML = OV.places.map(([p]) => `<option value="${esc(p)}">`).join("");
+});
+const OV = { people: [], places: [], years: [], stories: [] };
+const fold = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const wordStart = (name, t) => fold(name).split(/[\s,·&-]+/).some(w => w.startsWith(t)) || fold(name).startsWith(t);
+function suggest() {
+  const raw = $("q").value.trim(), t = fold(raw);
+  if (!raw) return closeSugg();
+  const rows = [], add = (sec, html, act) => rows.push({ sec, html, act });
+  const enc = encodeURIComponent(raw);
+  const mode = { galaxy: "galaxy", time: "time" }[tab] || "search";
+  const MODES = { search: ["🔍", `Search for <b>“${esc(raw)}”</b>`, "Search"], time: ["⏳", `<b>“${esc(raw)}”</b> through the years`, "Time Machine"],
+                  galaxy: ["✦", `Light up <b>“${esc(raw)}”</b> in the galaxy`, "Galaxy"] };
+  [mode, ...Object.keys(MODES).filter(m => m !== mode)].forEach((m, k) => {
+    const [g, h, name] = MODES[m]; add("", `<span class="g">${g}</span><span>${h}</span><small>${k ? name : "↵"}</small>`, () => submit(m));
+  });
+  if (t.length >= 2) {
+    OV.people.filter(([p]) => wordStart(p, t)).slice(0, 4).forEach(([p, n]) =>
+      add("People", `<span class="g">👤</span><span>${esc(p)}</span><small>${n.toLocaleString()} photos</small>`, () => { $("q").value = ""; searchFor("", only({ person: p })); }));
+    OV.places.filter(([p]) => wordStart(p, t)).slice(0, 3).forEach(([p, n]) =>
+      add("Places", `<span class="g">📍</span><span>${esc(p)}</span><small>${n.toLocaleString()} photos</small>`, () => { $("q").value = ""; searchFor("", only({ place: p })); }));
+    OV.stories.filter(s => wordStart(s.title || "", t) || (/^\d{4}$/.test(raw) && s.id === raw) || (s.kind === "trip" && s.start.startsWith(raw)))
+      .slice(0, 4).forEach(s => add("Stories", `${s.cover ? `<img src="/thumb/${s.cover}.jpg" alt="">` : `<span class="g">▶</span>`}<span>${esc(s.title)}${s.kind === "trip" ? " trip" : " · year in review"}</span><small>${s.kind === "trip" ? dateRange(s.start, s.end) : s.photos.toLocaleString() + " photos"} ▶</small>`,
+        () => open(`/review/${s.id}`, "_blank")));
+  }
+  if (/^\d{4}$/.test(raw) && OV.years.some(([y]) => y === raw))
+    add("Years", `<span class="g">📅</span><span>Best of ${raw}</span>`, () => { $("q").value = ""; searchFor("", only({ after: `${raw}-01-01`, before: `${+raw + 1}-01-01` })); });
+  let last = null;
+  $("sugg").innerHTML = rows.map((r, k) => { const h = r.sec && r.sec !== last ? `<div class="sh">${r.sec}</div>` : ""; last = r.sec; return h + `<a data-k="${k}" class="${k ? "" : "cur"}">${r.html}</a>`; }).join("");
+  $("sugg")._rows = rows; $("sugg").classList.add("on");
+}
+function closeSugg() { $("sugg").classList.remove("on"); }
+$("q").addEventListener("input", () => { closePanel(); loadOverview().then(suggest, suggest); suggest(); });
+$("q").addEventListener("focus", () => loadOverview().catch(() => {}));
+$("q").addEventListener("keydown", e => {
+  const s = $("sugg"); if (!s.classList.contains("on")) return;
+  const items = [...s.querySelectorAll("a")], k = items.findIndex(a => a.classList.contains("cur"));
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault(); items[k]?.classList.remove("cur");
+    items[(k + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length].classList.add("cur");
+  }
+  if (e.key === "Escape") closeSugg();
+});
+$("sugg").onclick = e => { const a = e.target.closest("a[data-k]"); if (a) { closeSugg(); $("sugg")._rows[a.dataset.k].act(); } };
+
+/* ---------- search results ---------- */
+const R = { key: null, results: [], sort: store.get("sort", "best") };
+views.search = async arg => {
+  const [qs, ps] = arg.split("?"), q = decodeURIComponent(qs || ""), p = new URLSearchParams(ps || "");
+  for (const k of FIELDS) F[k] = p.get(k) || "";
+  AUTO = new Set((p.get("auto") || "").split(",").filter(k => F[k]));
+  $("q").value = q;
+  renderChips();
+  const like = p.get("like"), key = arg;
+  if (key === R.key) return showResults();
+  R.key = key; R.q = q; R.like = like;
+  const params = { ...(like ? { like } : { q }), ...Object.fromEntries(FIELDS.filter(k => F[k]).map(k => [k, F[k]])) };
+  $("rtitle").innerHTML = title(); $("status").textContent = "searching…"; $("racts").innerHTML = ""; $("grid").innerHTML = "";
+  try {
+    const r = await api("/api/search", params);
+    if (R.key !== key) return;
+    R.results = r.results; R.meta = r;
+  } catch (e) { $("status").textContent = e.message; return; }
+  showResults(); scrollTo(0, 0);
+};
+function title() {
+  if (R.like) return `<img src="/thumb/${R.like}.jpg" alt="">Look-alikes`;
+  if (R.q) return `“${esc(R.q)}”`;
+  if (F.person) return esc(F.person.split(",").join(" & "));
+  if (F.place) return esc(F.place);
+  if (F.after && F.before && F.after.endsWith("-01-01") && F.before.endsWith("-01-01") && +F.before.slice(0, 4) === +F.after.slice(0, 4) + 1) return "Best of " + F.after.slice(0, 4);
+  return "Your best photos";
+}
+function showResults() {
+  const r = R.meta; if (!r) return;
+  const auto = [...AUTO].map(k => CHIP[k](F[k])).join(" · ");
+  $("rtitle").innerHTML = title();
+  $("status").textContent = `${r.results.length} ${R.q || R.like ? "best matches" : "favourites, by how interesting they look"} · from ${r.total.toLocaleString()} photos · ${r.ms} ms`
+    + (auto ? ` · ✨ ${auto}` : "");
+  $("racts").innerHTML = `${R.q ? `<a class="pill" href="#time/${encodeURIComponent(R.q)}">⏳ Through the years</a><a class="pill" href="#galaxy/${encodeURIComponent(R.q)}">✦ In the galaxy</a>` : ""}
+    <div class="seg"><button data-s="best" class="${R.sort === "best" ? "on" : ""}">Best match</button><button data-s="date" class="${R.sort === "date" ? "on" : ""}">By date</button></div>`;
+  $("racts").querySelector(".seg").onclick = e => { const s = e.target.dataset.s; if (s) { R.sort = s; store.set("sort", s); showResults(); } };
+  const el = $("grid");
+  if (!r.results.length) { el.innerHTML = `<p class="status">Nothing found. Try fewer filters, or other words.</p>`; return; }
+  if (R.sort === "best") { el._list = r.results; return bindGrid(el, r.results); }
+  // by date: newest first, in years
+  const sorted = [...r.results].sort((a, b) => (a.undated - b.undated) || b.date.localeCompare(a.date));
+  el._list = sorted;
+  const groups = [];
+  sorted.forEach((x, i) => { const y = x.undated ? "Undated" : x.date.slice(0, 4); if (groups.at(-1)?.y !== y) groups.push({ y, at: i, items: [] }); groups.at(-1).items.push(x); });
+  bindGrid(el, sorted, () => groups.map(g =>
+    `<div class="ygroup"><h2>${g.y}<small>${g.items.length} photo${g.items.length > 1 ? "s" : ""}</small></h2>${justify(el, g.items, g.at)}</div>`).join(""));
+}
+
+/* ---------- home: on this day as a slow slideshow, then shelves ---------- */
+const HOME = { day: null, slides: [], at: 0, timer: 0, data: null };
+const md = d => `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const shiftDay = (day, n) => { const [m, d] = day.split("-").map(Number); return md(new Date(2000, m - 1, d + n)); };  // 2000: has Feb 29
+const dayName = day => { const [m, d] = day.split("-").map(Number); return new Date(2000, m - 1, d).toLocaleDateString(undefined, { month:"long", day:"numeric" }); };
+const HERO_MS = 7000;
+views.home = arg => {
+  const day = /^\d{2}-\d{2}$/.test(arg) ? arg : md(new Date());
+  if (day !== HOME.day) loadHero(day); else heroShow(HOME.at);
+  loadShelves();
+};
+leave.home = () => clearTimeout(HOME.timer);
+async function loadHero(day) {
+  HOME.day = day; clearTimeout(HOME.timer);
+  const isToday = day === md(new Date());
+  $("hday").innerHTML = isToday ? "" : `<a href="#home">back to today</a>`;
+  $("hprev").onclick = e => { e.stopPropagation(); go("home/" + shiftDay(day, -1)); };
+  $("hnext").onclick = e => { e.stopPropagation(); go("home/" + shiftDay(day, 1)); };
+  let r;
+  try { r = (await api("/api/today", { day })).results; } catch (e) { $("hago").textContent = e.message; return; }
+  if (HOME.day !== day) return;
+  // each year's best photo first, then the next best of each, so the slideshow walks through the years
+  const per = r.years.map(y => y.photos.map(p => ({ ...p, ago: y.ago, year: y.year, trip: y.trip })));
+  let slides = [];
+  for (let k = 0; per.some(p => p[k]); k++) per.forEach(p => p[k] && slides.push(p[k]));
+  HOME.empty = !slides.length;
+  if (HOME.empty) slides = (await api("/api/rediscover", { n: 8 })).results;
+  HOME.slides = slides.slice(0, 24);
+  $("hkick").textContent = HOME.empty ? `Nothing from ${dayName(day)} in other years · from the archive` : `${isToday ? "On this day" : dayName(day)}${r.window ? " · the week around it" : ""}`;
+  $("hslides").innerHTML = HOME.slides.map((x, k) => `<div class="hs" data-k="${k}" style="--kx:${(k % 3 - 1) * 2}%;--ky:${(k % 2 ? -1 : 1) * 1.5}%">
+    <div class="hb"></div><img alt="" class="${x.ar < 1.15 && innerWidth > 760 ? "contain" : ""}"></div>`).join("");
+  $("hdots").innerHTML = HOME.slides.length > 1 ? HOME.slides.map((_, k) => `<i data-k="${k}"></i>`).join("") : "";
+  $("hdots").style.setProperty("--hd", HERO_MS + "ms");
+  heroShow(0);
+  // the rest of the day's photos, by year
+  const all = per.flat();
+  $("hmore").hidden = all.length <= 1;
+  $("hmoreh").textContent = isToday ? "More from this day" : `More from ${dayName(day)}`;
+  $("hmorep").textContent = r.years.length ? `${r.years.length} year${r.years.length > 1 ? "s" : ""}, newest first` : "";
+  bindShelf($("todayshelf"), all, x => x.year);
+}
+function heroShow(k) {
+  const n = HOME.slides.length; if (!n) return;
+  HOME.at = k = (k + n) % n;
+  const x = HOME.slides[k], el = $("hslides").children[k];
+  const img = el.querySelector("img");
+  if (!img.src) { img.src = `/photo/${x.uuid}.jpg`; el.querySelector(".hb").style.backgroundImage = `url(/thumb/${x.uuid}.jpg)`; sharpen(img, x.uuid); }
+  [...$("hslides").children].forEach((s, j) => s.classList.toggle("on", j === k));
+  [...$("hdots").children].forEach((d, j) => d.classList.toggle("on", j === k));
+  const nx = HOME.slides[(k + 1) % n]; if (nx) new Image().src = `/photo/${nx.uuid}.jpg`;
+  if (HOME.empty) {
+    $("hago").textContent = x.undated ? "From the archive" : x.date.slice(0, 4);
+    $("hsub").innerHTML = `${x.undated ? "" : longDate(x.date)}${x.place ? " · " + esc(short(x.place)) : ""}`;
+  } else {
+    $("hago").textContent = ago(x.ago);
+    $("hsub").innerHTML = `${longDate(x.date)}${x.place ? " · " + esc(short(x.place)) : ""}`
+      + (x.trip ? ` · on the <a href="/review/${x.trip.id}" target="_blank">${esc(x.trip.name)} trip ▶</a>` : "")
+      + (x.persons?.length ? `<br>${esc(x.persons.slice(0, 4).join(", "))}` : "");
+  }
+  clearTimeout(HOME.timer);
+  if (n > 1 && tab === "home") HOME.timer = setTimeout(() => heroShow(HOME.at + 1), HERO_MS);
+}
+$("hdots").onclick = e => { e.stopPropagation(); const k = e.target.dataset.k; if (k != null) heroShow(+k); };
+$("hero").onclick = e => { if (!e.target.closest("a, button, #hdots")) lightbox(HOME.slides, HOME.at); };
+
+const loadStories = once(async () => (await api("/api/stories")).results);
+const ASKS = ["birthday cake with candles", "sunset at the beach", "kids playing in the snow", "dinner with family", "mountains and a lake",
+              "a dog", "halloween costumes", "fireworks", "first day of school", "a picnic in the park", "a selfie with friends", "an old photo"];
+let shelvesDone = false;
+async function loadShelves() {
+  if (shelvesDone) return; shelvesDone = true;
+  $("asks").innerHTML = ASKS.map(a => `<a class="pill" href="#${searchHash(a, {}, new Set())}">${esc(a)}</a>`).join("");
+  $("rediscover").innerHTML = skeleton(8); $("tripshelf").innerHTML = skeleton(6, .75); $("yearshelf").innerHTML = skeleton(8, 1);
+  shuffle();
+  try {
+    const s = await loadStories();
+    $("tripshelf").innerHTML = s.filter(x => x.kind === "trip").map(x => poster(x)).join("") || `<p class="status">No trips found yet: they need photos with locations.</p>`;
+    $("yearshelf").innerHTML = s.filter(x => x.kind === "year").map(x => poster(x)).join("");
+    const n = s.filter(x => x.kind === "year").reduce((a, x) => a + x.photos, 0);
+    $("hfoot").textContent = `${n.toLocaleString()} dated photos across ${s.filter(x => x.kind === "year").length} years and ${s.filter(x => x.kind === "trip").length} trips · press / to search from anywhere`;
+  } catch (e) { $("tripshelf").innerHTML = `<p class="status">${esc(e.message)}</p>`; }
+}
+async function shuffle() {
+  try { const r = (await api("/api/rediscover", { n: 24 })).results; bindShelf($("rediscover"), r, x => x.date.slice(0, 4)); }
+  catch (e) { $("rediscover").innerHTML = `<p class="status">${esc(e.message)}</p>`; }
+}
+$("shuffle").onclick = shuffle;
 
 /* ---------- stories ---------- */
 function dateRange(a, b) {
@@ -748,24 +954,27 @@ function dateRange(a, b) {
   const end = s.getMonth() === e.getMonth() ? e.getDate() : e.toLocaleDateString(undefined, md);
   return `${s.toLocaleDateString(undefined, md)}–${end}, ${e.getFullYear()}`;
 }
-function storyCard(x) {
-  const by = x.made_by ? " · " + ({ claude: "✨ curated by Claude", you: "✏️ edited by you" }[x.made_by] || "automatic")
-                         + (x.edited ? ", edited" : "") : "";
-  return `<div class="card story">
-    ${x.cover ? `<a href="/review/${x.id}" target="_blank"><img loading="lazy" src="/thumb/${x.cover}.jpg" alt=""></a>` : ""}
-    <div class="body">
-      <h3>${esc(x.title)}</h3>
-      <p>${x.kind === "trip" ? dateRange(x.start, x.end) + " · " : ""}${x.photos.toLocaleString()} photos${by}</p>
-      <p class="go"><a href="/review/${x.id}" target="_blank">▶ ${x.made_by ? "Play" : "Make & play"}</a>
-        ${x.made_by ? ` · <a href="/review/${x.id}?download=1">⬇ Download</a>` : ""} · <a href="#edit/${x.id}">✏️ Edit</a></p>
-    </div></div>`;
+function poster(x, acts = false) {
+  const by = { claude: "✨ by Claude", you: "✏️ by you" }[x.made_by];
+  return `<a class="poster ${x.kind === "year" ? "year" : ""}" href="/review/${x.id}" target="_blank" title="${x.made_by ? "play" : "make & play"}">
+    ${x.cover ? `<img loading="lazy" src="/thumb/${x.cover}.jpg" alt="">` : ""}
+    ${by && x.kind === "trip" ? `<span class="by">${by}${x.edited ? ", edited" : ""}</span>` : ""}
+    ${acts ? `<span class="pacts">${x.made_by ? `<span data-go="/review/${x.id}?download=1" title="download, to send to family">⤓</span>` : ""}<span data-go="#edit/${x.id}" title="edit">✎</span></span>` : ""}
+    <div class="pt"><h3>${esc(x.title)}</h3><small>${x.kind === "trip" ? dateRange(x.start, x.end) + " · " : ""}${x.photos.toLocaleString()} photos${by && x.kind === "year" ? " · " + by : ""}</small></div>
+  </a>`;
 }
 views.stories = async () => {
-  const r = (await api("/api/stories")).results;
-  const trips = r.filter(x => x.kind === "trip");
-  $("trips").innerHTML = trips.map(storyCard).join("") || `<p class="status">No trips found yet: they need photos with locations.</p>`;
-  $("years").innerHTML = r.filter(x => x.kind === "year").map(storyCard).join("");
+  const r = await loadStories.fresh();
+  $("trips").innerHTML = r.filter(x => x.kind === "trip").map(x => poster(x, true)).join("") || `<p class="status">No trips found yet: they need photos with locations.</p>`;
+  $("years").innerHTML = r.filter(x => x.kind === "year").map(x => poster(x, true)).join("");
 };
+loadStories.fresh = async () => (await api("/api/stories")).results;  // edits change titles and authors
+// links inside a poster link: open their own target, not the slideshow
+document.addEventListener("click", e => {
+  const a = e.target.closest(".pacts [data-go]"); if (!a) return;
+  e.preventDefault(); e.stopPropagation();
+  location.href = a.dataset.go;
+}, true);
 
 /* ---------- story editor ---------- */
 // E.story is the story being edited; every change snapshots it for undo, re-renders, and saves after a pause.
@@ -951,25 +1160,344 @@ $("pickgrid").onclick = e => {
   }
   changed();
 };
+leave.edit = leaveEdit;
+
+/* ---------- galaxy ---------- */
+const G = { data: null, s: 1, ox: 0, oy: 0, hi: null, imgs: new Map(), vis: [], raf: 0 };
+const yearColor = (y, a = 1) => {
+  if (!y) return `rgba(150,150,160,${a * 0.6})`;  // undated
+  const t = (y - G.y0) / Math.max(1, G.y1 - G.y0);
+  return `hsla(${250 - 215 * t}, 85%, ${55 + 8 * t}%, ${a})`;
+};
+const cv = $("gcanvas"), cx = cv.getContext("2d");
+
+async function openGalaxy() {
+  resizeGalaxy();
+  if (G.data || G.loading) return;
+  G.loading = true;
+  $("gstatus").textContent = "mapping your library… (the first time takes a minute)";
+  try {
+    G.data = (await api("/api/galaxy")).results;
+  } catch (e) { $("gstatus").textContent = "couldn't map: " + e.message; G.loading = false; return; }
+  G.y0 = Math.min(...G.data.year.filter(Boolean)); G.y1 = Math.max(...G.data.year);
+  $("gy0").textContent = G.y0; $("gy1").textContent = G.y1;
+  $("ggrad").style.background = `linear-gradient(90deg, ${[0, .25, .5, .75, 1].map(t => yearColor(G.y0 + t * (G.y1 - G.y0))).join(",")})`;
+  $("gstatus").textContent = `${G.data.uuids.length.toLocaleString()} photos · similar photos sit together · scroll to zoom · drag to pan · click a photo`;
+  fitGalaxy();
+};
+function resizeGalaxy() {
+  const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1;
+  cv.width = r.width * d; cv.height = r.height * d; cx.setTransform(d, 0, 0, d, 0, 0);
+  G.w = r.width; G.h = r.height; draw();
+}
+function fitGalaxy() {
+  G.s0 = G.s = Math.min(G.w, G.h) * 0.88 / 1000;
+  G.ox = (G.w - 1000 * G.s) / 2; G.oy = (G.h - 1000 * G.s) / 2 + 16; draw();
+}
+addEventListener("resize", () => { if ($("galaxy").classList.contains("on")) resizeGalaxy(); });
+function draw() { if (!G.raf) G.raf = requestAnimationFrame(render); }
+function render() {
+  G.raf = 0;
+  cx.clearRect(0, 0, G.w, G.h);
+  const d = G.data; if (!d) return;
+  const n = d.uuids.length, zoom = G.s / G.s0;
+  const vis = [];
+  for (let i = 0; i < n; i++) {
+    const sx = d.x[i] * 1000 * G.s + G.ox, sy = d.y[i] * 1000 * G.s + G.oy;
+    if (sx > -60 && sx < G.w + 60 && sy > -60 && sy < G.h + 60) vis.push([i, sx, sy]);
+  }
+  const ts = Math.min(110, 4 * zoom);  // thumbnails grow as you zoom in
+  const thumbs = ts >= 12 && vis.length <= 1500;
+  G.vis = vis; G.ts = thumbs ? ts : 0;
+  const lit = G.hi;
+  for (const [i, sx, sy] of vis) {
+    const on = !lit || lit.has(d.uuids[i]);
+    if (thumbs) {
+      const im = thumb(d.uuids[i]);
+      cx.globalAlpha = on ? 1 : 0.12;
+      if (im.complete && im.naturalWidth) {
+        const r = Math.min(im.naturalWidth, im.naturalHeight);
+        cx.drawImage(im, (im.naturalWidth - r) / 2, (im.naturalHeight - r) / 2, r, r, sx - ts / 2, sy - ts / 2, ts, ts);
+      } else { cx.fillStyle = yearColor(d.year[i]); cx.fillRect(sx - ts / 2, sy - ts / 2, ts, ts); }
+    } else {
+      if (lit && on) continue;  // drawn on top below
+      cx.globalAlpha = 1;
+      cx.fillStyle = on ? yearColor(d.year[i], 0.85) : "rgba(120,120,140,.18)";
+      const r = Math.min(6, 2.2 * Math.sqrt(zoom));
+      cx.fillRect(sx - r / 2, sy - r / 2, r, r);
+    }
+  }
+  cx.globalAlpha = 1;
+  if (lit && !thumbs) {  // matches glow on top of the dimmed map
+    for (const [i, sx, sy] of vis) {
+      if (!lit.has(d.uuids[i])) continue;
+      cx.beginPath(); cx.arc(sx, sy, 4.5, 0, 7);
+      cx.fillStyle = yearColor(d.year[i]); cx.shadowColor = cx.fillStyle; cx.shadowBlur = 10; cx.fill();
+    }
+    cx.shadowBlur = 0;
+  }
+  if (zoom < 4 && !lit) {  // region names, biggest first, skipping any that would overlap one already drawn
+    cx.textAlign = "center"; cx.textBaseline = "middle";
+    const placed = [];
+    for (const g of [...d.regions].sort((a, b) => b.n - a.n)) {
+      if (!g.name) continue;
+      const sx = g.x * 1000 * G.s + G.ox, sy = g.y * 1000 * G.s + G.oy;
+      cx.font = `600 ${Math.round(11 + Math.min(6, g.n / 120))}px -apple-system, system-ui`;
+      const w = cx.measureText(g.name).width / 2 + 6, h = 11;
+      if (placed.some(([x, y, pw]) => Math.abs(x - sx) < w + pw && Math.abs(y - sy) < 2 * h)) continue;
+      placed.push([sx, sy, w]);
+      cx.lineWidth = 4; cx.strokeStyle = "rgba(0,0,0,.75)"; cx.strokeText(g.name, sx, sy);
+      cx.fillStyle = "rgba(255,255,255,.92)"; cx.fillText(g.name, sx, sy);
+    }
+  }
+}
+function thumb(u) {
+  let im = G.imgs.get(u);
+  if (!im) { im = new Image(); im.onload = draw; im.src = `/thumb/${u}.jpg`; G.imgs.set(u, im); }
+  return im;
+}
+function pick(mx, my) {
+  let best = -1, bd = Math.max(8, G.ts / 2) ** 2;
+  for (const [i, sx, sy] of G.vis) {
+    const dd = (sx - mx) ** 2 + (sy - my) ** 2;
+    if (dd < bd) { bd = dd; best = i; }
+  }
+  return best;
+}
+const pointers = new Map(); let dragged = false, pinch0 = 0;
+cv.onpointerdown = e => { cv.setPointerCapture(e.pointerId); pointers.set(e.pointerId, [e.offsetX, e.offsetY]); dragged = false;
+  if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); } };
+cv.onpointermove = e => {
+  const prev = pointers.get(e.pointerId);
+  if (!prev) {  // hover
+    const i = G.data ? pick(e.offsetX, e.offsetY) : -1, tip = $("gtip");
+    if (i < 0) { tip.style.display = "none"; return; }
+    tip.innerHTML = `<img src="/thumb/${G.data.uuids[i]}.jpg"><div style="padding:3px 2px 0">${G.data.year[i] || "date unknown"}</div>`;
+    tip.style.display = "block";
+    tip.style.left = Math.min(e.offsetX + 14, G.w - 200) + "px"; tip.style.top = Math.min(e.offsetY + 14, G.h - 220) + "px";
+    return;
+  }
+  pointers.set(e.pointerId, [e.offsetX, e.offsetY]);
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()], dd = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    zoomAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, dd / pinch0); pinch0 = dd; dragged = true; return;
+  }
+  const dx = e.offsetX - prev[0], dy = e.offsetY - prev[1];
+  if (Math.abs(dx) + Math.abs(dy) > 2) dragged = true;
+  G.ox += dx; G.oy += dy; $("gtip").style.display = "none"; draw();
+};
+cv.onpointerup = e => {
+  pointers.delete(e.pointerId);
+  if (!dragged && G.data) {
+    const i = pick(e.offsetX, e.offsetY);
+    if (i >= 0) galaxyOpen(i);
+  }
+};
+cv.onpointerleave = () => { $("gtip").style.display = "none"; };
+function zoomAt(mx, my, f) {
+  const s = Math.max(G.s0 * 0.5, Math.min(G.s0 * 200, G.s * f)); f = s / G.s;
+  G.ox = mx - (mx - G.ox) * f; G.oy = my - (my - G.oy) * f; G.s = s; draw();
+}
+cv.onwheel = e => { e.preventDefault(); zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0022)); };
+cv.ondblclick = e => zoomAt(e.offsetX, e.offsetY, 2.5);
+async function galaxyOpen(i) {
+  lightbox([(await api("/api/info", { uuid: G.data.uuids[i] })).results], 0);
+}
+views.galaxy = arg => { const q = decodeURIComponent(arg || ""); $("q").value = q; openGalaxy(); lightUp(q); };
+async function lightUp(q) {  // the search box, on this mode: light up the best matches
+  if (!q) return clearHi();
+  if (G.litQ === q) return;
+  G.litQ = q;
+  const r = await api("/api/search", { q, k: 250 });
+  if (G.litQ !== q) return;
+  G.hi = new Set(r.results.map(x => x.uuid)); $("glit").hidden = false; $("glitq").textContent = q;
+  $("gstatus").textContent = `lit: the 250 best matches for “${q}”`;
+  draw();
+}
+function clearHi() {
+  const was = G.litQ; G.hi = null; G.litQ = null; $("glit").hidden = true; draw();
+  if (was && location.hash !== "#galaxy") history.replaceState(null, "", "#galaxy");
+}
+$("glit").onclick = clearHi;
+
+/* ---------- time machine ---------- */
+const T = { years: [], at: 0, timer: 0, q: null };
+const T_PRESETS = ["birthday cake", "christmas tree", "beach", "snow", "first day of school", "family dinner",
+                   "halloween costume", "fireworks", "hiking in the mountains", "a selfie"];
+$("tchips").innerHTML = T_PRESETS.map(p => `<a class="pill" href="#time/${encodeURIComponent(p)}">${p}</a>`).join("");
+views.time = arg => {
+  const q = decodeURIComponent(arg || "");
+  $("q").value = q || T.q || "";
+  $("tempty").hidden = !!q || !!T.years.length;
+  if (q && q !== T.q) runTime(q);
+};
+leave.time = () => stopPlay();
+async function runTime(q) {
+  T.q = q; stopPlay();
+  $("tempty").hidden = true; $("tq").textContent = `“${q}”`;
+  $("tstatus").textContent = "travelling…";
+  const r = await api("/api/timeline", { q });
+  if (T.q !== q) return;
+  const best = Math.max(...r.results.map(y => y.results[0].score));
+  T.years = r.results.map(y => ({ ...y.results[0], year: y.year, weak: y.results[0].score < best - 0.08 }));
+  $("tstatus").textContent = `${T.years.length} years · faded ones are weak matches · ← →`;
+  $("strip").innerHTML = T.years.map((y, i) =>
+    `<div data-i="${i}" class="${y.weak ? "weak" : ""}"><img src="/thumb/${y.uuid}.jpg" data-i="${i}">${y.year}</div>`).join("");
+  showYear(T.years.findIndex(y => !y.weak));
+}
+function showYear(i) {
+  if (i < 0 || i >= T.years.length) return;
+  T.at = i; const y = T.years[i];
+  $("timg").style.opacity = 0;
+  setTimeout(() => { $("timg").src = `/photo/${y.uuid}.jpg`; sharpen($("timg"), y.uuid); $("tbg").style.backgroundImage = `url(/thumb/${y.uuid}.jpg)`; }, 150);
+  $("tyear").textContent = y.year;
+  $("tmeta").innerHTML = `${longDate(y.date, { month:"long", day:"numeric" })}<br>${esc(short(y.place))}<br>${esc(y.persons.slice(0, 4).join(", "))}`;
+  document.querySelectorAll("#strip > div").forEach((d, j) => d.classList.toggle("cur", j === i));
+  document.querySelector("#strip .cur")?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  const nx = T.years[i + 1]; if (nx) new Image().src = `/photo/${nx.uuid}.jpg`;  // preload
+}
+$("timg").onload = () => { $("timg").style.opacity = 1; };
+$("timg").onclick = () => lightbox(T.years, T.at);
+$("strip").onclick = e => { const i = e.target.closest("[data-i]")?.dataset.i; if (i != null) { stopPlay(); showYear(+i); } };
+function stopPlay() { clearInterval(T.timer); T.timer = 0; $("tplay").textContent = "▶ Play"; }
+$("tplay").onclick = () => {
+  if (T.timer) return stopPlay();
+  if (!T.years.length) return;
+  $("tplay").textContent = "❚❚ Pause";
+  const strong = () => T.years.map((y, i) => i).filter(i => !T.years[i].weak);
+  T.timer = setInterval(() => { const s = strong(); showYear(s[(s.indexOf(T.at) + 1) % s.length]); }, 1800);
+};
+addEventListener("keydown", e => {
+  if (tab !== "time" || $("lb").classList.contains("on") || /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+  if (e.key === "ArrowRight") { stopPlay(); showYear(T.at + 1); }
+  if (e.key === "ArrowLeft") { stopPlay(); showYear(T.at - 1); }
+  if (e.key === " ") { e.preventDefault(); $("tplay").click(); }
+});
+
+/* ---------- games ---------- */
+const ROUNDS = 10;
+const P = { mode: null, round: 0, total: 0, cur: null, guess: null, map: null, layers: [] };
+views.play = () => { if (!P.mode) playMenu(); };
+function playMenu() {
+  P.mode = null;
+  const best = store.get("best", {});
+  $("playroot").innerHTML = `
+    <div class="kick">Play</div>
+    <h1>Game night, with your own photos</h1>
+    <p class="status" style="margin:0 0 22px">${ROUNDS} rounds · up to 100 points each · pass the phone around</p>
+    <div class="cards">
+      <div class="card" data-mode="year" style="--art:linear-gradient(135deg, #c2591f, #42170a)"><span class="glyph">📅</span><h3>Guess the Year</h3>
+        <p>A random photo. When was it taken?</p><p style="margin-top:10px"><b>Best: ${best.year ?? "–"}</b> / ${ROUNDS * 100}</p></div>
+      <div class="card" data-mode="place" style="--art:linear-gradient(135deg, #1d7f8c, #0b2a30)"><span class="glyph">📍</span><h3>Guess the Place</h3>
+        <p>Drop a pin where you think it was taken.</p><p style="margin-top:10px"><b>Best: ${best.place ?? "–"}</b> / ${ROUNDS * 100}</p></div>
+    </div>`;
+  $("playroot").querySelectorAll(".card").forEach(c => c.onclick = () => startGame(c.dataset.mode));
+}
+async function startGame(mode) {
+  P.mode = mode; P.round = 0; P.total = 0;
+  if (mode === "place") await loadLeaflet();
+  nextRound();
+}
+async function nextRound() {
+  if (P.round >= ROUNDS) return endGame();
+  P.round++; P.guess = null;
+  try { P.cur = (await api("/api/game", { mode: P.mode })).results; }
+  catch (e) { $("playroot").innerHTML = `<p>${esc(e.message)}</p>`; return; }
+  const c = P.cur;
+  $("playroot").innerHTML = `
+    <div class="score"><span>Round ${P.round} / ${ROUNDS}</span><span>Score <span id="total">${P.total}</span></span><a href="#play" id="quit">quit</a></div>
+    <div id="play-area" style="margin-top:10px">
+      <img id="play-photo" src="/photo/${c.uuid}.jpg" alt="">
+      <div id="guess">${P.mode === "year" ? `
+        <div id="bigyear">${Math.round((c.first + c.last) / 2)}</div>
+        <input type="range" id="yr" min="${c.first}" max="${c.last}" value="${Math.round((c.first + c.last) / 2)}">
+        <div class="score"><span>${c.first}</span><span>${c.last}</span></div>` : `
+        <div id="map"></div><div class="status">tap the map to drop your pin</div>`}
+        <button id="go">Guess</button>
+        <div class="reveal" id="reveal"></div>
+      </div>
+    </div>`;
+  sharpen($("play-photo"), c.uuid);
+  $("quit").onclick = e => { e.preventDefault(); playMenu(); };
+  if (P.mode === "year") {
+    $("yr").oninput = () => { $("bigyear").textContent = $("yr").value; };
+  } else {
+    P.map = L.map("map", { worldCopyJump: true }).setView([20, 0], 1);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(P.map);
+    P.map.on("click", ev => {
+      if (P.revealed) return;
+      P.guess = ev.latlng; P.layers.forEach(l => l.remove());
+      P.layers = [L.circleMarker(ev.latlng, { radius: 8, color: "#2563eb" }).addTo(P.map)];
+    });
+  }
+  P.revealed = false;
+  $("go").onclick = reveal;
+}
+function km(a, b) {
+  const R = 6371, r = Math.PI / 180, dLat = (b[0] - a[0]) * r, dLon = (b[1] - a[1]) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function reveal() {
+  if (P.revealed) return nextRound();
+  const c = P.cur; let pts, msg;
+  if (P.mode === "year") {
+    const g = +$("yr").value, real = +c.date.slice(0, 4), off = Math.abs(g - real);
+    pts = Math.round(100 * Math.exp(-off / 2.5));
+    msg = off === 0 ? `Exactly ${real}!` : `It was <b>${real}</b> (${c.date}) — ${off} year${off > 1 ? "s" : ""} off.`;
+  } else {
+    if (!P.guess) return;
+    const d = km([P.guess.lat, P.guess.lng], [c.lat, c.lon]);
+    pts = Math.round(100 * Math.exp(-d / 600));
+    P.layers.push(L.marker([c.lat, c.lon]).addTo(P.map), L.polyline([P.guess, [c.lat, c.lon]], { dashArray: "6" }).addTo(P.map));
+    P.map.fitBounds(L.latLngBounds([P.guess, [c.lat, c.lon]]).pad(0.4));
+    msg = `${esc(c.place) || "Here"} — ${d < 1 ? "spot on" : Math.round(d).toLocaleString() + " km away"}.`;
+  }
+  P.total += pts; P.revealed = true;
+  $("reveal").innerHTML = `${msg}<br><b>+${pts}</b>${c.persons.length ? `<div class="status">${esc(c.persons.join(", "))}</div>` : ""}`;
+  $("go").textContent = P.round >= ROUNDS ? "See score" : "Next photo →";
+  $("total").textContent = P.total;
+}
+function endGame() {
+  const best = store.get("best", {}), was = best[P.mode] ?? 0;
+  if (P.total > was) { best[P.mode] = P.total; store.set("best", best); }
+  const mode = P.mode;
+  $("playroot").innerHTML = `<h2>${P.total} / ${ROUNDS * 100}</h2>
+    <p>${P.total > was ? "🎉 New best!" : `Best so far: ${was}`}</p>
+    <button id="again">Play again</button> <button class="ghost" id="menu">Other game</button>`;
+  $("again").onclick = () => startGame(mode);
+  $("menu").onclick = playMenu;
+}
+function loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  const css = document.createElement("link");
+  css.rel = "stylesheet"; css.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+  document.head.append(css);
+  return new Promise((ok, fail) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"; s.onload = ok; s.onerror = fail;
+    document.head.append(s);
+  });
+}
 
 /* ---------- photo math ---------- */
 const M = { base: null };
 const M_PRESETS = [["night", "day"], ["snow", "summer"], ["a painting", "a photograph"], ["crowded", "empty"],
                    ["sunset", "midday"], ["rain", "sunshine"], ["", "people"], ["kids", "adults"]];
-$("mchips").innerHTML = M_PRESETS.map(([p, m], i) => `<a data-i="${i}">${p ? "+ " + p : ""} ${m ? "− " + m : ""}</a>`).join("");
+$("mchips").innerHTML = M_PRESETS.map(([p, m], i) => `<a class="pill" data-i="${i}">${p ? "+ " + p : ""} ${m ? "− " + m : ""}</a>`).join("");
 $("mchips").onclick = e => { const i = e.target.dataset.i; if (i == null) return;
   [$("mplus").value, $("mminus").value] = M_PRESETS[i]; runMath(); };
 $("mw").oninput = () => { $("mwv").textContent = (+$("mw").value).toFixed(1); };
 function setMathBase(x) {
   M.base = x;
   $("mathbase").innerHTML = x ? `<img src="/thumb/${x.uuid}.jpg"><a href="#math" id="mclear" class="status">change</a>`
-                              : `<input id="mtext" placeholder="start from… e.g. a street" style="width:200px">`;
+                              : `<input id="mtext" placeholder="start from… e.g. a street" style="width:220px">`;
   if (x) $("mclear").onclick = e => { e.preventDefault(); setMathBase(null); };
 }
 setMathBase(null);
 views.math = () => {
   if (!M.base && !$("mgrid").innerHTML)
-    $("mstatus").textContent = "Start from a photo (open one anywhere → “Use in Photo Math”) or from words, then add and take away ideas.";
+    $("mstatus").textContent = "Start from a photo (open one anywhere → “∑ Math”) or from words, then add and take away ideas.";
 };
 $("mf").onsubmit = e => { e.preventDefault(); runMath(); };
 async function runMath() {
@@ -981,5 +1509,6 @@ async function runMath() {
   bindGrid($("mgrid"), r.results);
 }
 
+renderChips();
 route();
 </script>

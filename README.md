@@ -134,20 +134,25 @@ uv run python ps.py serve
 
 Open **http://localhost:8765**. It works while `index` is still running, and picks up new photos as they're added.
 
-| Tab | What it does |
+One search box at the top works everywhere (press **/** or **⌘K** to jump to it). As you type, it suggests the
+people, places, trips and years that match, and offers the same words in the other modes ("through the years",
+"light up in the galaxy"). Filters (who, where, when, season, photos or videos, *without…*) sit behind the ☰ button
+and show as chips you can remove. On a phone, the modes move to a dock at the bottom.
+
+| Mode | What it does |
 |---|---|
-| **On this day** | What the Search tab opens on: the best few photos from today's date in each earlier year, and which trip you were on (with a link to its story). ‹ › steps through other days; `ps.py today` does the same in the terminal. Photos that look like documents, screenshots or ID cards are left out. |
-| **Search** | Describe a photo. Put what you *don't* want in **without…** (e.g. "selfies"): the model is weak at "no …" inside the description. Filter by person (names you've tagged in Photos), date range, or photo/video. |
-| **Galaxy** | Your whole library on one zoomable map, with similar photos next to each other and colored by year. Scroll to zoom, drag to pan, hover to peek. Type in *Light up…* to see where, say, "beach" lives. The first visit takes a minute to lay out the map. |
-| **Time Machine** | Pick something that happens every year ("birthday cake", "christmas tree") and flip through the best match from each year. |
+| **Home** | Opens on **On this day**: a slow slideshow of today's date in earlier years, which trip you were on (with a link to its story), and ‹ › to step through other days (`ps.py today` does the same in the terminal). Below it are shelves: *Rediscover* (random photos worth another look, ↻ to shuffle), your trips, ideas to search for, the other modes and your years. Photos that look like documents, screenshots or ID cards are left out. |
+| **Search** | Describe a photo. Results keep their shape, in rows like a photo book, sorted by best match or by date. Picking a person or place from the suggestions shows their most interesting photos. Put what you *don't* want in **without…** (e.g. "selfies"): the model is weak at "no …" inside the description. Every search has its own address, so back and forward work. |
+| **Galaxy** | Your whole library on one zoomable map, with similar photos next to each other and colored by year. Scroll to zoom, drag to pan, hover to peek. Type in the search box to see where, say, "beach" lives. The first visit takes a minute to lay out the map. |
+| **Time Machine** | Pick something that happens every year ("birthday cake", "christmas tree") and flip through the best match from each year. ▶ or space plays them in turn. |
 | **Play** | *Guess the Year* and *Guess the Place*, 10 rounds each. Works on a phone, for passing around. |
-| **Photo Math** | Start from a photo or words, then add and take away ideas: *this photo + snow − summer*. |
-| **Stories** | Every trip (found automatically from where photos were taken) and every year as a slideshow of its best, most varied moments, with chapters and captions. **⬇ Download** saves one as a single HTML file (photos included) you can send to family. |
+| **Math** | Start from a photo or words, then add and take away ideas: *this photo + snow − summer*. |
+| **Stories** | Every trip (found automatically from where photos were taken) and every year as a slideshow of its best, most varied moments, with chapters and captions. **⤓** saves one as a single HTML file (photos included) you can send to family; **✎** edits it. |
 
 **✨ Smart search (optional).** With a [TypeSafe](https://typesafe.ai) API key, the search box fills in the
 filters from your description: *"Sam at the beach last summer, no selfies"* becomes person Sam, summer 2025,
-without selfies. The fields it fills are highlighted so you can see and fix what it understood; untick ✨ to turn
-it off. Put the key in a `.env` file next to `ps.py` (it's git-ignored):
+without selfies. The chips it adds are amber, so you can see and remove what it understood; untick ✨ in the filters
+to turn it off. Put the key in a `.env` file next to `ps.py` (it's git-ignored):
 
 ```
 TYPESAFE_API_KEY=...
@@ -156,8 +161,11 @@ TYPESAFE_API_KEY=...
 Names and years are matched on your Mac. Only the description goes to TypeSafe's Jev model, with tagged names
 replaced by "someone"; no photos or library data are sent. Without a key, search works as before.
 
-Clicking any photo opens it large, with **More like this**, **Use in Photo Math** and **Open in Photos**
-(the first time, macOS asks whether your terminal may control Photos; click OK). ← → browse.
+Clicking any photo opens it large, on a blur of its own colours. Along the bottom is a row of look-alikes: tap
+one to wander from photo to similar photo, with a trail of dots to go back. Names and the place are links to more
+of them; **📅 This day** shows the same date in other years; **∑ Math** starts Photo Math from it; **Open in Photos**
+shows it in the Photos app (the first time, macOS asks whether your terminal may control Photos; click OK).
+← → or a swipe browse; Esc or a swipe down closes.
 
 *Guess the Place* loads its map from OpenStreetMap, so it needs internet; only map tiles are fetched, never your photos.
 

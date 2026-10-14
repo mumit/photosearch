@@ -262,11 +262,25 @@ def rank(con, qvec, k, **filters):
     return [dict(info[uuids[i]], score=float(scores[i])) for i in top]
 
 
+_ar = {}
+
+def aspect(uuid):
+    """Width / height of the thumbnail (it keeps the photo's shape), so the page can lay out rows before images load."""
+    if uuid not in _ar:
+        try:
+            from PIL import Image
+            w, h = Image.open(THUMBS / f"{uuid}.jpg").size  # reads the header only
+            _ar[uuid] = round(w / h, 3)
+        except Exception:
+            return 1.0
+    return _ar[uuid]
+
+
 def photo_info(con, uuids):
     rows = con.execute(f"select uuid, date, kind, place, persons, lat, lon, not ({DATED}) from photos where uuid in "
                        f"({','.join('?' * len(uuids))})", list(uuids))
     return {r[0]: dict(uuid=r[0], date=r[1][:10], kind=r[2], place=r[3], persons=json.loads(r[4]), lat=r[5], lon=r[6],
-                       **({"undated": True} if r[7] else {})) for r in rows}
+                       ar=aspect(r[0]), **({"undated": True} if r[7] else {})) for r in rows}
 
 
 def vec_of(con, uuid):
@@ -461,6 +475,36 @@ def interest(con):
         good = np.stack([embed_query(t) for t in INTERESTING]); bad = np.stack([embed_query(t) for t in BORING])
         _interest = (M, (M @ good.T).max(1) - (M @ bad.T).max(1))
     return _interest[1]
+
+
+def best_of(con, k=48, **f):
+    """No words to search for, only filters (a person, a place, a season): their most interesting photos."""
+    keep, _ = filtered(con, **f)
+    uuids, _, pos = vectors(con)
+    score = interest(con)
+    top = sorted(keep, key=lambda u: -score[pos[u]])[:k]
+    info = photo_info(con, top)
+    return [dict(info[u], score=float(score[pos[u]])) for u in top]
+
+
+def rediscover(con, n=24):
+    """A random handful of the library's more interesting photos, for the home page to resurface."""
+    uuids, _, _ = vectors(con)
+    score = interest(con)
+    ok = {r[0] for r in con.execute(f"select uuid from photos where kind='photo' and {DATED}")}
+    cand = [uuids[i] for i in np.argsort(-score)[: max(n, len(uuids) * 2 // 5)] if uuids[i] in ok]
+    pick = random.sample(cand, min(n, len(cand)))
+    info = photo_info(con, pick)
+    return [info[u] for u in pick]
+
+
+def overview(con):
+    """Names, places and years, for the search box to suggest as you type."""
+    rows = con.execute(f"select persons, place, iif({DATED}, substr(date,1,4), null) from photos").fetchall()
+    people = Counter(p for r in rows for p in json.loads(r[0]))
+    places = Counter(short_place(r[1]) for r in rows if r[1])
+    years = Counter(r[2] for r in rows if r[2])
+    return dict(people=people.most_common(80), places=places.most_common(120), years=sorted(years.items()))
 
 
 def game_round(con, mode="year"):
@@ -1046,10 +1090,22 @@ def cmd_today(a):
 
 # ---------------------------------------------------------------- web UI
 
+class ThreadCon:
+    """A connection per thread. The server answers requests in parallel, and queries interleaved on one shared
+    sqlite connection hand back each other's rows."""
+    def __init__(self):
+        self.local = threading.local()
+
+    def __getattr__(self, name):
+        if not hasattr(self.local, "con"):
+            self.local.con = db()
+        return getattr(self.local.con, name)
+
+
 def cmd_serve(a):
     from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
     from urllib.parse import urlparse, parse_qs
-    con = db()
+    con = ThreadCon()
     model()  # warm up before first request
     fetcher = Fetcher(con)
 
@@ -1057,9 +1113,13 @@ def cmd_serve(a):
 
     def api_search(q):
         f = dict(person=split(q.get("person")), after=q.get("after"), before=q.get("before"), kind=q.get("kind"),
-                 months=SEASONS.get(q.get("season")))
+                 place=q.get("place"), months=SEASONS.get(q.get("season")))
         k = int(q.get("k", 48))
-        return similar(con, q["like"], k, **f) if "like" in q else search(con, q.get("q", ""), k, split(q.get("exclude")), **f)
+        if "like" in q:
+            return similar(con, q["like"], k, **f)
+        if not q.get("q"):  # just filters, e.g. a person picked from the suggestions
+            return best_of(con, k, **f)
+        return search(con, q["q"], k, split(q.get("exclude")), **f)
 
     def api_parse(q):  # the smart search box: {"enabled": False} when there's no Jev key
         if not jev_key():
@@ -1087,7 +1147,8 @@ def cmd_serve(a):
            "/api/sharp": lambda q: {u: fetcher.status(u) for u in q.get("uuids", "").split(",") if u},
            "/api/story_photos": lambda q: story_candidates(con, q.get("id", ""), q.get("q"), q.get("like")),
            "/api/search": api_search, "/api/open": api_open, "/api/info": api_info, "/api/parse": api_parse,
-           "/api/galaxy": lambda q: galaxy(con),
+           "/api/galaxy": lambda q: galaxy(con), "/api/overview": lambda q: overview(con),
+           "/api/rediscover": lambda q: rediscover(con, min(60, int(q.get("n", 24)))),
            "/api/timeline": lambda q: timeline(con, q.get("q", ""), int(q.get("per", 1))),
            "/api/game": lambda q: game_round(con, q.get("mode", "year")),
            "/api/math": lambda q: photo_math(con, q["base"], q.get("plus", ""), q.get("minus", ""),
