@@ -40,3 +40,14 @@ def test_photos_looked_at_by_eye_dont_fail(con, monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(demo, "look_for_people", lambda: {first: (1, 0)})
     demo.cmd_demo_check(Namespace(real=str(real)))
     assert "looked at: " + first in capsys.readouterr().out
+
+
+def test_approved_places_are_allowed_but_only_those(con, tmp_path, capsys):
+    real = tmp_path / "real"; real.mkdir()
+    shutil.copy(config.DB, real / "index.sqlite")
+    con.execute("insert into meta values('library', '/Users/x/Pictures/Photosearch Demo.photoslibrary')"); con.commit()
+    (config.DATA / "approved-places.json").write_text('{"Portland": "fine to show"}')
+    with pytest.raises(SystemExit):
+        demo.cmd_demo_check(Namespace(real=str(real)))
+    out = capsys.readouterr().out
+    assert "'Portland'" not in out and "shows 'Sam'" in out  # names are never approvable this way

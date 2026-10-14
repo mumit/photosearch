@@ -8,7 +8,8 @@ searches for each name in your library), and fails on any name tagged in your li
 home, any of your library's photo ids, or a location near your home. It also has macOS's Vision look for faces and
 people in every demo photo, and reports faces Photos itself has found in the demo library. Vision mistakes some
 statues, carvings and animals for people: once you've looked, list those in the demo's data folder as
-checked-by-eye.json, {"uuid": "why it's fine"}, and they're reported as looked at instead."""
+checked-by-eye.json, {"uuid": "why it's fine"}, and they're reported as looked at instead. Likewise a place near home
+you're happy to show (a big city nearby, say) can be listed in approved-places.json, {"place": "why"}."""
 import http.client, json, re, socket, sqlite3, sys, threading
 from argparse import Namespace
 from pathlib import Path
@@ -106,6 +107,8 @@ def cmd_demo_check(a):
     if real == DATA.resolve():
         sys.exit("give your own library's data folder as the argument, and the demo's as PHOTOSEARCH_DATA")
     names, places, ids, home = your_library(real)
+    approved = json.loads((DATA / "approved-places.json").read_text()) if (DATA / "approved-places.json").exists() else {}
+    places -= set(approved)
     problems = []
     con = db()
     for u, ps, la, lo in con.execute("select uuid, persons, lat, lon from photos"):
