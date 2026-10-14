@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-DATA = HERE / "data"
+DATA = Path(os.environ.get("PHOTOSEARCH_DATA") or HERE / "data")  # tests point this at a made-up library
 DB = DATA / "index.sqlite"
 THUMBS = DATA / "thumbs"
 MODEL = "google/embeddinggemma-2"
@@ -539,7 +539,10 @@ def save_album(con, body):
     if not q and not any(f.values()):
         raise ValueError("an album needs words or a filter to look for")
     clean = lambda xs: [str(u)[:64] for u in (xs or []) if re.fullmatch(r"[0-9A-Fa-f-]{8,64}", str(u))][:2000]
-    aid = str(body.get("id") or "") or slug(name)[:50] or "album"
+    if body.get("id"):  # an update: only of an album that exists (the id names its file)
+        aid = load_album(str(body["id"]))["id"]
+    else:
+        aid = slug(name)[:50].strip("-") or "album"
     if not body.get("id"):  # a new album: don't overwrite one with the same name
         base, n = aid, 2
         while (ALBUMS / f"{aid}.json").exists():
@@ -1813,6 +1816,16 @@ def cmd_serve(a):
             self.send(b"not found", "text/plain", 404)
 
         def do_POST(self):  # the requests that write: signing in, saving an edited story, fetching full-size copies
+            # Read the body before any answer, refusals too: closing a connection with a body still unread resets it,
+            # and the browser then sees a network error instead of the reason.
+            try:
+                n = int(self.headers.get("content-length") or 0)
+            except ValueError:
+                n = -1
+            if not 0 <= n <= 1 << 20:
+                self.close_connection = True
+                return self.send(b"too large", "text/plain", 413)
+            raw = self.rfile.read(n)
             # Only this page may write. Other sites can't send JSON here without a CORS preflight, which we never
             # answer; checking Host too stops DNS rebinding (a site whose name resolves to 127.0.0.1).
             origin = self.headers.get("origin")
@@ -1822,7 +1835,7 @@ def cmd_serve(a):
             path = urlparse(self.path).path
             if path == "/login" and lan:
                 try:
-                    body = json.loads(self.rfile.read(min(4096, int(self.headers.get("content-length") or 0))))
+                    body = json.loads(raw[:4096])
                     token = lan.sign_in(self.client_address[0], body.get("code", ""))
                 except (PermissionError, ValueError, AttributeError) as ex:
                     return self.send(json.dumps(dict(error=str(ex) or "that's not it")).encode(), "application/json", 403)
@@ -1839,7 +1852,7 @@ def cmd_serve(a):
                 if path in ("/api/album_photos", "/api/dupes_send") and not self.local():
                     return self.send(json.dumps(dict(error="copying into Photos only works on the Mac")).encode(), "application/json", 403)
                 try:
-                    body = json.loads(self.rfile.read(min(1 << 20, int(self.headers.get("content-length") or 0))))
+                    body = json.loads(raw)
                     res = writes[path](body if isinstance(body, dict) else {})
                 except (ValueError, LookupError, AttributeError, TypeError) as ex:
                     return self.send(json.dumps(dict(error=str(ex))).encode(), "application/json", 400)
@@ -1847,7 +1860,7 @@ def cmd_serve(a):
             if path not in ("/api/story", "/api/sharp"):
                 return self.send(b"not found", "text/plain", 404)
             try:
-                body = json.loads(self.rfile.read(int(self.headers.get("content-length") or 0)))
+                body = json.loads(raw)
                 if path == "/api/sharp":  # fetch full-size copies of these photos from iCloud, in the background
                     uuids = [str(u)[:64] for u in body.get("uuids", [])][:200]
                     fetcher.add(uuids)

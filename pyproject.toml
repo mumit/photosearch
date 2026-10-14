@@ -16,3 +16,14 @@ dependencies = [
     "transformers>=5.19.0",
     "umap-learn>=0.5.12",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "websockets>=17.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not browser'"
+markers = ["browser: drives the web page in headless Chrome (slow; run with -m browser)"]
