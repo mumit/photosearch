@@ -149,7 +149,9 @@ async function galaxyOpen(i) {
 views.galaxy = arg => {  // #galaxy/beach lights up a search; #galaxy/?person=Name, everyone's photos of them
   const [qs, ps] = (arg || "").split("?"), q = decodeURIComponent(qs || ""), person = new URLSearchParams(ps || "").get("person");
   $("q").value = q; openGalaxy();
-  person ? lightUp("👤 " + person, { person, k: 6000 }, `all of ${person}'s photos`) : lightUp(q, { q, k: 250 }, `the 250 best matches for “${q}”`);
+  // a search lights up its best matches: 250, or the best seventh of a smaller library, so the lit part still stands out
+  const k = Math.max(30, Math.min(250, Math.round((G.data?.uuids.length ?? 1e9) / 7)));
+  person ? lightUp("👤 " + person, { person, k: 6000 }, `all of ${person}'s photos`) : lightUp(q, { q, k }, `the ${k} best matches for “${q}”`);
 };
 async function lightUp(key, params, what) {
   if (!key) return clearHi();
@@ -178,7 +180,8 @@ function flyTo(set) {
   };
   requestAnimationFrame(step);
 }
-// the years: the slider shows the library as it was up to a year; ▶ plays it growing from the first
+// the years: the slider shows the library as it was up to a year; ▶ plays it growing from the first, in about 6 seconds
+// however many years there are (no slower than 3/4 s a year)
 function setUpto(y) { G.upto = y; $("gyl").textContent = y ? `up to ${y}` : "All years"; $("gbig").textContent = y || ""; draw(); }
 function stopGrow() { clearInterval(G.grow); G.grow = 0; $("gplay").textContent = "▶"; }
 $("gyr").oninput = () => { stopGrow(); const v = +$("gyr").value; setUpto(v >= G.y1 ? null : v); };
@@ -189,7 +192,7 @@ $("gplay").onclick = () => {
   G.grow = setInterval(() => {
     if (++y > G.y1) { stopGrow(); setUpto(null); $("gyr").value = G.y1; return; }
     setUpto(y); $("gyr").value = y;
-  }, 750);
+  }, Math.min(750, 6000 / Math.max(1, G.y1 - G.y0)));
 };
 $("gppl").onclick = e => { const n = e.target.dataset.name; if (n) go("galaxy/?person=" + encodeURIComponent(n)); };
 leave.galaxy = () => stopGrow();

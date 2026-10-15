@@ -1,4 +1,4 @@
-"""The launch video: photosearch in presenter mode, about 40 seconds. Captions say what the tool does, never more."""
+"""The launch video: photosearch in presenter mode, about 55 seconds. Captions say what the tool does, never more."""
 
 pill = "[...document.querySelectorAll('#wregions .pill')].find(b => b.textContent.includes({!r}))"
 
@@ -16,7 +16,7 @@ BEATS = [
 
     # 3. Galaxy: the whole library as a map of look-alikes, growing year by year, then lit up by a search
     ("galaxy", "await __demo.click('nav#tabs a[href=\"#galaxy\"]'); __demo.caption('Your whole library, as a map of look-alikes')", 2.4),
-    ("grow", "await __demo.click('#gplay')", 3.4),
+    ("grow", "await __demo.click('#gplay')", 6.6),
     ("light", "stopGrow(); setUpto(null); await __demo.type('#q', 'the ocean'); await __demo.click('#gobtn')", 2.8),
 
     # 4. Photo math
