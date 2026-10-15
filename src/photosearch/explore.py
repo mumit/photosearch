@@ -65,12 +65,17 @@ def timeline(con, query, per=1, person=None):
     return [dict(year=int(y), results=[dict(info[uuids[i]], score=float(s[i])) for i in best[y]]) for y in sorted(best)]
 
 
-def rediscover(con, n=24):
-    """A random handful of the library's more interesting photos, for the home page to resurface."""
+def rediscover_pool(con, n=24):
+    """Every photo rediscover() may pick from: the more interesting two fifths of the library (at least n)."""
     uuids, _, _ = vectors(con)
     score = interest(con)
     ok = {r[0] for r in con.execute(f"select uuid from photos where kind='photo' and {DATED}")}
-    cand = [uuids[i] for i in np.argsort(-score)[: max(n, len(uuids) * 2 // 5)] if uuids[i] in ok]
+    return [uuids[i] for i in np.argsort(-score)[: max(n, len(uuids) * 2 // 5)] if uuids[i] in ok]
+
+
+def rediscover(con, n=24):
+    """A random handful of the library's more interesting photos, for the home page to resurface."""
+    cand = rediscover_pool(con, n)
     pick = random.sample(cand, min(n, len(cand)))
     info = photo_info(con, pick)
     return [info[u] for u in pick]

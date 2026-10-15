@@ -5,7 +5,8 @@
 A storyboard is a Python file with BEATS: a list of (name, JavaScript, seconds to hold afterwards), and optionally WARM:
 views (#hashes) to open before recording, so their map tiles and data are already loaded when they're shown. The JavaScript runs
 in the page as the body of an async function, with __demo (overlay.js) for the cursor, typing and captions. Every frame
-Chrome paints is kept with its time, and ffmpeg turns them into a steady 60 fps video.
+Chrome paints is kept with its time, and ffmpeg turns them into a steady 60 fps video. Next to OUT.mp4 it writes
+OUT.photos.json (every photo the page loaded, to check before sharing) and OUT.beats.json (when each beat starts).
 """
 import argparse, asyncio, base64, json, runpy, shutil, subprocess, sys, tempfile, time, urllib.request
 from pathlib import Path
@@ -19,6 +20,7 @@ HERE = Path(__file__).resolve().parent
 class Page:
     def __init__(self, ws, frames):
         self.ws, self.n, self.waiting, self.frames, self.errors, self.photos = ws, 0, {}, frames, [], set()
+        self.beats = {}  # name: when the beat started (seconds since epoch, like the frames)
 
     async def read(self):
         try:
@@ -94,7 +96,7 @@ async def record(beats, url, w, h, dpr, frames, theme="dark", warm=()):
                 raise RuntimeError("the overlay didn't load: " + "; ".join(page.errors))
             await page.cmd("Page.startScreencast", format="jpeg", quality=92, maxWidth=int(w * dpr), maxHeight=int(h * dpr))
             for name, js, hold in beats:
-                t = time.time()
+                t = page.beats[name] = time.time()
                 if js:
                     await page.run(js)
                 await asyncio.sleep(hold)
@@ -103,7 +105,7 @@ async def record(beats, url, w, h, dpr, frames, theme="dark", warm=()):
             await page.cmd("Page.stopScreencast")
             await asyncio.sleep(0.3)
             reader.cancel()
-            return page.errors, page.photos
+            return page.errors, page.photos, page.beats
     finally:
         chrome.kill(); chrome.wait()
         shutil.rmtree(profile, ignore_errors=True)
@@ -142,8 +144,10 @@ def main():
     board = runpy.run_path(a.storyboard)
     beats = board["BEATS"]
     frames = []
-    errors, photos = asyncio.run(record(beats, a.url, w, h, float(dpr), frames, a.theme, board.get("WARM", ())))
+    errors, photos, starts = asyncio.run(record(beats, a.url, w, h, float(dpr), frames, a.theme, board.get("WARM", ())))
     Path(a.out).with_suffix(".photos.json").write_text(json.dumps(sorted(photos)))  # for checking each one before sharing
+    if frames:  # where each beat starts in the video, for cutting it up afterwards (tools/launch/edit.py)
+        Path(a.out).with_suffix(".beats.json").write_text(json.dumps({n: round(t - frames[0][0], 3) for n, t in starts.items()}))
     if len(frames) < 3:
         sys.exit("no frames captured")
     span = frames[-1][0] - frames[0][0]

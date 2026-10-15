@@ -294,6 +294,7 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 | `src/photosearch/` | The code (see [Code layout](#code-layout)) |
 | `src/photosearch/web/` | The web page: `index.html`, `app.css`, one script per view in `js/`, and `review.html`, the story player (also used for the one-file export) |
 | `tests/` | The tests and the made-up library they run on (see [Tests](#tests)) |
+| `tools/director/`, `tools/launch/` | Recording and cutting a demo video from a separate demo library (see [Demo videos](#demo-videos)) |
 | `data/reviews/` | Saved story picks and captions, one JSON file per year (`2025.json`) or trip (`trip-2024-05-02.json`) |
 | `.env` | Optional `TYPESAFE_API_KEY` for ✨ smart search (git-ignored) |
 | `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector |
@@ -390,6 +391,14 @@ the model, iCloud or Photos: the libraries that would (osxphotos, torch, sentenc
 during tests, and a stand-in records what would have been added to which album. So the tests pass on a fresh clone,
 before indexing, without Photos access or the model; the first run takes ~30 s longer while UMAP compiles itself. The phone tests connect
 through this Mac's Wi-Fi address, so the server sees a device other than itself; they're skipped when offline.
+
+### Demo videos
+
+To show photosearch without showing your photos, index a separate Photos library of photos you're happy to share into
+its own data folder (`PHOTOSEARCH_DATA=data-demo uv run photosearch index`) and serve it with `serve --demo`
+(presenter mode: no phone pairing, no opening photos in Photos, and it refuses your own `data/`). `photosearch
+demo-check data` checks that nothing from your own library shows. [`tools/launch/README.md`](tools/launch/README.md)
+has the whole reshoot: recording the web app and Claude Code, checking every photo the takes show, and cutting the video.
 
 ### Measurements
 
