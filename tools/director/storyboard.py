@@ -2,6 +2,9 @@
 
 pill = "[...document.querySelectorAll('#wregions .pill')].find(b => b.textContent.includes({!r}))"
 
+# opened once before recording: the map's tiles and Galaxy's layout are loaded before they're shown
+WARM = ["#world", "#galaxy"]
+
 BEATS = [
     # 1. Home, then the hook: search by what's in the photo
     ("home", "__demo.caption('Search your photos by what’s <i>in</i> them', 'on your Mac · nothing leaves it')", 2.0),

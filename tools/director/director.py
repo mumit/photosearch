@@ -2,7 +2,8 @@
 
     uv run python tools/director/director.py STORYBOARD.py OUT.mp4 [--url http://localhost:8766/] [--size 1280x720@1.5]
 
-A storyboard is a Python file with BEATS: a list of (name, JavaScript, seconds to hold afterwards). The JavaScript runs
+A storyboard is a Python file with BEATS: a list of (name, JavaScript, seconds to hold afterwards), and optionally WARM:
+views (#hashes) to open before recording, so their map tiles and data are already loaded when they're shown. The JavaScript runs
 in the page as the body of an async function, with __demo (overlay.js) for the cursor, typing and captions. Every frame
 Chrome paints is kept with its time, and ffmpeg turns them into a steady 60 fps video.
 """
@@ -59,7 +60,7 @@ class Page:
         return r.get("result", {}).get("value")
 
 
-async def record(beats, url, w, h, dpr, frames, theme="dark"):
+async def record(beats, url, w, h, dpr, frames, theme="dark", warm=()):
     port = 9400
     profile = tempfile.mkdtemp(prefix="director-")
     chrome = subprocess.Popen([CHROME, "--headless", "--hide-scrollbars", "--force-color-profile=srgb", "--mute-audio",
@@ -81,6 +82,12 @@ async def record(beats, url, w, h, dpr, frames, theme="dark"):
             await page.cmd("Emulation.setEmulatedMedia", features=[dict(name="prefers-color-scheme", value=theme)])
             await page.cmd("Page.navigate", url=url)
             await asyncio.sleep(4)  # fonts, the first photos
+            for view in warm:
+                await page.cmd("Runtime.evaluate", expression=f"location.hash = {json.dumps(view)}")
+                await asyncio.sleep(4)
+            if warm:
+                await page.cmd("Runtime.evaluate", expression="location.hash = ''; scrollTo(0, 0)")
+                await asyncio.sleep(2)
             # the page moves between views by #hash and never reloads, so the overlay goes in once
             await page.cmd("Runtime.evaluate", expression=(HERE / "overlay.js").read_text())
             if await page.run("return typeof __demo") != "object":
@@ -132,9 +139,10 @@ def main():
     a = ap.parse_args()
     wh, dpr = a.size.split("@") if "@" in a.size else (a.size, "1")
     w, h = map(int, wh.split("x"))
-    beats = runpy.run_path(a.storyboard)["BEATS"]
+    board = runpy.run_path(a.storyboard)
+    beats = board["BEATS"]
     frames = []
-    errors, photos = asyncio.run(record(beats, a.url, w, h, float(dpr), frames, a.theme))
+    errors, photos = asyncio.run(record(beats, a.url, w, h, float(dpr), frames, a.theme, board.get("WARM", ())))
     Path(a.out).with_suffix(".photos.json").write_text(json.dumps(sorted(photos)))  # for checking each one before sharing
     if len(frames) < 3:
         sys.exit("no frames captured")
