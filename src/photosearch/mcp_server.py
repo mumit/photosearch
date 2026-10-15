@@ -88,7 +88,8 @@ def library_overview() -> dict:
 def make_album(name: str, uuids: list[str]) -> str:
     """Add photos to an album in the Photos app, creating it if needed. Only adds; never removes or deletes.
     Check the photos with view_photos first."""
-    return f"added {photos_app.add_now(name, uuids)} of {len(uuids)} photos to album '{name}'"
+    # in its own process, as the page's adds are: AppleScript from this server's worker threads can hang for minutes
+    return f"added {photos_app.add_to_photos_album(name, uuids)} of {len(uuids)} photos to album '{name}'"
 
 
 class ReviewPhoto(TypedDict):

@@ -79,11 +79,18 @@ def test_the_cli_goes_through_the_check(lib, monkeypatch):
     assert fake.albums == {}
 
 
-def test_claudes_make_album_goes_through_the_check(lib, monkeypatch):
+def test_claudes_make_album_adds_in_its_own_process(lib, photos_app):
+    """Through `photosearch add-to-album` (whose check is tested above), not on the MCP server's worker thread, where
+    AppleScript to Photos can hang until it times out."""
     from photosearch import mcp_server
-    fake = FakePhotos(monkeypatch, indexed={lib["dog0"], lib["dog1"]}, open_has={lib["dog0"], lib["dog1"]})
     assert mcp_server.make_album("Dogs", [lib["dog0"], lib["dog1"]]) == "added 2 of 2 photos to album 'Dogs'"
-    fake.albums.clear()
-    FakePhotos(monkeypatch, indexed={lib["dog0"]}, open_has=set())
-    with pytest.raises(LookupError):
+    assert photos_app.added == [("Dogs", [lib["dog0"], lib["dog1"]])]
+
+
+def test_claude_hears_why_photos_refused(lib, monkeypatch):
+    from photosearch import mcp_server
+    def refused(name, uuids):
+        raise LookupError("Photos didn't take them: LookupError: Photos has another library open")
+    monkeypatch.setattr(photos_app, "add_to_photos_album", refused)
+    with pytest.raises(LookupError, match="another library"):
         mcp_server.make_album("Dogs", [lib["dog0"]])
