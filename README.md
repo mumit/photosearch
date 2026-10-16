@@ -295,6 +295,8 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 | `src/photosearch/web/` | The web page: `index.html`, `app.css`, one script per view in `js/`, and `review.html`, the story player (also used for the one-file export) |
 | `tests/` | The tests and the made-up library they run on (see [Tests](#tests)) |
 | `tools/director/`, `tools/launch/` | Recording and cutting a demo video from a separate demo library (see [Demo videos](#demo-videos)) |
+| `tools/rank_test.py` | Measures how 70 vision tokens changes search rankings (see [Measurements](#measurements)) |
+| `AGENTS.md`, `CLAUDE.md` | Notes for coding agents working on photosearch |
 | `data/reviews/` | Saved story picks and captions, one JSON file per year (`2025.json`) or trip (`trip-2024-05-02.json`) |
 | `.env` | Optional `TYPESAFE_API_KEY` for ✨ smart search (git-ignored) |
 | `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector |
