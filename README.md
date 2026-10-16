@@ -297,6 +297,7 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 | `tools/director/`, `tools/launch/` | Recording and cutting a demo video from a separate demo library (see [Demo videos](#demo-videos)) |
 | `tools/rank_test.py` | Measures how 70 vision tokens changes search rankings (see [Measurements](#measurements)) |
 | `AGENTS.md`, `CLAUDE.md` | Notes for coding agents working on photosearch |
+| `ROADMAP.md` | What to build next, in order |
 | `data/reviews/` | Saved story picks and captions, one JSON file per year (`2025.json`) or trip (`trip-2024-05-02.json`) |
 | `.env` | Optional `TYPESAFE_API_KEY` for ✨ smart search (git-ignored) |
 | `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector |
@@ -423,8 +424,11 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
   | Top 10 in common | 6.4 on average |
   | First 24 (one page) in common | 16.5 on average |
 
-  This measures agreement, not quality: a different first photo can be just as good a match. A full library has more
-  close calls than 2,000 photos, so it probably agrees less.
+  That measures agreement, not quality, so the same top 5s were also judged by eye, blind (the two settings in random
+  order). At 280 tokens, 194 of the 250 photos fit the search; at 70, 187. Where the first photo differed (28
+  searches), it was about as good in 22, better at 280 in 4 and better at 70 in 2. So 70 tokens mostly reorders
+  results and is only slightly worse. One judge (Claude) scored a 2,000-photo sample; a full library has more close
+  calls.
 - The "photo anchor" published by pastel-labs on Hugging Face only matters for 1- or 4-bit compressed vectors. It isn't needed at this size.
 
 - Some photos (very dark, very plain) score fairly high for any query. A CSLS-style penalty using Apple's labels as a
@@ -446,12 +450,13 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
   confidence are ignored.
 
 **Status:** full library indexed (16,975 items in 140 min on an M3 Pro; 42 skipped for lack of a local preview). Every web tab checked in headless
-Chrome. Nothing that writes to the Photos app has been run yet: `album`, `make_album`, **Copy to Photos** and **Send the
-extras** all use the same add-only path (osxphotos' PhotosAlbum), so try one on a small album first. 1,042 photos carry a
+Chrome. `album`, `make_album`, **Copy to Photos** and **Send the extras** all use the same add-only path (osxphotos'
+PhotosAlbum). `make_album` has made albums many times in a separate demo library, while recording the demo video, and all four
+have been tested on the main library. Try a small album first on a new library. 1,042 photos carry a
 placeholder date (2002-01-01 00:00); they are treated as undated. Tidy up finds 2,370 near-identical groups (5,290
 extras) on this library.
 
-**Ideas next:** index the audio track of videos; video previews on hover; a "use as portrait" choice for people pages.
+**Ideas next:** see [ROADMAP.md](ROADMAP.md).
 
 ## License
 

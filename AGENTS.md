@@ -51,12 +51,7 @@ PHOTOSEARCH_DATA=data-demo uv run photosearch serve --demo --port 8766   # prese
 
 I want it fun first: for me now, maybe for my family later. Keep the page usable on phones. LAN sharing (`serve --lan`) is opt-in and stays off by default. For yes/no or pick-one decisions, I prefer cheap decision models (Jev) to a generative LLM, measured first.
 
-Ideas not built yet:
-- smarter dates for photos with placeholder dates;
-- indexing video audio;
-- hover previews;
-- "use as portrait" on people pages;
-- nightly re-index (only if I ask for a background job).
+What to build next is in [ROADMAP.md](ROADMAP.md). Keep it current: move items to Done when they ship.
 
 ## Open work
 
@@ -64,4 +59,4 @@ Update this section when something finishes or starts.
 
 - **Launch posts:** Highlight important changes so I can post those to X/LinkedIn.
 - **Demo leftovers:** the demo Photos library, its import folder, `data-demo/` and a separate Claude config folder for the demo takes are still on disk. I haven't decided whether to keep them. Before the demo library is deleted, Photos must be switched back to my library (hold Option while opening Photos).
-- **Vision tokens:** 70 tokens is 4.7× faster but changes the first result in more than half of searches. Whether those results are worse hasn't been judged by eye.
+- **Vision tokens:** done. 70 tokens is 4.7× faster, changes the first result in more than half of searches, but is only slightly worse when judged by eye (see the README's Measurements). 280 stays the default.
