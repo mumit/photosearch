@@ -115,7 +115,7 @@ uv run photosearch index
 - Expect the Mac to run warm while it works; it's using the GPU.
 
 **Speed vs. quality:** each image is given to the model as a number of "vision tokens" (default 280).
-`--vision-tokens 70` is about 4× faster at some cost in search quality:
+`--vision-tokens 70` is about 4× faster, but changes which photos come first (see [Measurements](#measurements)):
 
 ```bash
 uv run photosearch index --vision-tokens 70
@@ -406,12 +406,23 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
 
 | Setup | Photos/s | Full library |
 |---|---|---|
-| PyTorch MPS bf16, 280 vision tokens (default) | ~1.2 | ~4 h |
-| PyTorch MPS bf16, 70 vision tokens | ~4.6 | ~1 h |
-| MLX (`mlx-community/embeddinggemma-2-bf16` via mlx-vlm) | ~1.3 | ~4 h (no gain, dropped) |
+| PyTorch MPS bf16, 280 vision tokens (default) | ~2.0 | 2 h 20 min (16,927 photos, measured) |
+| PyTorch MPS bf16, 70 vision tokens | ~9 | ~30 min (estimated from 2,000 photos) |
+| MLX (`mlx-community/embeddinggemma-2-bf16` via mlx-vlm) | ~1.3 | no gain, dropped |
 | CPU fp32 | ~0.3 | — |
 
-- 70-token vectors have mean cosine 0.95 to the 280-token ones. The effect on ranking quality is untested.
+- 70 tokens changes the rankings more than its vectors suggest. On 2,000 random photos, the 70-token vectors have mean
+  cosine 0.95 to the 280-token ones (5% of photos are below 0.91, the lowest 0.73). Over 50 searches of those 2,000:
+
+  | 70 tokens vs. 280 | Result |
+  |---|---|
+  | Same photo first | 22 of 50 searches |
+  | 280's first photo still in 70's top 5 | 45 of 50 |
+  | Top 10 in common | 6.4 on average |
+  | First 24 (one page) in common | 16.5 on average |
+
+  This measures agreement, not quality: a different first photo can be just as good a match. A full library has more
+  close calls than 2,000 photos, so it probably agrees less.
 - The "photo anchor" published by pastel-labs on Hugging Face only matters for 1- or 4-bit compressed vectors. It isn't needed at this size.
 
 - Some photos (very dark, very plain) score fairly high for any query. A CSLS-style penalty using Apple's labels as a
