@@ -36,6 +36,9 @@ const short = place => (place || "").split(",")[0];
 const longDate = (d, opt = { weekday:"long", month:"long", day:"numeric", year:"numeric" }) => {
   const [y, m, day] = d.split("-").map(Number); return new Date(y, m - 1, day).toLocaleDateString(undefined, opt);
 };
+// A photo's date as sure as it is: dates from the date detective may be a month or a year
+const photoDate = (x, opt) => x.undated ? "date unknown" : x.approx === "year" ? x.date.slice(0, 4)
+  : x.approx === "month" ? longDate(x.date, { month: opt?.month || "long", year: "numeric" }) : longDate(x.date, opt);
 const ago = n => !n ? "Earlier this year" : n === 1 ? "A year ago" : `${n} years ago`;
 // the header's height, for the full-screen modes to fit under it
 new ResizeObserver(([e]) => document.documentElement.style.setProperty("--hh", e.target.offsetHeight + "px")).observe(document.querySelector("header"));
@@ -82,7 +85,7 @@ function tileHTML(x, i, { badge, caption = true } = {}) {
   return `<figure class="tile" data-i="${i}" style="--ar:${clampAr(x.ar)}">
     <img loading="lazy" src="/thumb/${x.uuid}.jpg" alt="" onload="${loaded}">
     ${badge ? `<b class="badge">${esc(badge)}</b>` : ""}${x.kind === "video" ? `<span class="vid">▶ video</span>` : ""}
-    ${caption ? `<figcaption><span>${x.undated ? "date unknown" : longDate(x.date, { month:"short", day:"numeric", year:"numeric" })}</span><span>${esc(short(x.place))}</span></figcaption>` : ""}
+    ${caption ? `<figcaption><span>${photoDate(x, { month:"short", day:"numeric", year:"numeric" })}</span><span>${esc(short(x.place))}</span></figcaption>` : ""}
   </figure>`;
 }
 // Justified rows, like a photo book: each row fills the width and every photo keeps its shape.
@@ -126,10 +129,10 @@ function lightbox(list, i, keepTrail = false) {
   const x = list[i];
   $("lbimg").src = `/photo/${x.uuid}.jpg`; sharpen($("lbimg"), x.uuid);
   $("lbbg").style.backgroundImage = `url(/thumb/${x.uuid}.jpg)`;
-  $("lbdate").textContent = x.undated ? "Date unknown" : longDate(x.date);
+  $("lbdate").textContent = x.undated ? "Date unknown" : photoDate(x);
   $("lbplace").innerHTML = x.place ? `<a data-place="${esc(short(x.place))}" title="more from here">${esc(x.place)}</a>` : "";
   $("lbppl").innerHTML = (x.persons || []).map(p => `<a data-person="${esc(p)}" title="${esc(p)}'s page">${esc(p)}</a>`).join("");
-  $("lbday").hidden = !!x.undated;
+  $("lbday").hidden = !!(x.undated || x.approx);
   $("lbprev").style.visibility = i > 0 ? "" : "hidden"; $("lbnext").style.visibility = i < list.length - 1 ? "" : "hidden";
   $("lbpos").textContent = list.length > 1 ? `${i + 1} of ${list.length}` : "";
   $("lbtrail").innerHTML = LB.trail.map((t, k) => `<img src="/thumb/${t.uuid}.jpg" data-k="${k}" title="back to here">`).join("");

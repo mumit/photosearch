@@ -33,22 +33,24 @@ def date_range(start, end):
     return f"{ma} {a.day}, {a.year} – {mb} {b.day}, {b.year}"
 
 
-def span_photos(con, start, end, home=None):
+def span_photos(con, start, end, home=None, exact=False):
     """(uuid, date, persons) of the indexed photos from day start to day end (inclusive), in time order. home: a
-    (lat, lon) whose photos to leave out, e.g. a trip's first morning at home; photos without a location stay."""
+    (lat, lon) whose photos to leave out, e.g. a trip's first morning at home; photos without a location stay.
+    exact: leave out photos the date detective dated only to a month or a year."""
     _, _, pos = vectors(con)
+    guessed = " and uuid not in (select uuid from redated where precision != 'day')" if exact else ""
     return [r[:3] for r in con.execute(f"select uuid, date, persons, lat, lon from photos where kind='photo' and date >= ? "
-                                       f"and date < ? and {DATED} order by date", (start, day_after(end)))
+                                       f"and date < ? and {DATED}{guessed} order by date", (start, day_after(end)))
             if r[0] in pos and not (home and r[3] is not None and km(home, (r[3], r[4])) <= AWAY_KM)]
 
 
-def highlights(con, start, end, n=40, home=None):
+def highlights(con, start, end, n=40, home=None, exact=False):
     """A varied set of the best photos taken from day start to day end (inclusive), in date order: candidates for a
     review (home as in span_photos). Greedy pick of the most interesting photo (family photos count a little extra),
     skipping near-duplicates of anything already picked and spreading picks across events (runs of photos with no
     day-long gap)."""
     uuids, M, pos = vectors(con)
-    rows = span_photos(con, start, end, home)
+    rows = span_photos(con, start, end, home, exact)
     if not rows:
         return []
     times = [datetime.fromisoformat(r[1]) for r in rows]

@@ -6,6 +6,10 @@ What to build next, in order. Move an item to **Done** when it ships, with its c
 
 ### 1. Date detective
 
+**Built, waiting on my answers:** Play → Date Detective, and `photosearch dates`. It uses album names, album series,
+people and look-alikes. Look-alikes turned out weak (25 of 105 years right when the whole event is hidden), so I
+confirm every group. Not built: Apple's labels as a month clue.
+
 1,042 photos carry a placeholder date (2002-01-01). They're missing from On this day, Time Machine, stories, Guess the Year and the galaxy's years.
 
 Estimate each one's date from:
@@ -55,6 +59,6 @@ Find screenshots, receipts, accidental pocket shots, ID cards and other document
 
 ## Done
 
-- `photosearch eval`: compares two variants of the index (vision tokens, shorter or compressed vectors, another index), with blind sheets to judge. It reproduced the vision-token numbers.
+- `photosearch eval`: compares two variants of the index (vision tokens, shorter or compressed vectors, another index), with blind sheets to judge. It reproduced the vision-token numbers (de6e9da).
 - Vision tokens judged by eye: 70 is 4.7× faster and only slightly worse (552f91d).
 - Writing to the main library tested: `album` from the terminal, `make_album` through Claude, Copy to Photos and Send the extras.

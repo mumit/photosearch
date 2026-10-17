@@ -6,6 +6,7 @@ import numpy as np
 
 from . import embed
 from .config import LARGE, MODEL, THUMBS, THUMB_PX
+from .dates import apply as apply_dates
 from .store import db, photos_db
 from .images import open_image
 
@@ -79,6 +80,7 @@ def cmd_index(a):
         con.executemany(f"update photos set ({META_COLS}) = ({','.join('?' * N_META)}) where uuid=?",
                         [meta(lib[u]) + (u,) for u in keep])
         con.commit()
+        apply_dates(con)  # Photos still has the placeholder dates; keep mine
         print(f"refreshed {len(keep)}, removed {len(gone)} deleted from the library")
         done = keep
     todo = [p for u, p in lib.items() if u not in done]

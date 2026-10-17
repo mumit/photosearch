@@ -17,6 +17,7 @@ from .explore import days, galaxy, game_round, on_this_day, overview, photo_math
 from .stories import STORY_ID, edit_review, export_name, load_review, render_review, stories, story_candidates, story_for_editor, story_uuids
 from .albums import album_preview, album_to_photos, album_view, albums, delete_album, save_album
 from .dupes import DUP_LEVELS, dupes, dupes_choose, dupes_send
+from .dates import next_group, set_date, undo as undo_dates
 from .photos_app import Fetcher
 from .lan import LOGIN, LanAccess
 
@@ -136,6 +137,7 @@ def make_server(a):
            "/api/near": lambda q: near(con, float(q["lat"]), float(q["lon"]), min(500.0, float(q.get("km", 2))), min(120, int(q.get("k", 60)))),
            "/api/timeline": lambda q: timeline(con, q.get("q", ""), int(q.get("per", 1)), q.get("person")),
            "/api/game": lambda q: game_round(con, q.get("mode", "year")),
+           "/api/undated": lambda q: next_group(con, (q.get("skip") or "").split("|")),
            "/api/math": lambda q: photo_math(con, q["base"], q.get("plus", ""), q.get("minus", ""),
                                              float(q.get("w", 1)), int(q.get("k", 24)))}
 
@@ -245,10 +247,15 @@ def make_server(a):
             writes = {"/api/album": lambda b: save_album(con, b), "/api/album_preview": lambda b: album_preview(con, b), "/api/album_delete": lambda b: delete_album(str(b.get("id", ""))),
                       "/api/album_photos": lambda b: album_to_photos(con, str(b.get("id", ""))),
                       "/api/dupes": lambda b: dupes_choose(con, b),
-                      "/api/dupes_send": lambda b: dupes_send(con, b.get("level") if b.get("level") in DUP_LEVELS else "same")}
+                      "/api/dupes_send": lambda b: dupes_send(con, b.get("level") if b.get("level") in DUP_LEVELS else "same"),
+                      # dates go in this index, not Photos; still only from this Mac, so a guest's guess doesn't stick
+                      "/api/undated": lambda b: set_date(con, [str(u) for u in b["uuids"]][:2000], b["year"], b.get("month")),
+                      "/api/undated_undo": lambda b: undo_dates(con, [str(u) for u in b["uuids"]][:2000])}
             if path in writes:
                 if path in ("/api/album_photos", "/api/dupes_send") and not self.local():
                     return self.send(json.dumps(dict(error="copying into Photos only works on the Mac")).encode(), "application/json", 403)
+                if path in ("/api/undated", "/api/undated_undo") and not self.local():
+                    return self.send(json.dumps(dict(error="dates can only be set on the Mac")).encode(), "application/json", 403)
                 try:
                     body = json.loads(raw)
                     res = writes[path](body if isinstance(body, dict) else {})

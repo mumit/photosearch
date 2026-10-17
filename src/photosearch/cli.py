@@ -9,6 +9,7 @@
   photosearch trips                                     trips, found from where photos were taken
   photosearch review 2025|trip-2024-05-02 [--export F.html]   a year or a trip as a slideshow
   photosearch eval run NAME tokens=70 | score | report   compare two variants of the index, judged blind
+  photosearch dates [set GROUP 2007-01 | undo GROUP|all]  date the photos whose date is a placeholder
 
 Nothing is downloaded from iCloud: with "Optimize Mac Storage" on we embed the
 local preview Photos keeps (the model only sees ~280 visual tokens anyway).
@@ -27,6 +28,7 @@ from .photos_app import add_now, cmd_add_to_album, cmd_fetch, fetch_large, needs
 from .server import cmd_serve
 from .demo import cmd_demo_check
 from .evals import cmd_eval
+from .dates import cmd_dates
 
 
 def cmd_album(a):
@@ -136,7 +138,14 @@ def main():
     q.add_argument("--judge", default="me")
     q = ev.add_parser("report", help="the results, unblinded"); q.add_argument("name")
     p.set_defaults(fn=cmd_eval)
+    p = sub.add_parser("dates", help="date the photos whose date in Photos is a placeholder (kept here, never in Photos)")
+    p.add_argument("do", nargs="?", default="list", choices=["list", "set", "undo"])
+    p.add_argument("group", nargs="?", help="an album name, or p:UUID for a loose photo and its look-alikes; undo: also all")
+    p.add_argument("when", nargs="?", help="2007, 2007-01 or 2007-01-15")
+    p.add_argument("--limit", type=int, default=40); p.set_defaults(fn=cmd_dates)
     a = ap.parse_args()
+    if a.fn is cmd_dates and ((a.do == "set" and not a.when) or (a.do != "list" and not a.group)):
+        ap.error("dates set GROUP WHEN, or dates undo GROUP|all")
     if getattr(a, "vision_tokens", None):
         embed.VISION_TOKENS = a.vision_tokens
     try:

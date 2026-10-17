@@ -147,7 +147,7 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 | **Map** | Everywhere you've been, each place as a pin showing its best photo and how many were taken there. It opens on home; chips along the bottom fly to the other regions (named like trips: "Lisbon", "Sintra & Cascais") or show everywhere. Nearby places merge until you zoom in. Tap a pin for that place's best photos, or **▶ Slideshow** them. Map tiles come from OpenStreetMap (so it needs internet); your photos never leave the Mac. |
 | **Galaxy** | Your whole library on one zoomable map, with similar photos next to each other and colored by year. Scroll to zoom, drag to pan, hover to peek. Type in the search box to see where, say, "beach" lives, and the map glides there; the faces along the bottom light up everyone's photos of one person. **▶** plays the years: the library grows from the first photo, each year's new ones standing out. The first visit takes a minute to lay out the map. |
 | **Time Machine** | Pick something that happens every year ("birthday cake", "christmas tree") and flip through the best match from each year, or follow one person (👤): their best photo each year, or just their birthdays. ▶ or space plays them in turn, slowly dissolving or as a quick **Flipbook**. |
-| **Play** | *Guess the Year*, *Guess the Place* and *Which Came First?* (two photos: tap the older one). Play alone (10 rounds, best scores kept) or add players to pass the phone around: everyone gets 5 turns and the end shows who won. **Photo Math** lives here too: start from a photo or words, then add and take away ideas, *this photo + snow − summer*. |
+| **Play** | *Guess the Year*, *Guess the Place* and *Which Came First?* (two photos: tap the older one). Play alone (10 rounds, best scores kept) or add players to pass the phone around: everyone gets 5 turns and the end shows who won. **Photo Math** lives here too: start from a photo or words, then add and take away ideas, *this photo + snow − summer*. **Date Detective** asks when photos without a real date were taken, and your answer becomes their date (see [Date the undated photos](#date-the-undated-photos)). |
 | **Albums** | Smart albums: **＋ Album** on any search (words, a person, a place, dates) saves it as an album that keeps itself up to date: new photos that match as well as the ones in it join by themselves. A slider sets how strict it is. ✕ takes a photo out *and teaches the album* to find fewer like it; ☆ keeps one in for good (both nudge what the album looks for). **Copy to Photos** (on the Mac) makes or updates an album of the same name in the Photos app, adding only what's new. Kept in `data/albums/`. |
 | **Tidy up** | Under Albums: near-duplicates, as groups of bursts and copies of the same picture. Each group has a suggested keeper (the sharpest, judged from the detail in its thumbnail); tap another to keep that instead, or **Not duplicates** to stop suggesting the group. **Send the extras** adds every non-keeper to an album in Photos called *Photosearch · maybe delete*, so you can look through it and delete there. Nothing is ever deleted by Photosearch. *Near-identical* is the default; *Also similar shots* includes shots of the same moment that differ a little more. Receipts, ID cards and screenshots only count when they're practically the same pixels, so two different receipts are never paired. |
 | **Photo frame** | `#frame`, or from Home: a slow, endless full-screen slideshow of your best photos with the time and date, for a spare iPad or TV. It keeps the screen awake. **⚙ What to show** picks everything, on this day, one person, or any search (`#frame/?person=…`, `#frame/?q=…`). **▶ Slideshow** on any search, place or open photo plays just those. |
@@ -271,6 +271,40 @@ that changes your library.** It never deletes anything.
 
 ---
 
+### Date the undated photos
+
+Scans and cameras with a reset clock give many photos the same placeholder date (here 1,042 photos say
+2002-01-01). The year-based features leave those out: On this day, Time Machine, stories, the games, the galaxy's
+years. **Play → Date Detective** dates them a group at a time:
+
+- **An album of them** goes together. Albums that mostly hold other albums' photos (a "Roll 1" across every scan),
+  or that also hold dated photos, are skipped.
+- **A loose photo** comes with its closest loose look-alikes. Tap any that don't belong to leave them out.
+
+Each group shows its clues and a guess:
+
+- **A date in the album's name** ("Lisbon March 2025"). These groups come first.
+- **An album series named by weeks** ("Baby weeks 4-6"): once one is dated, the others are worked out from it.
+- **Who's in it,** and the years they appear in dated photos.
+- **Dated photos it looks like.** This is a weak clue. Hiding each dated album's whole event and guessing its year
+  from the rest got 25 of 105 right, and 58 within a year.
+
+Pick the year and the month (or *don't know*), then **Date these photos**. Captions then say "March 2025" or "2025"
+instead of a day, and On this day leaves out photos with only a month or a year.
+
+The dates go in photosearch's index, **never in Photos**, and `photosearch index` keeps them when it refreshes what
+Photos says. From the terminal:
+
+```bash
+uv run photosearch dates                                    # the groups, with their guesses
+uv run photosearch dates set "Lisbon March 2025" 2025-03    # or 2025, or 2025-03-14
+uv run photosearch dates undo "Lisbon March 2025"           # or: undo all
+```
+
+Dates can only be set on the Mac, not from a phone on the Wi-Fi.
+
+---
+
 ### Photo quality
 
 With *Optimize Mac Storage*, Photos keeps only a small preview of most photos on the Mac (here 60% are 256–511 px;
@@ -299,7 +333,7 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 | `ROADMAP.md` | What to build next, in order |
 | `data/reviews/` | Saved story picks and captions, one JSON file per year (`2025.json`) or trip (`trip-2024-05-02.json`) |
 | `.env` | Optional `TYPESAFE_API_KEY` for ✨ smart search (git-ignored) |
-| `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector |
+| `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector. Also the dates you gave photos without a real one (table `redated`, with the date Photos has) |
 | `data/thumbs/` | Small JPEG previews for the web page (512 px) |
 | `data/large/` | Full-size copies (up to 2560 px) of photos shown big whose local preview was small, fetched from iCloud. Safe to delete; they come back when needed |
 | `data/albums/` | Smart albums, one JSON file each: the words and filters, the threshold, what's been pinned or taken out |
@@ -374,6 +408,7 @@ thing, and they only import downwards in this list:
 | `explore.py` | Galaxy, time machine, rediscover, calendar, games, photo math, on this day |
 | `photos_app.py` | Everything that talks to the Photos app or iCloud (in a separate process) |
 | `albums.py`, `dupes.py` | Smart albums; tidying up near-duplicates |
+| `dates.py` | The date detective: grouping undated photos, their clues, and the dates you give them |
 | `evals.py` | `photosearch eval`: comparing two variants of the index, judged blind (searches in `eval_queries.txt`) |
 | `lan.py`, `server.py` | Phones on the home Wi-Fi; the web server and its API |
 

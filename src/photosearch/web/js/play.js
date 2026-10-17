@@ -24,10 +24,13 @@ function playMenu() {
     <div class="cards">
       ${Object.entries(GAMES).map(([m, g]) => `<div class="card" data-mode="${m}" style="--art:${g.art}"><div class="collage"></div><span class="glyph">${g.glyph}</span><h3>${g.name}</h3>
         <p>${g.text}</p><p style="margin-top:10px"><b>Best: ${best[m] ?? "–"}</b> / 1000</p></div>`).join("")}
+      <div class="card" id="detcard" style="--art:linear-gradient(180deg, transparent 10%, rgba(40,70,40,.55) 45%, #142414 82%)"><div class="collage"></div><span class="glyph">🕵️</span><h3>Date Detective</h3>
+        <p>Photos without a real date. Your answer becomes the date.</p></div>
       <a class="card" href="#math" style="--art:linear-gradient(180deg, transparent 10%, rgba(110,25,70,.55) 45%, #2c0d1f 82%)"><div class="collage"></div><span class="glyph">∑</span><h3>Photo Math</h3>
         <p>This photo + snow − summer = ?</p></a>
     </div>`;
   $("playroot").querySelectorAll(".card[data-mode]").forEach(c => c.onclick = () => startGame(c.dataset.mode));
+  $("detcard").onclick = () => detective();
   $("playroot").querySelector(".players").onclick = e => {
     const k = e.target.dataset.k; if (k == null) return;
     const ps = players(); ps.splice(+k, 1); store.set("players", ps); playMenu();
@@ -153,6 +156,65 @@ function endGame() {
     <p style="display:flex;gap:8px;margin-top:22px"><button id="again">Play again</button><button class="ghost" id="menu">Other game</button></p>`;
   $("again").onclick = () => startGame(mode);
   $("menu").onclick = playMenu;
+}
+
+/* ---------- date detective: photos whose date in Photos is a placeholder ---------- */
+const DT = { skip: [], g: null, out: new Set() };
+const MONTH_NAMES = Array.from({ length: 12 }, (_, k) => new Date(2000, k, 1).toLocaleDateString(undefined, { month: "long" }));
+async function detective(done) {
+  P.mode = "detective"; scrollTo(0, 0);
+  let r;
+  try { r = (await api("/api/undated", { skip: DT.skip.join("|") })).results; }
+  catch (e) { $("playroot").innerHTML = `<p>${esc(e.message)}</p>`; return; }
+  const g = DT.g = r.group; DT.out = new Set();
+  const head = `<div class="ghead"><span>Date Detective</span><span class="sp"></span>
+    <span>${r.left ? `${r.left.toLocaleString()} photos left, in ${r.groups} groups` : ""}</span><a href="#play" id="quit">done</a></div>`;
+  if (!g) {
+    $("playroot").innerHTML = head + `<h2 class="ask">Every photo has a date.</h2>${done || ""}`;
+    $("quit").onclick = e => { e.preventDefault(); playMenu(); }; return;
+  }
+  const shown = g.photos.slice(0, 24), more = g.photos.length - shown.length;
+  const y0 = g.guess?.year || new Date().getFullYear(), m0 = g.guess?.month || 0;
+  $("playroot").innerHTML = head + `
+    ${done ? `<div class="reveal dtdone">${done}</div>` : ""}
+    <h2 class="ask">When were these taken?</h2>
+    <p class="status">${g.album ? `The album “${esc(g.album)}”` : "Photos that look alike, with no album to go on"} · ${g.photos.length} photo${g.photos.length > 1 ? "s" : ""} · tap one to leave it out</p>
+    <div class="dtgrid">${shown.map((x, k) => `<figure data-k="${k}"><img src="/thumb/${x.uuid}.jpg" alt="" loading="lazy"></figure>`).join("")}</div>
+    ${more ? `<p class="status">and ${more} more from the same album</p>` : ""}
+    <div id="play-area" class="dtarea">
+      <div><h3>Clues</h3><ul class="clues">${g.clues.map(c => `<li>${esc(c)}</li>`).join("") || "<li>None.</li>"}</ul>
+        ${g.alike.length ? `<h3>It looks like these</h3><div class="dtalike">${g.alike.map(x => `<figure><img src="/thumb/${x.uuid}.jpg" alt=""><figcaption>${photoDate(x, { month:"short", year:"numeric" })}</figcaption></figure>`).join("")}</div>` : ""}</div>
+      <div id="guess">
+        <div id="bigyear">${y0}</div>
+        <div class="dtyear"><button class="ghost" data-d="-1" aria-label="a year earlier">‹</button>
+          <input type="range" id="yr" min="1950" max="${new Date().getFullYear()}" value="${y0}"><button class="ghost" data-d="1" aria-label="a year later">›</button></div>
+        <select id="mo"><option value="0">Month: don't know</option>${MONTH_NAMES.map((n, k) => `<option value="${k + 1}"${k + 1 === m0 ? " selected" : ""}>${n}</option>`).join("")}</select>
+        ${g.guess ? `<p class="status">My guess, from ${esc(g.guess.how)}.</p>` : ""}
+        <button id="go"></button>
+        <button class="ghost" id="skip">Skip: I don't know</button>
+      </div>
+    </div>`;
+  const count = () => { const n = g.photos.length - DT.out.size; $("go").textContent = `Date ${n === 1 ? "this photo" : `these ${n} photos`}`; $("go").disabled = !n; };
+  count();
+  $("playroot").querySelector(".dtgrid").onclick = e => {
+    const f = e.target.closest("figure"); if (!f) return;
+    const u = shown[+f.dataset.k].uuid; DT.out.has(u) ? DT.out.delete(u) : DT.out.add(u);
+    f.classList.toggle("out", DT.out.has(u)); count();
+  };
+  $("yr").oninput = () => { $("bigyear").textContent = $("yr").value; };
+  $("playroot").querySelectorAll(".dtyear button").forEach(b => b.onclick = () => { $("yr").value = +$("yr").value + +b.dataset.d; $("yr").oninput(); });
+  $("quit").onclick = e => { e.preventDefault(); playMenu(); };
+  $("skip").onclick = () => { DT.skip.push(g.id); detective(); };
+  $("go").onclick = async () => {
+    const uuids = g.photos.map(x => x.uuid).filter(u => !DT.out.has(u)), year = +$("yr").value, month = +$("mo").value || null;
+    $("go").disabled = true;
+    try { await post("/api/undated", { uuids, year, month }); }
+    catch (e) { $("go").textContent = e.message; return; }
+    const when = month ? `${MONTH_NAMES[month - 1]} ${year}` : year;
+    detective(`Dated ${uuids.length} photo${uuids.length > 1 ? "s" : ""} to ${when}. <a href="#play" id="dtundo" data-u="${uuids.join(",")}">Undo</a>`);
+  };
+  const un = $("dtundo");
+  if (un) un.onclick = async e => { e.preventDefault(); await post("/api/undated_undo", { uuids: un.dataset.u.split(",") }); detective("Undone: back to no date."); };
 }
 
 function loadLeaflet() {

@@ -149,7 +149,7 @@ def on_this_day(con, day=None, per_year=4):
             if center >= today:
                 continue
             a, b = (center - timedelta(days=window)).isoformat(), (center + timedelta(days=window)).isoformat()
-            picks = highlights(con, a, b, per_year)
+            picks = highlights(con, a, b, per_year, exact=True)  # a guessed month isn't this day
             if picks:
                 t = next((t for t in found if t["start"] <= center.isoformat() <= t["end"]), None)
                 out.append(dict(year=y, ago=today.year - y, date=center.isoformat(), photos=picks,

@@ -20,12 +20,17 @@ def db():
     if "geo" not in cols:
         con.execute("alter table photos add column geo text")
     con.execute("create table if not exists meta(key text primary key, value text)")
+    # dates I gave photos whose date in Photos is a placeholder (dates.py), with the date Photos has
+    con.execute("""create table if not exists redated(uuid text primary key, date text, photos_date text,
+                   precision text, how text, at text)""")
     return con
 
 
 # Timestamps shared by 50+ photos aren't real dates: scans, or a camera whose clock was reset (here 1,042 photos
-# say 2002-01-01 00:00). Year-based features (time machine, games, year in review) leave these out.
-DATED = "date not in (select date from photos group by date having count(*) >= 50)"
+# say 2002-01-01 00:00). Year-based features (time machine, games, year in review) leave these out. Photos I've
+# dated (dates.py) have a new date, and their old one stays a placeholder however few photos are left on it.
+DATED = ("date not in (select date from photos group by date having count(*) >= 50 "
+         "union select photos_date from redated)")
 
 
 def load_matrix(con, where="", params=()):
@@ -81,10 +86,11 @@ def aspect(uuid):
 
 
 def photo_info(con, uuids):
-    rows = con.execute(f"select uuid, date, kind, place, persons, lat, lon, not ({DATED}) from photos where uuid in "
-                       f"({','.join('?' * len(uuids))})", list(uuids))
+    rows = con.execute(f"select uuid, date, kind, place, persons, lat, lon, not ({DATED}), "
+                       f"(select precision from redated r where r.uuid = photos.uuid) from photos where uuid in ({','.join('?' * len(uuids))})", list(uuids))
     return {r[0]: dict(uuid=r[0], date=r[1][:10], kind=r[2], place=r[3], persons=json.loads(r[4]), lat=r[5], lon=r[6],
-                       ar=aspect(r[0]), **({"undated": True} if r[7] else {})) for r in rows}
+                       ar=aspect(r[0]), **({"undated": True} if r[7] else {}),
+                       **({"approx": r[8]} if r[8] in ("month", "year") else {})) for r in rows}
 
 
 def vec_of(con, uuid):
