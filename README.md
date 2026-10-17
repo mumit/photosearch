@@ -160,9 +160,17 @@ sounds (talking, background noise, `SOUND_BASE` in `videos.py`), because a loud 
 close to every sound. `SOUND_AT` then sets where a sound match ranks among photos. Searching for photos like a photo
 (✦ Looks like this) uses frames, not sound.
 
-**How `SOUND_AT` is set.** By ear: the top sound matches for a dozen searches, played back without their scores,
-marked as heard or not. The marks go in `data/sound-marks.json`. (Not done yet: today's value is a first guess.) Adding videos doesn't need this again. A new model,
-or a change to `SOUND_BASE`, does.
+**How `SOUND_AT` is set.** By ear. For 12 searches ("people laughing", "a dog barking", "waves crashing on a
+beach"), the sound matches ranked 1 to 4, 8 and 16 were played back in random order, without their scores, and each
+was marked as the searched sound, something else, or can't tell. The marks are in `data/sound-marks.json`. Then each
+value of `SOUND_AT` was tried, counting the heard videos in each search's top 24 that were marked right or wrong.
+At 0.59 there were 19 right and 6 wrong; at 0.62, the first guess, 24 right and 18 wrong. Adding videos doesn't need
+this again. A new model, or a change to `SOUND_BASE`, does.
+
+**What it hears well, and what it doesn't.** Happy Birthday, laughing, clapping and cheering, and music come up
+by sound. The model hears the kind of sound more than its source: kids shouting matched "a dog barking", people
+singing matched "birds singing", and a fairground ride matched "fireworks". So no single score tells a right sound
+from a wrong one across searches. A wrong match for one search can score higher than a right one for another.
 
 ### Search and play in the browser
 
@@ -537,8 +545,12 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
   sounds (a weather forecast, "happy birthday", beeps, noise) each scored highest on their own description. Text and
   image vectors are the same with the audio encoder loaded or not. On 50 videos, a matching sound stood out from
   everyday home-video sounds by +0.09 to +0.19 (Happy Birthday over a cake, laughing on a couch). A trampoline park
-  or stadium was close to every sound until that adjustment. Where a sound ranks among photos (`SOUND_AT`) is a first
-  guess, not yet judged by ear.
+  or stadium was close to every sound until that adjustment. Judged by ear (72 clips from the 752 videos, 12
+  searches): 38 right, 33 wrong, 1 can't tell. The score separated right from wrong only a little (0.62, where 0.5
+  is chance), because each search's scores sit at their own level: "a baby crying" got six wrong matches at +0.10 to
+  +0.12, and "music playing" six right ones at +0.03 to +0.05. Scoring each sound against all sounds for that search,
+  or adding "children playing" to `SOUND_BASE`, didn't help. `SOUND_AT` = 0.59 keeps most of the right ones in the
+  top 24 and drops most of the wrong ones; "a dog barking" still brings up kids shouting.
 - Some photos (very dark, very plain) score fairly high for any query. A CSLS-style penalty using Apple's labels as a
   query bank was tried on ~5k photos and made results worse (it boosted documents and handwriting), so search uses
   plain cosine.

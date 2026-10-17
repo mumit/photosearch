@@ -5,7 +5,8 @@ seconds, so "people singing Happy Birthday" finds the video and the moment it ha
 Sound vectors land in the same space as text and images, but a noisy clip (a trampoline park, a stadium) is close to
 every sound, so a sound counts by how much closer it is to the search than to SOUND_BASE, the everyday sounds of home
 videos. Measured on 48 videos: a match stood out by +0.09 to +0.19 (Happy Birthday over a cake, laughing on a couch),
-others by about 0. SOUND_AT puts a +0.06 sound about where the best 0.1% of photos are.
+others by about 0. SOUND_AT was set by ear (data/sound-marks.json): at 0.59, the heard videos in the top 24 of 12
+searches were 19 right and 6 wrong, all 6 "a dog barking" (kids shouting). At 0.62, wrong ones flooded in.
 
 Most videos live only in iCloud. With --icloud they're downloaded through PhotoKit (~2 s each), which leaves the
 original in the Photos library as `photosearch fetch` does; nothing in the library changes. Only frames are kept here.
@@ -24,7 +25,7 @@ FRAME_EVERY = 3  # seconds between frames
 FRAME_EMBED_PX = 768  # what the model sees of a frame; the kept copy is THUMB_PX
 SOUND_WIN = 10  # seconds of sound per vector, so a long video says when
 RATE = 16000  # the model wants mono 16 kHz
-SOUND_AT = 0.62
+SOUND_AT = 0.59
 SOUND_BASE = ["people talking", "background noise", "a room", "voices", "a sound", "someone speaking",
               "noise outdoors", "a video"]
 
@@ -95,6 +96,7 @@ def local_file(p):
     return None
 
 
+VIDEO_FILES = (".mov", ".mp4", ".m4v", ".3gp", ".3g2", ".avi", ".mpg", ".mts")  # 3gp: 2010 phones
 DOWNLOAD_BATCH = 25  # videos per downloading process; each holds at most this many files at once
 
 
@@ -132,8 +134,8 @@ def cmd_download_videos(a):
             # the original, even of an edited video: PhotoKit rendering an edit crashed the process every time
             r = PhotoExporter(p).export(str(d), options=ExportOptions(download_missing=True, use_photokit=True,
                                                                       edited=False, timeout=300))
-            f = [x for x in r.exported if Path(x).suffix.lower() in (".mov", ".mp4", ".m4v")]
-            print(f"{u} ok {f[0]}" if f else f"{u} {r.error or 'nothing exported'}", flush=True)
+            f = [x for x in r.exported if Path(x).suffix.lower() in VIDEO_FILES]
+            print(f"{u} ok {f[0]}" if f else f"{u} {r.error or 'nothing exported'} {[Path(x).name for x in r.exported]}", flush=True)
         except Exception as ex:
             print(f"{u} {ex.__class__.__name__}: {ex}"[:300], flush=True)
 
