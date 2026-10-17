@@ -4,19 +4,7 @@ What to build next, in order. Move an item to **Done** when it ships, with its c
 
 ## Next
 
-### 1. Evaluation harness: `photosearch eval`
-
-Turn the vision-token test into a command:
-- a fixed set of searches;
-- blind side-by-side sheets of two settings' top results, in random order;
-- a judge: me, or Claude through MCP;
-- a score written to the README's Measurements.
-
-Every later experiment then gets a number. `tools/rank_test.py` is the starting point.
-
-**Done when:** `photosearch eval A B` compares two indexes or settings, and the vision-token numbers can be reproduced with it.
-
-### 2. Date detective
+### 1. Date detective
 
 1,042 photos carry a placeholder date (2002-01-01). They're missing from On this day, Time Machine, stories, Guess the Year and the galaxy's years.
 
@@ -29,13 +17,13 @@ Then play the best guesses as Guess the Year with real stakes: my answer becomes
 
 **Done when:** most undated photos have a confirmed or confident date, and the features above include them.
 
-### 3. Clutter and sensitive-photo sweep
+### 2. Clutter and sensitive-photo sweep
 
 Find screenshots, receipts, accidental pocket shots, ID cards and other documents. Put them in a review album in Photos, as Tidy up does. Nothing is deleted.
 
 **Done when:** a Tidy up section lists them by kind, and sends a chosen kind to an album.
 
-### 4. Real video search
+### 3. Real video search
 
 - Embed each video's audio with the model's audio encoder (skipped today), so "laughing", "Happy Birthday being sung" or "waves" find videos. Check first that audio vectors land in the same space as text and images.
 - Embed several frames per video, so a search can open a long clip at the right moment.
@@ -45,11 +33,12 @@ Find screenshots, receipts, accidental pocket shots, ID cards and other document
 
 ## Later
 
-**Experiments with the model** (measure each with the harness):
+**Experiments with the model** (measure each with `photosearch eval`):
 - **Shorter or compressed vectors:** check whether the vectors can be cut to 256 numbers, or stored as int8 or 1-bit, and what that costs.
 - **Other languages:** EmbeddingGemma is multilingual; test searches in other languages.
 - **"Why did this match?":** cover parts of a photo one at a time, re-score it, and show a heat map.
 - **Learn from ✕ and ☆:** train a small adjustment applied to every search from smart-album feedback.
+- **Judge eval sheets in the web page or through MCP,** not only with `photosearch eval score`.
 - **Quick first index:** 70 tokens first, so search works in about 30 minutes, then upgrade to 280.
 
 **Fun:**
@@ -66,5 +55,6 @@ Find screenshots, receipts, accidental pocket shots, ID cards and other document
 
 ## Done
 
+- `photosearch eval`: compares two variants of the index (vision tokens, shorter or compressed vectors, another index), with blind sheets to judge. It reproduced the vision-token numbers.
 - Vision tokens judged by eye: 70 is 4.7× faster and only slightly worse (552f91d).
 - Writing to the main library tested: `album` from the terminal, `make_album` through Claude, Copy to Photos and Send the extras.

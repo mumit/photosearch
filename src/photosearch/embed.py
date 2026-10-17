@@ -17,10 +17,15 @@ def model():
         # bf16 is safe for this model; float16 is not (per model card). Audio encoder not needed.
         _model = SentenceTransformer(MODEL, device=dev, config_kwargs={"audio_config": None},
                                      model_kwargs={"torch_dtype": torch.bfloat16 if dev == "mps" else torch.float32})
-        proc = _model[0].processor
-        proc.image_seq_length = proc.image_processor.image_seq_length = VISION_TOKENS
-        proc.image_processor.max_soft_tokens = VISION_TOKENS
+        set_vision_tokens(_model, VISION_TOKENS)
     return _model
+
+
+def set_vision_tokens(m, n):
+    """How many tokens each image becomes from now on (the index records it; `photosearch eval` compares others)."""
+    proc = m[0].processor
+    proc.image_seq_length = proc.image_processor.image_seq_length = n
+    proc.image_processor.max_soft_tokens = n
 
 
 _model_lock = threading.Lock()  # the web server answers in parallel; torch on MPS crashes the process if two threads encode at once

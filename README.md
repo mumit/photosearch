@@ -295,7 +295,6 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 | `src/photosearch/web/` | The web page: `index.html`, `app.css`, one script per view in `js/`, and `review.html`, the story player (also used for the one-file export) |
 | `tests/` | The tests and the made-up library they run on (see [Tests](#tests)) |
 | `tools/director/`, `tools/launch/` | Recording and cutting a demo video from a separate demo library (see [Demo videos](#demo-videos)) |
-| `tools/rank_test.py` | Measures how 70 vision tokens changes search rankings (see [Measurements](#measurements)) |
 | `AGENTS.md`, `CLAUDE.md` | Notes for coding agents working on photosearch |
 | `ROADMAP.md` | What to build next, in order |
 | `data/reviews/` | Saved story picks and captions, one JSON file per year (`2025.json`) or trip (`trip-2024-05-02.json`) |
@@ -375,6 +374,7 @@ thing, and they only import downwards in this list:
 | `explore.py` | Galaxy, time machine, rediscover, calendar, games, photo math, on this day |
 | `photos_app.py` | Everything that talks to the Photos app or iCloud (in a separate process) |
 | `albums.py`, `dupes.py` | Smart albums; tidying up near-duplicates |
+| `evals.py` | `photosearch eval`: comparing two variants of the index, judged blind (searches in `eval_queries.txt`) |
 | `lan.py`, `server.py` | Phones on the home Wi-Fi; the web server and its API |
 
 The web page has no build step: plain scripts that share one global scope, loaded in order by `index.html`, and re-read
@@ -403,6 +403,26 @@ its own data folder (`PHOTOSEARCH_DATA=data-demo uv run photosearch index`) and 
 demo-check data` checks that nothing from your own library shows. [`tools/launch/README.md`](tools/launch/README.md)
 has the whole reshoot: recording the web app and Claude Code, checking every photo the takes show, and cutting the video.
 
+### Experiments: `photosearch eval`
+
+To see whether a change to the index makes search better or worse, compare it with the index on a random sample:
+
+```bash
+uv run photosearch eval run tokens70 tokens=70 --speed 200   # re-embed 2,000 photos at 70 vision tokens
+```
+
+Other variants: `dims=256` (the vectors cut short), `bits=1` or `bits=8` (compressed vectors), `index=PATH` (another
+index of the same library). The run prints how much the two agree over 50 searches. It also writes one blind sheet per
+search to `data/eval/<name>/sheets/`, with each variant's top 5 as rows X and Y in random order. Judge each sheet by
+noting which photos fit the search, and which row's first photo fits better:
+
+```bash
+uv run photosearch eval score tokens70 7 --x 1,2,4 --y 1,3 --first x
+uv run photosearch eval report tokens70     # unblinded: which variant's photos fit better
+```
+
+An agent that can look at images can do the judging too (give it `--judge claude`, so scores stay separate).
+
 ### Measurements
 
 Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 videos, 13.3k originals in iCloud only):
@@ -427,7 +447,8 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
   That measures agreement, not quality, so the same top 5s were also judged by eye, blind (the two settings in random
   order). At 280 tokens, 194 of the 250 photos fit the search; at 70, 187. Where the first photo differed (28
   searches), it was about as good in 22, better at 280 in 4 and better at 70 in 2. So 70 tokens mostly reorders
-  results and is only slightly worse. One judge (Claude) scored a 2,000-photo sample; a full library has more close
+  results and is only slightly worse. Judging the same sample again with `photosearch eval` (new blind order) gave 192
+  and 185, and the same 4, 2 and 22. One judge (Claude) scored a 2,000-photo sample; a full library has more close
   calls.
 - The "photo anchor" published by pastel-labs on Hugging Face only matters for 1- or 4-bit compressed vectors. It isn't needed at this size.
 

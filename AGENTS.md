@@ -17,11 +17,11 @@ Read this before working on photosearch. [README.md](README.md) covers what the 
 | Path | What it is |
 |---|---|
 | `src/photosearch/` | The package. `cli.py` has the commands, `server.py` the web app, `mcp_server.py` the tools Claude uses, `embed.py` the model. |
+| `src/photosearch/evals.py` | `photosearch eval`: measures a change to the index (vision tokens, shorter or compressed vectors), judged blind. Use it for any experiment with the model. |
 | `src/photosearch/web/` | The page: `index.html`, `app.css`, `js/*.js`. Re-read on every request, so no build step. |
 | `tests/` | pytest, on a made-up library with a fake model. |
 | `tools/director/` | Records the web app in headless Chrome from a storyboard. |
 | `tools/launch/` | Reshoots the launch video. Its README is the step-by-step guide. |
-| `tools/rank_test.py` | Measures how 70 vision tokens changes rankings (the numbers in the README). |
 | `data/` | My index, thumbnails and logs. Git-ignored and personal. |
 | `data-demo/` | The demo library's index and launch takes. Git-ignored. |
 

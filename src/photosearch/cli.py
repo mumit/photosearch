@@ -8,6 +8,7 @@
   photosearch today [--day 08-14]                       photos from this day in earlier years
   photosearch trips                                     trips, found from where photos were taken
   photosearch review 2025|trip-2024-05-02 [--export F.html]   a year or a trip as a slideshow
+  photosearch eval run NAME tokens=70 | score | report   compare two variants of the index, judged blind
 
 Nothing is downloaded from iCloud: with "Optimize Mac Storage" on we embed the
 local preview Photos keeps (the model only sees ~280 visual tokens anyway).
@@ -25,6 +26,7 @@ from .stories import REVIEWS, auto_review, date_range, load_review, render_revie
 from .photos_app import add_now, cmd_add_to_album, cmd_fetch, fetch_large, needs_fetch
 from .server import cmd_serve
 from .demo import cmd_demo_check
+from .evals import cmd_eval
 
 
 def cmd_album(a):
@@ -118,6 +120,22 @@ def main():
     p.add_argument("story", help="a year (2025) or a trip id from `photosearch trips` (trip-2024-05-02)")
     p.add_argument("--auto", action="store_true", help="rebuild the automatic version")
     p.add_argument("--export", metavar="FILE.html"); p.set_defaults(fn=cmd_review)
+    p = sub.add_parser("eval", help="compare two variants of the index on a sample: how much they agree, and blind sheets to judge")
+    ev = p.add_subparsers(dest="what", required=True)
+    q = ev.add_parser("run", help="compare variant B (tokens=70, dims=256, bits=1, index=PATH) with A on a sample")
+    q.add_argument("name"); q.add_argument("b"); q.add_argument("--a", default="index", help="default: this index as it is")
+    q.add_argument("--photos", type=int, default=2000); q.add_argument("--seed", type=int, default=7)
+    q.add_argument("-k", type=int, default=5, help="photos per row on the sheets")
+    q.add_argument("--queries", help="a file of searches, one per line (default: the built-in 50)")
+    q.add_argument("--speed", type=int, default=0, metavar="N", help="with tokens=: also time N photos at both settings")
+    q = ev.add_parser("score", help="record which photos on a sheet fit its search")
+    q.add_argument("name"); q.add_argument("n", type=int, help="the sheet's number")
+    q.add_argument("--x", default="", help="numbers of row X's photos that fit, e.g. 1,2,4")
+    q.add_argument("--y", default="", help="the same for row Y")
+    q.add_argument("--first", default="same", choices=["x", "y", "same"], help="whose first photo fits better")
+    q.add_argument("--judge", default="me")
+    q = ev.add_parser("report", help="the results, unblinded"); q.add_argument("name")
+    p.set_defaults(fn=cmd_eval)
     a = ap.parse_args()
     if getattr(a, "vision_tokens", None):
         embed.VISION_TOKENS = a.vision_tokens
