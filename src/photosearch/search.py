@@ -1,7 +1,7 @@
 """Search by words or by example, with filters, and how interesting each photo looks."""
 import numpy as np
 
-from . import embed
+from . import embed, videos
 from .store import photo_info, vec_of, vectors
 
 
@@ -29,14 +29,25 @@ def filtered(con, person=None, after=None, before=None, kind=None, place=None, m
     return keep, M[[pos[u] for u in keep]]
 
 
-def rank(con, qvec, k, **filters):
+def rank(con, qvec, k, sounds=False, **filters):
+    """A video scores by its best moment (videos.py): a later frame, or with sounds, what's heard. at: when."""
     uuids, M = filtered(con, **filters)
     if not uuids:
         return []
-    scores = M @ qvec
+    scores, at = M @ qvec, {}
+    if filters.get("kind") != "photo":
+        mo = videos.moments(con, qvec, sounds)
+        if mo:
+            pos = {u: i for i, u in enumerate(uuids)}
+            for u, (s, t, heard, frame) in mo.items():
+                i = pos.get(u)
+                if i is not None and s > scores[i]:
+                    scores[i] = s
+                    if t or heard:  # the first frame is the poster
+                        at[u] = dict(at=t, heard=heard, frame=frame)
     top = np.argsort(-scores)[:k]
     info = photo_info(con, [uuids[i] for i in top])
-    return [dict(info[uuids[i]], score=float(scores[i])) for i in top]
+    return [dict(info[uuids[i]], score=float(scores[i]), **at.get(uuids[i], {})) for i in top]
 
 
 EXCLUDE_W = 0.5  # how hard `exclude` pushes away; tested on "group photos at a party" minus "a selfie"
@@ -49,7 +60,7 @@ def search(con, query, k=24, exclude=None, **f):
         q = q - EXCLUDE_W * embed.embed_query(x)
     if exclude:
         q = (q / np.linalg.norm(q)).astype(np.float32)
-    return rank(con, q, k, **f)
+    return rank(con, q, k, sounds=True, **f)
 
 
 def similar(con, uuid, k=24, **f):

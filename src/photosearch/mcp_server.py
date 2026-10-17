@@ -25,7 +25,7 @@ SHEET_MAX, CELL = 30, 200
 
 
 def tidy(results):
-    return [{k: (round(v, 3) if k == "score" else v) for k, v in r.items() if v not in ("", [], None) and k not in ("lat", "lon")}
+    return [{k: (round(v, 3) if k == "score" else v) for k, v in r.items() if v not in ("", [], None) and k not in ("lat", "lon", "frame")}
             for r in results]
 
 
@@ -39,6 +39,8 @@ def search_photos(query: str, exclude: str | None = None, people: list[str] | No
     people: names that must all appear (substring match on the names tagged in Photos).
     place: substring of the place name, e.g. "Portland" or "Lisbon". after/before: ISO dates (YYYY-MM-DD).
     Scores only mean something relative to each other within one query.
+    Videos also match by what's heard in them ("people singing Happy Birthday", "a dog barking") and by later
+    frames, once `photosearch videos` has read them: then "at" is the moment in seconds, and "heard" says it was a sound.
     """
     return tidy(search.search(con, query, min(limit, 200), exclude, person=people, place=place, after=after, before=before, kind=kind))
 

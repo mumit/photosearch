@@ -1,5 +1,5 @@
 """`photosearch serve`: the web page and its API."""
-import json, sys, time
+import json, re, sys, time
 from datetime import date
 from pathlib import Path
 
@@ -19,8 +19,11 @@ from .albums import album_preview, album_to_photos, album_view, albums, delete_a
 from .dupes import DUP_LEVELS, dupes, dupes_choose, dupes_send
 from .clutter import clutter, clutter_choose, clutter_send
 from .dates import next_group, set_date, undo as undo_dates
+from .videos import FRAMES, frame_list
 from .photos_app import Fetcher
 from .lan import LOGIN, LanAccess
+
+VIDEO_FRAME = re.compile(r"[0-9A-F-]{36}/\d{1,6}\.jpg")  # a frame kept by `photosearch videos`
 
 
 def app_icon(px):
@@ -140,6 +143,7 @@ def make_server(a):
            "/api/game": lambda q: game_round(con, q.get("mode", "year")),
            "/api/clutter": lambda q: clutter(con, q.get("kind"), int(q.get("offset", 0)), min(200, int(q.get("limit", 60)))),
            "/api/undated": lambda q: next_group(con, (q.get("skip") or "").split("|")),
+           "/api/frames": lambda q: frame_list(con, q.get("uuid", "")),
            "/api/math": lambda q: photo_math(con, q["base"], q.get("plus", ""), q.get("minus", ""),
                                              float(q.get("w", 1)), int(q.get("k", 24)))}
 
@@ -176,7 +180,7 @@ def make_server(a):
             if u.path == "/login":
                 return self.send(LOGIN.encode(), "text/html; charset=utf-8") if (self.headers.get("host") or "").lower() in allowed \
                     else self.send(b"forbidden", "text/plain", 403)
-            if not self.gate(page=not u.path.startswith(("/api/", "/thumb/", "/photo/"))):
+            if not self.gate(page=not u.path.startswith(("/api/", "/thumb/", "/photo/", "/frame/"))):
                 return
             if u.path == "/api/open" and (demo or not self.local()):
                 return self.send(json.dumps(dict(error="Open in Photos only works on the Mac")).encode(), "application/json", 403)
@@ -193,6 +197,10 @@ def make_server(a):
                 if u.path.startswith("/thumb/"):
                     f = THUMBS / name
                     return self.send(f.read_bytes(), "image/jpeg") if f.exists() else self.send(b"", "text/plain", 404)
+                if u.path.startswith("/frame/"):  # /frame/UUID/SECONDS.jpg: a video's moment
+                    parts = u.path.split("/")
+                    f = FRAMES / parts[2] / parts[3] if len(parts) == 4 and VIDEO_FRAME.fullmatch(parts[2] + "/" + parts[3]) else None
+                    return self.send(f.read_bytes(), "image/jpeg") if f and f.exists() else self.send(b"", "text/plain", 404)
                 if u.path.startswith("/photo/"):
                     return self.send(photo_jpeg(con, name.removesuffix(".jpg")), "image/jpeg")
                 if u.path.startswith("/review/") and STORY_ID.fullmatch(name):

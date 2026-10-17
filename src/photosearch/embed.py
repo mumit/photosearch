@@ -5,19 +5,21 @@ import numpy as np
 
 from .config import MODEL
 
-_model = None
+_model, _audio = None, False
 VISION_TOKENS = 280  # model default; 70 is ~4x faster at some quality cost (70-1120 supported)
 
-def model():
-    global _model
-    if _model is None:
+def model(audio=False):
+    """The model; with audio, the one that can also hear (300M more, so only `photosearch videos` loads it). Both
+    give the same vectors for text and images."""
+    global _model, _audio
+    if _model is None or (audio and not _audio):
         import torch
         from sentence_transformers import SentenceTransformer
         dev = "mps" if torch.backends.mps.is_available() else "cpu"
-        # bf16 is safe for this model; float16 is not (per model card). Audio encoder not needed.
-        _model = SentenceTransformer(MODEL, device=dev, config_kwargs={"audio_config": None},
+        # bf16 is safe for this model; float16 is not (per model card)
+        _model = SentenceTransformer(MODEL, device=dev, config_kwargs={} if audio else {"audio_config": None},
                                      model_kwargs={"torch_dtype": torch.bfloat16 if dev == "mps" else torch.float32})
-        set_vision_tokens(_model, VISION_TOKENS)
+        set_vision_tokens(_model, VISION_TOKENS); _audio = audio
     return _model
 
 

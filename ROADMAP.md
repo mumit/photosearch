@@ -23,6 +23,12 @@ Then play the best guesses as Guess the Year with real stakes: my answer becomes
 
 ### 2. Real video search
 
+**Built, waiting on two things:** `photosearch videos` embeds each video's sound (10 s pieces) and a frame every 3 s.
+Search ranks a video by its best moment and shows it ("🔊 heard at 0:10"). Hovering flips through the frames, and
+the big view has a strip of them. `index` also reads new videos already on the Mac.
+- Run `photosearch videos --icloud` for the other 702. About 75 minutes, and Photos keeps the downloaded originals (38 GB).
+- Judge the top sound matches by ear, and set `SOUND_AT` (where a sound ranks among photos) from that.
+
 - Embed each video's audio with the model's audio encoder (skipped today), so "laughing", "Happy Birthday being sung" or "waves" find videos. Check first that audio vectors land in the same space as text and images.
 - Embed several frames per video, so a search can open a long clip at the right moment.
 - Show a preview when hovering over a video.
@@ -53,7 +59,7 @@ Then play the best guesses as Guess the Year with real stakes: my answer becomes
 
 ## Done
 
-- Clutter and sensitive-photo sweep: Albums → Tidy up → Clutter and private photos lists IDs and cards, screenshots, receipts and papers, and accidental shots, and sends a kind to its own album in Photos. Accidental shots turned out hard: blur and darkness also find dim family photos, so only the clearest (floors, black frames) count. Sending isn't tried on my library yet.
+- Clutter and sensitive-photo sweep: Albums → Tidy up → Clutter and private photos lists IDs and cards, screenshots, receipts and papers, and accidental shots, and sends a kind to its own album in Photos. Accidental shots turned out hard: blur and darkness also find dim family photos, so only the clearest (floors, black frames) count. Sending isn't tried on my library yet (bd7a318).
 - `photosearch eval`: compares two variants of the index (vision tokens, shorter or compressed vectors, another index), with blind sheets to judge. It reproduced the vision-token numbers (de6e9da).
 - Vision tokens judged by eye: 70 is 4.7× faster and only slightly worse (552f91d).
 - Writing to the main library tested: `album` from the terminal, `make_album` through Claude, Copy to Photos and Send the extras.

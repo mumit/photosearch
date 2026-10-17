@@ -25,6 +25,9 @@ def db():
     # dates I gave photos whose date in Photos is a placeholder (dates.py), with the date Photos has
     con.execute("""create table if not exists redated(uuid text primary key, date text, photos_date text,
                    precision text, how text, at text)""")
+    # each video's sound and its later frames (videos.py)
+    con.execute("create table if not exists clips(uuid text, kind text, t real, vec blob, primary key(uuid, kind, t))")
+    con.execute("create table if not exists videos_done(uuid text primary key, frames int, sounds int, error text, at text)")
     return con
 
 

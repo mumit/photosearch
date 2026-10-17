@@ -339,6 +339,11 @@ footer { padding:40px clamp(16px, 4vw, 48px) 48px; color:var(--mut); font-size:1
 #lbppl { display:flex; gap:6px; flex-wrap:wrap; }
 #lbppl a { font-size:12px; padding:4px 10px; border-radius:999px; background:rgba(255,255,255,.1); color:#fff; }
 #lbppl a:hover { background:rgba(255,255,255,.2); }
+#lbfilm { display:flex; align-items:center; gap:4px; max-width:100%; overflow-x:auto; scrollbar-width:none; }
+#lbfilm[hidden] { display:none; }
+#lbfilm span { font-size:12px; color:#ccc; white-space:nowrap; margin-right:4px; }
+#lbfilm img { height:40px; border-radius:4px; opacity:.6; cursor:pointer; flex:none; }
+#lbfilm img.on, #lbfilm img:hover { opacity:1; outline:2px solid #fff; }
 #lbacts { margin-left:auto; display:flex; gap:6px; }
 #lbacts button { background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.14); color:#fff; font-weight:500; font-size:13px; padding:7px 13px; backdrop-filter:blur(10px); }
 #lbacts button:hover { background:rgba(255,255,255,.18); }
@@ -351,11 +356,11 @@ footer { padding:40px clamp(16px, 4vw, 48px) 48px; color:var(--mut); font-size:1
 #lbsims img { height:76px; width:auto; min-width:40px; border-radius:6px; cursor:pointer; opacity:.75; transition:opacity .2s, transform .2s; flex:none; }
 #lbsims img:hover { opacity:1; transform:translateY(-3px); }
 @media (max-width: 760px) {
-  #lbstage { padding:96px 0 0; }
+  #lbstage { padding:var(--lbtop, 96px) 0 0; }  /* below the info, however many lines it takes */
   .lbnav { display:none !important; }
   #lbinfo { right:60px; gap:8px; }
-  #lbacts { margin-left:0; width:100%; }
-  #lbacts button { flex:1; padding:7px 6px; }
+  #lbacts { margin-left:0; width:100%; flex-wrap:wrap; }
+  #lbacts button { flex:1 1 auto; padding:7px 10px; white-space:nowrap; }
 }
 
 /* ---------- map ---------- */

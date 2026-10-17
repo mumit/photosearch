@@ -22,7 +22,7 @@ class NoPhotosOrModel:
 
 sys.meta_path.insert(0, NoPhotosOrModel())
 
-from photosearch import clutter, config, dupes, embed, people, search, smartbox, store  # noqa: E402
+from photosearch import clutter, config, dupes, embed, people, search, smartbox, store, videos  # noqa: E402
 from photosearch import photos_app as photos  # noqa: E402  (the fixture below is called photos_app)
 import library  # noqa: E402
 
@@ -38,6 +38,7 @@ def reset_caches():
     store._vecs = (None, [], np.zeros((0, config.DIM), np.float32), {})
     search._interest = (None, None)
     clutter._found = (None, None)
+    videos._clips = (None,)
     for c in (dupes._dupes, dupes._sharp, dupes._hash, dupes._px, store._ar):
         c.clear()
 
@@ -62,7 +63,7 @@ def offline():
     """For the whole run: the fake model, and no Photos app, iCloud or smart-search service."""
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(embed, "embed_query", fake_embed)
-        mp.setattr(embed, "model", lambda: None)
+        mp.setattr(embed, "model", lambda audio=False: None)
         mp.setattr(photos, "add_to_photos_album", no_photos_app)
         mp.setattr(photos, "fetch_in_subprocess", lambda con, uuids, wait=True: [])
         mp.setattr(smartbox, "jev_key", lambda: None)

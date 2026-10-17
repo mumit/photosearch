@@ -9,6 +9,7 @@ from .config import LARGE, MODEL, THUMBS, THUMB_PX
 from .dates import apply as apply_dates
 from .store import db, photos_db
 from .images import open_image
+from .videos import embed_videos, forget as forget_video
 
 
 def check_settings(con):
@@ -77,6 +78,7 @@ def cmd_index(a):
             con.execute("delete from photos where uuid=?", (u,))
             (THUMBS / f"{u}.jpg").unlink(missing_ok=True)
             (LARGE / f"{u}.jpg").unlink(missing_ok=True)  # and its full-size copy, if one was fetched
+            forget_video(con, u)
         keep = done & lib.keys()
         con.executemany(f"update photos set ({META_COLS}) = ({','.join('?' * N_META)}) where uuid=?",
                         [meta(lib[u]) + (u,) for u in keep])
@@ -121,6 +123,8 @@ def cmd_index(a):
             flush()
     flush()
     print(f"\ndone: {n} embedded, {skipped} skipped (no local preview / unreadable) in {(time.time()-t0)/60:.1f} min")
+    if not a.limit and not a.no_videos:  # new videos already on this Mac: their sound and frames (videos.py)
+        embed_videos(con, pdb)
 
 
 def cmd_thumbs(a):

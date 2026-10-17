@@ -28,7 +28,7 @@ full-size version, which is kept in `data/large/`. See [Photo quality](#photo-qu
 | [uv](https://docs.astral.sh/uv/) | Python package/environment manager | ~40 MB | `~/.local/bin/uv` |
 | Python 3.12 | Installed automatically by uv if missing | ~60 MB | uv's own folder |
 | Python packages | PyTorch, sentence-transformers, transformers, osxphotos, Pillow, pillow-heif, NumPy | ~1 GB | `.venv/` in this repo (backed by `~/.cache/uv`) |
-| **Model: `google/embeddinggemma-2`** | Multimodal embedding model (text + images in one vector space). Apache 2.0, not gated, no account or token needed. Only the text and vision parts are loaded (440M of 740M parameters); the audio encoder is skipped. | ~1.5 GB | `~/.cache/huggingface/hub/` |
+| **Model: `google/embeddinggemma-2`** | Multimodal embedding model (text + images in one vector space). Apache 2.0, not gated, no account or token needed. `index` and search load only the text and vision parts (440M of 740M parameters); `photosearch videos` also loads the audio encoder. | ~1.5 GB | `~/.cache/huggingface/hub/` |
 
 No other models are needed. The repo doesn't use any API keys or cloud services.
 
@@ -124,6 +124,45 @@ uv run photosearch index --vision-tokens 70
 Use one setting for the whole index (it's recorded, and `index` refuses to mix). To switch, delete the `data/` folder and re-index.
 Each run also refreshes people, albums and places for photos already indexed, and drops photos you've deleted.
 
+### Videos: what's heard in them, and later moments
+
+A video's poster frame is embedded like a photo. Photosearch also embeds its sound, in 10-second pieces, and a
+frame every 3 seconds. Then "people singing Happy Birthday", "people laughing" or "a crowd cheering" find videos by
+what's heard, and a search can find something that happens halfway through. A video found this way shows the frame
+from that moment and says when, such as **🔊 heard at 0:10** or **▶ at 0:42**. Hover over any video for a quick
+flip through its frames; in the big view, a strip of its frames sits under the date.
+
+**How a video gets read.** `index` does it for new videos that are already on this Mac, after the photos. Most videos
+live only in iCloud when "Optimize Mac Storage" is on (741 of 753 here), and those wait for `--icloud`:
+
+```bash
+uv run photosearch index              # new photos, then new videos already on this Mac
+uv run photosearch videos --icloud    # also download the videos only in iCloud
+```
+
+For each video:
+
+1. **Get the file.** If it's on this Mac, it's read where it is. With `--icloud`, Photos downloads it (about 2 s
+   each). Photos keeps the downloaded original in its library, as with `fetch`, until it needs the space again. That
+   can be many GB: 38 GB for 753 videos.
+2. **Cut it up.** ffmpeg takes a frame every 3 seconds and the sound as mono 16 kHz, the format the model wants. The
+   sound is cut into 10-second pieces; silent videos and those under a second have none.
+3. **Embed.** The same model turns each frame and each piece of sound into a vector, in the same space as text. This
+   loads the model's audio encoder, which search doesn't need. It takes about 6 s per video, mostly for the frames.
+4. **Keep.** The vectors go in the index (table `clips`), the frames in `data/frames/` (about 25 KB each). The video
+   file isn't kept. A video that couldn't be read (offline, iCloud said no) is tried again on the next run; one
+   that's done isn't read again. Deleting a video in Photos removes its moments at the next `index`.
+
+**How a search uses them.** A video ranks by its best moment: its poster, a later frame, or a piece of sound.
+A frame scores like a photo. A sound scores by how much closer it is to the search than to everyday home-video
+sounds (talking, background noise, `SOUND_BASE` in `videos.py`), because a loud clip, like a trampoline park, is
+close to every sound. `SOUND_AT` then sets where a sound match ranks among photos. Searching for photos like a photo
+(✦ Looks like this) uses frames, not sound.
+
+**How `SOUND_AT` is set.** By ear: the top sound matches for a dozen searches, played back without their scores,
+marked as heard or not. The marks go in `data/sound-marks.json`. (Not done yet: today's value is a first guess.) Adding videos doesn't need this again. A new model,
+or a change to `SOUND_BASE`, does.
+
 ### Search and play in the browser
 
 This doesn't need Claude. From the `photosearch` folder, in any terminal:
@@ -142,7 +181,7 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 | Mode | What it does |
 |---|---|
 | **Home** | Opens on **On this day**: a slow slideshow of today's date in earlier years, most striking first, which trip you were on (with a link to its story), and ‹ › to step through other days (`photosearch today` does the same in the terminal). Below it are shelves: *Rediscover* (random photos worth another look, ↻ to shuffle), the people you've tagged, your trips, ideas to search for, the other modes, *Day by day* (a calendar of the year, each day coloured by how many photos it has; hover for its best photo, click for the day) and your years. Photos that look like documents, screenshots or ID cards are left out. |
-| **Search** | Describe a photo. Results keep their shape, in rows like a photo book, sorted by best match or by date. Picking a person or place from the suggestions shows their most interesting photos. Put what you *don't* want in **without…** (e.g. "selfies"): the model is weak at "no …" inside the description. Every search has its own address, so back and forward work. |
+| **Search** | Describe a photo, or a sound in a video (see [Videos](#videos-whats-heard-in-them-and-later-moments)). Results keep their shape, in rows like a photo book, sorted by best match or by date. Picking a person or place from the suggestions shows their most interesting photos. Put what you *don't* want in **without…** (e.g. "selfies"): the model is weak at "no …" inside the description. Every search has its own address, so back and forward work. |
 | **People** | A page per person tagged in Photos: their best photo from every year (**▶ through the years** plays them in turn), who they're most often photographed with, their places and favourite photos. Portraits are picked by the search model as the closest thing to a close-up of a face. Names anywhere (suggestions, the big photo view) lead here. |
 | **Map** | Everywhere you've been, each place as a pin showing its best photo and how many were taken there. It opens on home; chips along the bottom fly to the other regions (named like trips: "Lisbon", "Sintra & Cascais") or show everywhere. Nearby places merge until you zoom in. Tap a pin for that place's best photos, or **▶ Slideshow** them. Map tiles come from OpenStreetMap (so it needs internet); your photos never leave the Mac. |
 | **Galaxy** | Your whole library on one zoomable map, with similar photos next to each other and colored by year. Scroll to zoom, drag to pan, hover to peek. Type in the search box to see where, say, "beach" lives, and the map glides there; the faces along the bottom light up everyone's photos of one person. **▶** plays the years: the library grows from the first photo, each year's new ones standing out. The first visit takes a minute to lay out the map. |
@@ -334,8 +373,9 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 | `ROADMAP.md` | What to build next, in order |
 | `data/reviews/` | Saved story picks and captions, one JSON file per year (`2025.json`) or trip (`trip-2024-05-02.json`) |
 | `.env` | Optional `TYPESAFE_API_KEY` for ✨ smart search (git-ignored) |
-| `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector. Also the dates you gave photos without a real one (table `redated`, with the date Photos has) |
+| `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector. Also the dates you gave photos without a real one (table `redated`, with the date Photos has), and with `photosearch videos`, a vector for each video's frames and pieces of sound (table `clips`) |
 | `data/thumbs/` | Small JPEG previews for the web page (512 px) |
+| `data/frames/` | With `photosearch videos`: a frame every 3 s of each video (512 px), for showing the moment a search found |
 | `data/large/` | Full-size copies (up to 2560 px) of photos shown big whose local preview was small, fetched from iCloud. Safe to delete; they come back when needed |
 | `data/albums/` | Smart albums, one JSON file each: the words and filters, the threshold, what's been pinned or taken out |
 | `data/cleanup.json`, `data/sharpness.json` | Tidy-up choices (keepers you picked, groups that aren't duplicates, what went to *maybe delete*, photos that aren't clutter, what went to each clutter album), and a cache of how sharp each thumbnail is |
@@ -384,6 +424,9 @@ Don't switch the model to float16: it produces broken vectors (NaNs). The code u
    in the same space (with the prefix `task: search result | query:`).
 3. Search ranks every photo by cosine similarity to the query vector. At this scale that's a few
    milliseconds in NumPy, so no vector database is needed.
+4. With `photosearch videos`, a video ranks by its best moment: its poster, a later frame, or a piece of its sound.
+   Sounds land in the same space as text, but are scored by how much closer they are to the search than to everyday
+   home-video sounds (talking, background noise). Otherwise a loud clip matches every search.
 
 ---
 
@@ -401,6 +444,7 @@ thing, and they only import downwards in this list:
 | `embed.py` | The search model |
 | `images.py` | Reading photos, writing JPEGs, contact sheets |
 | `index.py` | `photosearch index` and `thumbs` |
+| `videos.py` | `photosearch videos`: each video's sound and frames, and its best moment for a search |
 | `search.py` | Search, look-alikes, filters, how interesting a photo looks |
 | `smartbox.py` | The optional ✨ smart search box (Jev) |
 | `places.py` | Home, trips, the map |
@@ -488,6 +532,12 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
   calls.
 - The "photo anchor" published by pastel-labs on Hugging Face only matters for 1- or 4-bit compressed vectors. It isn't needed at this size.
 
+- Sound (`photosearch videos`): the audio encoder's vectors land in the same space as text. Spoken and made-up test
+  sounds (a weather forecast, "happy birthday", beeps, noise) each scored highest on their own description. Text and
+  image vectors are the same with the audio encoder loaded or not. On 50 videos, a matching sound stood out from
+  everyday home-video sounds by +0.09 to +0.19 (Happy Birthday over a cake, laughing on a couch). A trampoline park
+  or stadium was close to every sound until that adjustment. Where a sound ranks among photos (`SOUND_AT`) is a first
+  guess, not yet judged by ear.
 - Some photos (very dark, very plain) score fairly high for any query. A CSLS-style penalty using Apple's labels as a
   query bank was tried on ~5k photos and made results worse (it boosted documents and handwriting), so search uses
   plain cosine.

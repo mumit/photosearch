@@ -81,10 +81,14 @@ addEventListener("keydown", e => {  // "/" or ⌘K: to the search box from anywh
 /* ---------- photo tiles ---------- */
 const clampAr = ar => Math.min(2.4, Math.max(0.55, ar || 1));
 const loaded = "this.classList.add('ok')";
+const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+// A video found by a later moment (`photosearch videos`) shows that moment's frame, and says when, and whether it was heard.
+const tileSrc = x => x.frame != null ? `/frame/${x.uuid}/${x.frame}.jpg` : `/thumb/${x.uuid}.jpg`;
+const vidLabel = x => x.at != null ? `${x.heard ? "🔊 heard" : "▶"} at ${mmss(x.at)}` : "▶ video";
 function tileHTML(x, i, { badge, caption = true } = {}) {
-  return `<figure class="tile" data-i="${i}" style="--ar:${clampAr(x.ar)}">
-    <img loading="lazy" src="/thumb/${x.uuid}.jpg" alt="" onload="${loaded}">
-    ${badge ? `<b class="badge">${esc(badge)}</b>` : ""}${x.kind === "video" ? `<span class="vid">▶ video</span>` : ""}
+  return `<figure class="tile" data-i="${i}" style="--ar:${clampAr(x.ar)}"${x.kind === "video" ? ` data-v="${x.uuid}"` : ""}>
+    <img loading="lazy" src="${tileSrc(x)}" alt="" onload="${loaded}">
+    ${badge ? `<b class="badge">${esc(badge)}</b>` : ""}${x.kind === "video" ? `<span class="vid">${vidLabel(x)}</span>` : ""}
     ${caption ? `<figcaption><span>${photoDate(x, { month:"short", day:"numeric", year:"numeric" })}</span><span>${esc(short(x.place))}</span></figcaption>` : ""}
   </figure>`;
 }
@@ -119,6 +123,18 @@ function bindShelf(el, list, badge) {
   el.innerHTML = list.map((x, i) => tileHTML(x, i, { badge: badge?.(x) })).join("");
   el.onclick = e => { const t = e.target.closest(".tile"); if (t) lightbox(list, +t.dataset.i); };
 }
+// Hovering over a video flips through its frames, a preview without the video file (which may be only in iCloud).
+const framesOf = {};
+const videoFrames = uuid => framesOf[uuid] ??= api("/api/frames", { uuid }).then(r => r.results).catch(() => []);
+document.addEventListener("mouseover", async e => {
+  const t = e.target.closest?.(".tile[data-v]");
+  if (!t || t._flip || !matchMedia("(hover: hover)").matches) return;
+  const img = t.querySelector("img"), back = img.src, fs = await videoFrames(t.dataset.v);
+  if (!fs.length || !t.matches(":hover")) return;
+  let k = 0;
+  t._flip = setInterval(() => { img.src = `/frame/${t.dataset.v}/${fs[k++ % fs.length]}.jpg`; }, 450);
+  t.addEventListener("mouseleave", () => { clearInterval(t._flip); t._flip = 0; img.src = back; }, { once: true });
+});
 const skeleton = (n, w = 1.3) => Array.from({ length: n }, () => `<div class="tile skel" style="aspect-ratio:${w}"></div>`).join("");
 
 /* ---------- lightbox ---------- */
@@ -127,16 +143,18 @@ function lightbox(list, i, keepTrail = false) {
   if (!keepTrail) LB.trail = [];
   LB.list = list; LB.at = i;
   const x = list[i];
-  $("lbimg").src = `/photo/${x.uuid}.jpg`; sharpen($("lbimg"), x.uuid);
+  if (x.frame != null) $("lbimg").src = tileSrc(x);  // the moment that matched; the poster is a tap away in the strip
+  else { $("lbimg").src = `/photo/${x.uuid}.jpg`; sharpen($("lbimg"), x.uuid); }
   $("lbbg").style.backgroundImage = `url(/thumb/${x.uuid}.jpg)`;
   $("lbdate").textContent = x.undated ? "Date unknown" : photoDate(x);
   $("lbplace").innerHTML = x.place ? `<a data-place="${esc(short(x.place))}" title="more from here">${esc(x.place)}</a>` : "";
   $("lbppl").innerHTML = (x.persons || []).map(p => `<a data-person="${esc(p)}" title="${esc(p)}'s page">${esc(p)}</a>`).join("");
   $("lbday").hidden = !!(x.undated || x.approx);
+  filmstrip(x);
   $("lbprev").style.visibility = i > 0 ? "" : "hidden"; $("lbnext").style.visibility = i < list.length - 1 ? "" : "hidden";
   $("lbpos").textContent = list.length > 1 ? `${i + 1} of ${list.length}` : "";
   $("lbtrail").innerHTML = LB.trail.map((t, k) => `<img src="/thumb/${t.uuid}.jpg" data-k="${k}" title="back to here">`).join("");
-  $("lb").classList.add("on");
+  $("lb").classList.add("on"); lbTop();
   clearTimeout(LB.timer); LB.timer = setTimeout(() => loadSims(x), 220);  // not on every arrow press while flicking through
 }
 LB.mode = store.get("wander", "like");
@@ -156,6 +174,23 @@ async function loadSims(x) {
     $("lbsims").innerHTML = r.map((s, k) => `<img src="/thumb/${s.uuid}.jpg" data-k="${k}" style="width:${(76 * clampAr(s.ar)).toFixed(0)}px" alt="">`).join("");
   } catch {}
 }
+// A video's frames under it in the lightbox (phones can't hover): the moment that matched is marked, and tapping a frame shows it.
+async function filmstrip(x) {
+  const el = $("lbfilm"); el.innerHTML = ""; el.hidden = true;
+  if (x.kind !== "video") return;
+  const fs = await videoFrames(x.uuid);
+  if (LB.list[LB.at] !== x || !fs.length) return;
+  el.innerHTML = (x.at != null ? `<span>${vidLabel(x)}</span>` : "") +
+    fs.map(t => `<img src="/frame/${x.uuid}/${t}.jpg" data-t="${t}" title="${mmss(t)}" class="${t === x.frame ? "on" : ""}" alt="">`).join("");
+  el.hidden = false; lbTop();
+}
+// On a phone the info sits above the photo, and names, a filmstrip and the buttons can take several lines.
+const lbTop = () => $("lb").style.setProperty("--lbtop", `${$("lbinfo").offsetHeight + 28}px`);
+$("lbfilm").onclick = e => {
+  const im = e.target.closest("img[data-t]"); if (!im) return;
+  $("lbfilm").querySelectorAll("img").forEach(i => i.classList.toggle("on", i === im));
+  $("lbimg").src = im.src;
+};
 function lbOff() { $("lb").classList.remove("on"); LB.simsFor = null; }
 $("lbclose").onclick = lbOff;
 $("lbmode").onclick = e => {

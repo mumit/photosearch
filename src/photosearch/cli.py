@@ -1,6 +1,6 @@
 """photosearch: semantic search over an Apple Photos library with EmbeddingGemma 2.
 
-  photosearch index [--limit N] [--library PATH]        embed photos (incremental; safe to re-run)
+  photosearch index [--limit N] [--library PATH]        embed photos, and new videos on this Mac (incremental)
   photosearch search "kids on a slide" [-k 24] [--person NAME] [--after 2020-01-01] [--before ...]
   photosearch similar UUID [-k 24]                      photos that look like this one
   photosearch serve [--port 8765] [--lan]               the web page: search, map, galaxy, time machine, games, albums
@@ -10,9 +10,11 @@
   photosearch review 2025|trip-2024-05-02 [--export F.html]   a year or a trip as a slideshow
   photosearch eval run NAME tokens=70 | score | report   compare two variants of the index, judged blind
   photosearch dates [set GROUP 2007-01 | undo GROUP|all]  date the photos whose date is a placeholder
+  photosearch videos [--icloud] [--limit N]             embed each video's sound and a frame every 3 s
 
 Nothing is downloaded from iCloud: with "Optimize Mac Storage" on we embed the
 local preview Photos keeps (the model only sees ~280 visual tokens anyway).
+Only `videos --icloud` downloads (videos), and `fetch` (full-size photos).
 """
 import argparse, json, sys
 from pathlib import Path
@@ -28,6 +30,7 @@ from .photos_app import add_now, cmd_add_to_album, cmd_fetch, fetch_large, needs
 from .server import cmd_serve
 from .demo import cmd_demo_check
 from .evals import cmd_eval
+from .videos import cmd_videos
 from .dates import cmd_dates
 
 
@@ -39,7 +42,8 @@ def cmd_album(a):
 def show(results):
     for r in results:
         who = ", ".join(r["persons"])
-        print(f"{r['score']:.3f}  {r['date']}  {r['kind']:5}  {r['uuid']}  {r['place'][:40]}  {who}")
+        when = f"  {'heard' if r['heard'] else 'seen'} at {int(r['at']) // 60}:{int(r['at']) % 60:02}" if "at" in r else ""
+        print(f"{r['score']:.3f}  {r['date']}  {r['kind']:5}  {r['uuid']}  {r['place'][:40]}  {who}{when}")
 
 
 def fkw(a):
@@ -95,6 +99,7 @@ def main():
 
     p = sub.add_parser("index"); p.add_argument("--limit", type=int); p.add_argument("--library")
     p.add_argument("--batch", type=int, default=16)
+    p.add_argument("--no-videos", action="store_true", help="skip reading new videos' sound and frames (`photosearch videos` does it later)")
     p.add_argument("--vision-tokens", type=int, default=embed.VISION_TOKENS,
                    help="per-image token budget; keep it the same for the whole index"); p.set_defaults(fn=cmd_index)
     p = sub.add_parser("search"); p.add_argument("query"); p.add_argument("--exclude", help='e.g. "a selfie"')
@@ -143,6 +148,9 @@ def main():
     p.add_argument("group", nargs="?", help="an album name, or p:UUID for a loose photo and its look-alikes; undo: also all")
     p.add_argument("when", nargs="?", help="2007, 2007-01 or 2007-01-15")
     p.add_argument("--limit", type=int, default=40); p.set_defaults(fn=cmd_dates)
+    p = sub.add_parser("videos", help="embed each video's sound and a frame every 3 s, so searches find what's heard and when")
+    p.add_argument("--icloud", action="store_true", help="also download videos only in iCloud (~2 s each; Photos keeps the original)")
+    p.add_argument("--limit", type=int); p.set_defaults(fn=cmd_videos)
     a = ap.parse_args()
     if a.fn is cmd_dates and ((a.do == "set" and not a.when) or (a.do != "list" and not a.group)):
         ap.error("dates set GROUP WHEN, or dates undo GROUP|all")

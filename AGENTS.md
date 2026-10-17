@@ -43,6 +43,8 @@ PHOTOSEARCH_DATA=data-demo uv run photosearch serve --demo --port 8766   # prese
 - **Two scripts driving Photos at once can stall it** until it's force-quit.
 - **Torch on MPS crashes the process if two threads encode at once.** `embed_query` holds a lock.
 - **My dates for undated photos live in the `redated` table.** `photosearch index` rewrites `photos.date` from Photos, then `dates.apply` puts mine back. Anything else that rewrites dates must do the same.
+- **`index` also reads new videos on the Mac** (videos.py), which loads the model's audio encoder. `--no-videos` skips that; `--limit` trials skip it too.
+- **PhotoKit downloads stay in the Photos library.** `fetch` and `videos --icloud` leave each original on disk in Photos until it frees space, so a big run uses many GB.
 - **Vectors from different settings don't mix.** The index records its model and vision tokens and refuses others.
 - **Headless Chrome won't go below a 500 px window.** For phone layouts, use `Emulation.setDeviceMetricsOverride` and check that `innerWidth` equals the target width.
 - **VHS throws away the whole recording when a `Wait` times out,** so the Claude take uses a fixed `Sleep`.
@@ -61,5 +63,6 @@ Update this section when something finishes or starts.
 - **Launch posts:** Highlight important changes so I can post those to X/LinkedIn.
 - **Demo leftovers:** the demo Photos library, its import folder, `data-demo/` and a separate Claude config folder for the demo takes are still on disk. I haven't decided whether to keep them. Before the demo library is deleted, Photos must be switched back to my library (hold Option while opening Photos).
 - **Date detective:** built (Play → Date Detective, `photosearch dates`). Waiting on me to date the groups.
+- **Video search:** built (`photosearch videos`, ROADMAP item 2; `index` also reads new local videos). The `--icloud` run for the other 702 is approved. Then I judge sound matches by ear, and `SOUND_AT` is set from my marks.
 - **Clutter sweep:** built (Albums → Tidy up → Clutter and private photos). Sending a kind to Photos isn't tried on my library yet, and `photosearch index` needs one run to read Photos' screenshot marks.
 - **Vision tokens:** done. 70 tokens is 4.7× faster, changes the first result in more than half of searches, but is only slightly worse when judged by eye (see the README's Measurements). 280 stays the default.
