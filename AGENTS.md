@@ -44,6 +44,7 @@ PHOTOSEARCH_DATA=data-demo uv run photosearch serve --demo --port 8766   # prese
 - **Torch on MPS crashes the process if two threads encode at once.** `embed_query` holds a lock.
 - **My dates for undated photos live in the `redated` table.** `photosearch index` rewrites `photos.date` from Photos, then `dates.apply` puts mine back. Anything else that rewrites dates must do the same.
 - **`index` also reads new videos on the Mac** (videos.py), which loads the model's audio encoder. `--no-videos` skips that; `--limit` trials skip it too.
+- **PhotoKit crashes (SIGSEGV, in pyobjc) exporting an edited video.** `videos --icloud` downloads originals, in a `photosearch download-videos` process, so a crash costs one video, not the run.
 - **PhotoKit downloads stay in the Photos library.** `fetch` and `videos --icloud` leave each original on disk in Photos until it frees space, so a big run uses many GB.
 - **Vectors from different settings don't mix.** The index records its model and vision tokens and refuses others.
 - **Headless Chrome won't go below a 500 px window.** For phone layouts, use `Emulation.setDeviceMetricsOverride` and check that `innerWidth` equals the target width.

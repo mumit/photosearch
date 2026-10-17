@@ -30,7 +30,7 @@ from .photos_app import add_now, cmd_add_to_album, cmd_fetch, fetch_large, needs
 from .server import cmd_serve
 from .demo import cmd_demo_check
 from .evals import cmd_eval
-from .videos import cmd_videos
+from .videos import cmd_download_videos, cmd_videos
 from .dates import cmd_dates
 
 
@@ -151,6 +151,8 @@ def main():
     p = sub.add_parser("videos", help="embed each video's sound and a frame every 3 s, so searches find what's heard and when")
     p.add_argument("--icloud", action="store_true", help="also download videos only in iCloud (~2 s each; Photos keeps the original)")
     p.add_argument("--limit", type=int); p.set_defaults(fn=cmd_videos)
+    p = sub.add_parser("download-videos", help="download videos (by uuid) from iCloud into a folder; used by `videos --icloud`")
+    p.add_argument("dir"); p.add_argument("uuids", nargs="+"); p.set_defaults(fn=cmd_download_videos)
     a = ap.parse_args()
     if a.fn is cmd_dates and ((a.do == "set" and not a.when) or (a.do != "list" and not a.group)):
         ap.error("dates set GROUP WHEN, or dates undo GROUP|all")

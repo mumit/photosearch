@@ -87,20 +87,55 @@ def embed_video(con, uuid, path):
     return len(fr), len(so)
 
 
-def video_file(p, tmp, icloud):
-    """The video as shown in Photos (edited if it was), on disk: local, or downloaded into tmp with icloud."""
+def local_file(p):
+    """The video as shown in Photos (edited if it was), if it's on this Mac."""
     for f in ([p.path_edited] if p.hasadjustments else []) + [p.path]:
         if f and Path(f).exists():
             return f
-    if not icloud:
-        return None
+    return None
+
+
+DOWNLOAD_BATCH = 25  # videos per downloading process; each holds at most this many files at once
+
+
+def downloads(uuids, tmp):
+    """Yields (uuid, file or None, error) as a `photosearch download-videos` process gets each from iCloud, so one
+    video can be embedded while the next downloads. PhotoKit runs in its own process, so a crash (pyobjc segfaulted
+    on edited videos) only loses the video it was on, which is tried again next run."""
+    import sys
+    queue = list(uuids)
+    while queue:
+        batch, queue, seen = queue[:DOWNLOAD_BATCH], queue[DOWNLOAD_BATCH:], set()
+        proc = subprocess.Popen([sys.executable, "-m", "photosearch", "download-videos", tmp, *batch],
+                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        for line in proc.stdout:
+            u, _, rest = line.rstrip("\n").partition(" ")
+            if u in batch and u not in seen:
+                seen.add(u)
+                yield (u, rest[3:], None) if rest.startswith("ok ") else (u, None, rest)
+        proc.wait()
+        left = [u for u in batch if u not in seen]
+        if left:  # it crashed on the first of these; the others go to a new process
+            yield left[0], None, f"the download process stopped (exit {proc.returncode})"
+            queue = left[1:] + queue
+
+
+def cmd_download_videos(a):
+    """For `downloads`: each video from iCloud into a.dir, printing "UUID ok PATH" or "UUID ERROR" as it goes."""
     from osxphotos import ExportOptions, PhotoExporter
-    r = PhotoExporter(p).export(tmp, options=ExportOptions(download_missing=True, use_photokit=True,
-                                                           edited=p.hasadjustments, timeout=300))
-    f = [x for x in r.exported if Path(x).suffix.lower() in (".mov", ".mp4", ".m4v")]
-    if not f:
-        raise RuntimeError(r.error or "nothing exported")
-    return f[0]
+    from .store import photos_db
+    pdb = photos_db()
+    for u in a.uuids:
+        p = pdb.get_photo(u)
+        try:
+            d = Path(a.dir) / u; d.mkdir(parents=True, exist_ok=True)
+            # the original, even of an edited video: PhotoKit rendering an edit crashed the process every time
+            r = PhotoExporter(p).export(str(d), options=ExportOptions(download_missing=True, use_photokit=True,
+                                                                      edited=False, timeout=300))
+            f = [x for x in r.exported if Path(x).suffix.lower() in (".mov", ".mp4", ".m4v")]
+            print(f"{u} ok {f[0]}" if f else f"{u} {r.error or 'nothing exported'}", flush=True)
+        except Exception as ex:
+            print(f"{u} {ex.__class__.__name__}: {ex}"[:300], flush=True)
 
 
 def embed_videos(con, pdb, icloud=False, limit=None):
@@ -111,27 +146,37 @@ def embed_videos(con, pdb, icloud=False, limit=None):
         return
     done = {r[0] for r in con.execute("select uuid from videos_done where error is null")}
     todo = [r[0] for r in con.execute("select uuid from photos where kind='video' order by date desc") if r[0] not in done]
+    todo = todo[:limit] if limit else todo
     print(f"videos: {len(done)} done, {len(todo)} to go", flush=True)
-    t0, n, away = time.time(), 0, 0
-    for u in todo[:limit] if limit else todo:
-        p = pdb.get_photo(u)
-        if not p:
-            continue
-        with tempfile.TemporaryDirectory() as tmp:
+    t0, n = time.time(), 0
+
+    def read(u, f, err):
+        nonlocal n
+        nf = ns = 0
+        if f:
             try:
-                f = video_file(p, tmp, icloud)
-                if not f:
-                    away += 1; continue
-                nf, ns = embed_video(con, u, f); err = None
-            except Exception as ex:  # offline, iCloud says no, or ffmpeg can't read it: try again next time
-                nf = ns = 0; err = f"{ex.__class__.__name__}: {ex}"[:300]
-                print(f"\n  couldn't read {u}: {err}")
+                nf, ns = embed_video(con, u, f)
+            except Exception as ex:  # ffmpeg can't read it: try again next time
+                err = f"{ex.__class__.__name__}: {ex}"[:300]
+        if err:
+            print(f"\n  couldn't read {u}: {err}")
         con.execute("insert or replace into videos_done values(?,?,?,?,?)", (u, nf, ns, err, datetime.now().isoformat()))
         con.commit(); n += 1
         print(f"\r{n} read  {(time.time() - t0) / n:.1f} s each   ", end="", flush=True)
+
+    photos = {u: p for u in todo if (p := pdb.get_photo(u))}
+    here = {u: f for u, p in photos.items() if (f := local_file(p))}
+    for u, f in here.items():
+        read(u, f, None)
+    away = [u for u in photos if u not in here]
+    if icloud and away:
+        with tempfile.TemporaryDirectory() as tmp:
+            for u, f, err in downloads(away, tmp):
+                read(u, f, err)
+                shutil.rmtree(Path(tmp) / u, ignore_errors=True)
     if todo:
         print(f"\nvideos: {n} read in {(time.time() - t0) / 60:.1f} min"
-              + (f"; {away} are only in iCloud (`photosearch videos --icloud` downloads them)" if away else ""))
+              + (f"; {len(away)} are only in iCloud (`photosearch videos --icloud` downloads them)" if away and not icloud else ""))
 
 
 def cmd_videos(a):

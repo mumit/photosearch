@@ -94,3 +94,24 @@ def test_index_reads_new_videos_on_this_mac_and_leaves_icloud_ones(con, lib, mon
     assert done == {lib["video"]: 2}  # the iCloud one waits for `photosearch videos --icloud`
     videos.embed_videos(con, pdb)
     assert con.execute("select count(*) from videos_done").fetchone()[0] == 1  # and the done one isn't read again
+
+
+def test_a_crashed_download_loses_only_the_video_it_was_on(monkeypatch):
+    """PhotoKit downloads run in their own process; pyobjc once crashed it. The run goes on without that video."""
+    runs = []
+
+    class Proc:  # stands in for `photosearch download-videos` (a real one would reach Photos)
+        def __init__(self, cmd, **kw):
+            uuids = cmd[cmd.index("download-videos") + 2:]
+            runs.append(uuids)
+            lines = [f"{uuids[0]} ok /tmp/{uuids[0]}.mov"] if len(runs) == 1 else [f"{u} ok /tmp/{u}.mov" for u in uuids]
+            self.stdout, self.returncode = iter(x + "\n" for x in lines), -11 if len(runs) == 1 else 0
+
+        def wait(self):
+            return self.returncode
+
+    monkeypatch.setattr(videos.subprocess, "Popen", Proc)
+    monkeypatch.setattr(videos, "DOWNLOAD_BATCH", 3)
+    got = list(videos.downloads(["A", "B", "C", "D"], "/tmp/x"))
+    assert [(u, f is not None) for u, f, _ in got] == [("A", True), ("B", False), ("C", True), ("D", True)]
+    assert "stopped" in got[1][2] and runs == [["A", "B", "C"], ["C", "D"]]  # B crashed it; C goes to a new process

@@ -143,7 +143,8 @@ uv run photosearch videos --icloud    # also download the videos only in iCloud
 For each video:
 
 1. **Get the file.** If it's on this Mac, it's read where it is. With `--icloud`, Photos downloads it (about 2 s
-   each). Photos keeps the downloaded original in its library, as with `fetch`, until it needs the space again. That
+   each), in a separate process, so a crash there loses only that video. An edited video downloads as its original
+   (before trims and filters), because asking Photos for the edited version crashed every time (13 of 753 here). Photos keeps the downloaded original in its library, as with `fetch`, until it needs the space again. That
    can be many GB: 38 GB for 753 videos.
 2. **Cut it up.** ffmpeg takes a frame every 3 seconds and the sound as mono 16 kHz, the format the model wants. The
    sound is cut into 10-second pieces; silent videos and those under a second have none.
