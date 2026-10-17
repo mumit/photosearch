@@ -19,6 +19,11 @@ views.albums = async () => {
     $("tidyn").textContent = `${d.total.toLocaleString()} groups · ${d.extra.toLocaleString()} extra photos`;
     $("tidyart").innerHTML = d.groups.flatMap(g => g.photos.slice(0, 1)).map(p => `<img src="/thumb/${p.uuid}.jpg" alt="">`).join("");
   }).catch(() => {});
+  api("/api/clutter").then(r => {
+    const ks = r.results.kinds.filter(k => k.n);
+    $("clutn").textContent = ks.length ? ks.map(k => `${k.n.toLocaleString()} ${k.few}`).join(" · ") : "none found";
+    $("clutart").innerHTML = ks.filter(k => k.kind !== "ids").map(k => k.covers[0]).slice(0, 3).map(u => `<img src="/thumb/${u}.jpg" alt="">`).join("");
+  }).catch(() => {});
 };
 views.album = async arg => {
   const [id, ps] = (arg || "").split("?");
@@ -169,6 +174,57 @@ $("clgroups").onclick = async e => {
   }
 };
 $("cllevel").onclick = e => { const l = e.target.dataset.l; if (!l || l === CL.level) return; CL.level = l; store.set("cllevel", l); views.cleanup(); };
+/* ---------- tidy up: clutter, by kind, each offered to its own album in Photos ---------- */
+const CU = { kind: store.get("clukind", "screenshots"), photos: [], total: 0, offset: 0, sending: false, kinds: [] };
+views.clutter = () => { CU.offset = 0; CU.photos = []; clutterLoad(); };
+async function clutterLoad() {
+  if (!CU.offset) $("clugrid").innerHTML = `<p class="status">looking…</p>`;
+  let r;
+  try { r = (await api("/api/clutter", { kind: CU.kind, offset: CU.offset, limit: 60 })).results; }
+  catch (e) { $("clugrid").innerHTML = `<p class="status">${esc(e.message)}</p>`; return; }
+  CU.kinds = r.kinds; CU.total = r.total;
+  $("clukinds").innerHTML = r.kinds.map(k => `<button data-k="${k.kind}" class="${k.kind === CU.kind ? "on" : ""}">${esc(k.name)} <small>${k.n.toLocaleString()}</small></button>`).join("");
+  if (!CU.offset) $("clugrid").innerHTML = "";
+  const at = CU.photos.length; CU.photos.push(...r.photos); CU.offset += r.photos.length;
+  $("clugrid").insertAdjacentHTML("beforeend", r.photos.map((p, i) => `<figure data-i="${at + i}" class="${p.sent ? "sent" : ""}">
+    <img loading="lazy" src="/thumb/${p.uuid}.jpg" alt=""><button class="zoom" data-a="zoom" title="see it big">⤢</button>
+    <button class="cluno" data-a="not" title="not clutter: stop suggesting it">✕</button>
+    ${p.sent ? `<figcaption>in the album</figcaption>` : ""}</figure>`).join(""));
+  if (!CU.total) $("clugrid").innerHTML = `<p class="status">None found.</p>`;
+  $("clumore").innerHTML = CU.offset < CU.total ? `<button class="ghost" id="clumorebtn">Show more</button>` : "";
+  if ($("clumorebtn")) $("clumorebtn").onclick = clutterLoad;
+  clutterStats();
+}
+function clutterStats() {
+  const k = CU.kinds.find(x => x.kind === CU.kind); if (!k) return;
+  const todo = CU.total - k.sent;
+  $("clustats").textContent = `${CU.total.toLocaleString()} photos${k.sent ? ` · ${k.sent.toLocaleString()} already in “${k.album}”` : ""}`;
+  $("clusend").hidden = !SERVER.local || !todo; CU.sending = false;
+  $("clusend").textContent = `Send ${todo.toLocaleString()} to “${k.album}” in Photos`;
+  $("cluphone").hidden = SERVER.local;
+}
+$("clukinds").onclick = e => { const b = e.target.closest("[data-k]"); if (!b || b.dataset.k === CU.kind) return; CU.kind = b.dataset.k; store.set("clukind", CU.kind); views.clutter(); };
+$("clugrid").onclick = async e => {
+  const fig = e.target.closest("figure"); if (!fig) return;
+  const b = e.target.closest("[data-a]"), p = CU.photos[+fig.dataset.i];
+  if (b?.dataset.a === "not") {
+    try { await post("/api/clutter", { action: "not", uuid: p.uuid }); } catch (err) { return; }
+    fig.remove(); CU.total--; const k = CU.kinds.find(x => x.kind === CU.kind); k.n--; if (p.sent) k.sent--;
+    $("clukinds").querySelector(".on small").textContent = k.n.toLocaleString(); clutterStats(); return;
+  }
+  lightbox(CU.photos, +fig.dataset.i);
+};
+$("clusend").onclick = async () => {  // two taps, no browser dialog
+  const k = CU.kinds.find(x => x.kind === CU.kind);
+  if (!CU.sending) { CU.sending = true; $("clusend").textContent = `Tap again: add them to “${k.album}” (nothing gets deleted)`; return; }
+  CU.sending = false; $("clusend").disabled = true; $("clustats").textContent = "adding them in Photos…";
+  try { const r = await post("/api/clutter_send", { kind: CU.kind });
+        $("clustats").textContent = `Done: ${r.added.toLocaleString()} photos are in “${r.album}”. Look through it in Photos.`;
+        $("clusend").hidden = true; }
+  catch (err) { $("clustats").textContent = err.message; }
+  $("clusend").disabled = false;
+};
+
 $("clsend").onclick = async () => {  // two taps, no browser dialog
   if (!CL.sending) { CL.sending = true; $("clsend").textContent = `Tap again: add ${CL.extra.toLocaleString()} extras to “${CL.album}” (nothing gets deleted)`; return; }
   CL.sending = false; $("clsend").disabled = true; $("clstats").textContent = "adding them in Photos… (a minute or two for thousands)";

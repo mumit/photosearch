@@ -150,6 +150,7 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 | **Play** | *Guess the Year*, *Guess the Place* and *Which Came First?* (two photos: tap the older one). Play alone (10 rounds, best scores kept) or add players to pass the phone around: everyone gets 5 turns and the end shows who won. **Photo Math** lives here too: start from a photo or words, then add and take away ideas, *this photo + snow − summer*. **Date Detective** asks when photos without a real date were taken, and your answer becomes their date (see [Date the undated photos](#date-the-undated-photos)). |
 | **Albums** | Smart albums: **＋ Album** on any search (words, a person, a place, dates) saves it as an album that keeps itself up to date: new photos that match as well as the ones in it join by themselves. A slider sets how strict it is. ✕ takes a photo out *and teaches the album* to find fewer like it; ☆ keeps one in for good (both nudge what the album looks for). **Copy to Photos** (on the Mac) makes or updates an album of the same name in the Photos app, adding only what's new. Kept in `data/albums/`. |
 | **Tidy up** | Under Albums: near-duplicates, as groups of bursts and copies of the same picture. Each group has a suggested keeper (the sharpest, judged from the detail in its thumbnail); tap another to keep that instead, or **Not duplicates** to stop suggesting the group. **Send the extras** adds every non-keeper to an album in Photos called *Photosearch · maybe delete*, so you can look through it and delete there. Nothing is ever deleted by Photosearch. *Near-identical* is the default; *Also similar shots* includes shots of the same moment that differ a little more. Receipts, ID cards and screenshots only count when they're practically the same pixels, so two different receipts are never paired. |
+| **Clutter** | Also under Tidy up: photos that are probably not memories, in four kinds: *IDs and cards*, *Screenshots*, *Receipts and papers* and *Accidental shots* (floors, black frames). Tap ✕ on any that don't belong. **Send** adds a kind to its own album in Photos (*Photosearch · screenshots* and so on) to look through there. IDs are worth moving to Photos' locked Hidden album. Nothing is deleted. Screenshots are the ones Photos marks as screenshots; run `photosearch index` once to read those marks (until then, they're found by their phone-screen shape). The other kinds come from the search model, with cut-offs set by eye on a 17,000-photo library (`clutter.py` says how). |
 | **Photo frame** | `#frame`, or from Home: a slow, endless full-screen slideshow of your best photos with the time and date, for a spare iPad or TV. It keeps the screen awake. **⚙ What to show** picks everything, on this day, one person, or any search (`#frame/?person=…`, `#frame/?q=…`). **▶ Slideshow** on any search, place or open photo plays just those. |
 | **Stories** | Every trip (found automatically from where photos were taken) and every year as a slideshow of its best, most varied moments, with chapters and captions. **⤓** saves one as a single HTML file (photos included) you can send to family; **✎** edits it. |
 
@@ -337,7 +338,7 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 | `data/thumbs/` | Small JPEG previews for the web page (512 px) |
 | `data/large/` | Full-size copies (up to 2560 px) of photos shown big whose local preview was small, fetched from iCloud. Safe to delete; they come back when needed |
 | `data/albums/` | Smart albums, one JSON file each: the words and filters, the threshold, what's been pinned or taken out |
-| `data/cleanup.json`, `data/sharpness.json` | Tidy-up choices (keepers you picked, groups that aren't duplicates, what went to *maybe delete*), and a cache of how sharp each thumbnail is |
+| `data/cleanup.json`, `data/sharpness.json` | Tidy-up choices (keepers you picked, groups that aren't duplicates, what went to *maybe delete*, photos that aren't clutter, what went to each clutter album), and a cache of how sharp each thumbnail is |
 | `data/lan.json` | With `serve --lan`: the passcode and the signed-in devices (readable only by you) |
 | `data/galaxy.json` | The Galaxy map layout (rebuilt automatically when the index grows by 10%) |
 
@@ -407,7 +408,7 @@ thing, and they only import downwards in this list:
 | `stories.py` | Stories: making, editing, the slideshow page |
 | `explore.py` | Galaxy, time machine, rediscover, calendar, games, photo math, on this day |
 | `photos_app.py` | Everything that talks to the Photos app or iCloud (in a separate process) |
-| `albums.py`, `dupes.py` | Smart albums; tidying up near-duplicates |
+| `albums.py`, `dupes.py`, `clutter.py` | Smart albums; tidying up near-duplicates and clutter |
 | `dates.py` | The date detective: grouping undated photos, their clues, and the dates you give them |
 | `evals.py` | `photosearch eval`: comparing two variants of the index, judged blind (searches in `eval_queries.txt`) |
 | `lan.py`, `server.py` | Phones on the home Wi-Fi; the web server and its API |

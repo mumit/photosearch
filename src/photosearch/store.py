@@ -19,6 +19,8 @@ def db():
             con.execute(f"alter table photos add column {c} real")
     if "geo" not in cols:
         con.execute("alter table photos add column geo text")
+    if "flags" not in cols:  # e.g. ["screenshot"]; null until the next `photosearch index`
+        con.execute("alter table photos add column flags text")
     con.execute("create table if not exists meta(key text primary key, value text)")
     # dates I gave photos whose date in Photos is a placeholder (dates.py), with the date Photos has
     con.execute("""create table if not exists redated(uuid text primary key, date text, photos_date text,

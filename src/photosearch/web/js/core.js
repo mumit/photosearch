@@ -52,7 +52,7 @@ function route() {
   lbOff(); closeSugg(); closePanel();
   if (tab && tab !== next) leave[tab]?.();
   tab = views[next] ? next : "home";
-  document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.hash === "#" + ({ edit: "stories", math: "play", person: "home", album: "albums", cleanup: "albums" }[tab] || tab)));
+  document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.hash === "#" + ({ edit: "stories", math: "play", person: "home", album: "albums", cleanup: "albums", clutter: "albums" }[tab] || tab)));
   document.querySelectorAll("main section").forEach(s => s.classList.toggle("on", s.id === tab));
   $("q").placeholder = PLACEHOLDER[tab] || PLACEHOLDER.home;
   if (!["search", "galaxy", "time"].includes(tab)) $("q").value = "";

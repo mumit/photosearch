@@ -21,13 +21,7 @@ Then play the best guesses as Guess the Year with real stakes: my answer becomes
 
 **Done when:** most undated photos have a confirmed or confident date, and the features above include them.
 
-### 2. Clutter and sensitive-photo sweep
-
-Find screenshots, receipts, accidental pocket shots, ID cards and other documents. Put them in a review album in Photos, as Tidy up does. Nothing is deleted.
-
-**Done when:** a Tidy up section lists them by kind, and sends a chosen kind to an album.
-
-### 3. Real video search
+### 2. Real video search
 
 - Embed each video's audio with the model's audio encoder (skipped today), so "laughing", "Happy Birthday being sung" or "waves" find videos. Check first that audio vectors land in the same space as text and images.
 - Embed several frames per video, so a search can open a long clip at the right moment.
@@ -59,6 +53,7 @@ Find screenshots, receipts, accidental pocket shots, ID cards and other document
 
 ## Done
 
+- Clutter and sensitive-photo sweep: Albums → Tidy up → Clutter and private photos lists IDs and cards, screenshots, receipts and papers, and accidental shots, and sends a kind to its own album in Photos. Accidental shots turned out hard: blur and darkness also find dim family photos, so only the clearest (floors, black frames) count. Sending isn't tried on my library yet.
 - `photosearch eval`: compares two variants of the index (vision tokens, shorter or compressed vectors, another index), with blind sheets to judge. It reproduced the vision-token numbers (de6e9da).
 - Vision tokens judged by eye: 70 is 4.7× faster and only slightly worse (552f91d).
 - Writing to the main library tested: `album` from the terminal, `make_album` through Claude, Copy to Photos and Send the extras.

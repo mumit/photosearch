@@ -146,7 +146,8 @@ def test_dated_leaves_out_shared_timestamps(con):
     # 50+ photos sharing one timestamp are scans or a reset camera clock, not real dates
     rows = [(f"FA{n:06X}-0000-0000-0000-000000000000", "2002-01-01T00:00:00", "photo", "", "", "[]", "[]", "[]", "",
              con.execute("select vec from photos limit 1").fetchone()[0], None, None, "{}") for n in range(50)]
-    con.executemany("insert into photos values(?,?,?,?,?,?,?,?,?,?,?,?,?)", rows); con.commit()
+    con.executemany("insert into photos (uuid, date, kind, title, place, persons, albums, labels, src, vec, lat, lon, geo) "
+                    "values(?,?,?,?,?,?,?,?,?,?,?,?,?)", rows); con.commit()
     assert 2002 not in {y["year"] for y in explore.timeline(con, "a photo")}
     assert store.photo_info(con, [rows[0][0]])[rows[0][0]]["undated"] is True
     assert json.loads(json.dumps(stories.stories(con)))  # still renders

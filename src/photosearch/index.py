@@ -48,10 +48,11 @@ def meta(p):
     return (p.date.isoformat(), "video" if p.ismovie else "photo", p.title or "",
             (p.place.name if p.place else "") or "",
             json.dumps(list(dict.fromkeys(x for x in p.persons if x != "_UNKNOWN_"))), json.dumps(p.albums),
-            json.dumps(p.labels), lat, lon, geo(p))
+            json.dumps(p.labels), lat, lon, geo(p), json.dumps([f for f in FLAGS if getattr(p, f, False)]))
 
 
-META_COLS = "date, kind, title, place, persons, albums, labels, lat, lon, geo"
+FLAGS = ("screenshot", "selfie")  # what Photos knows about how a photo was made
+META_COLS = "date, kind, title, place, persons, albums, labels, lat, lon, geo, flags"
 N_META = len(META_COLS.split(","))
 
 

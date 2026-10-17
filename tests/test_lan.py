@@ -129,6 +129,7 @@ def test_some_things_only_work_on_the_mac(srv, cookie, photos_app):
     assert phone(srv, "POST", "/api/album_photos", dict(id="dog"), cookie=cookie)[0] == 403
     assert phone(srv, "POST", "/api/dupes_send", dict(level="same"), cookie=cookie)[0] == 403
     assert phone(srv, "POST", "/api/undated", dict(uuids=["x"], year=2007), cookie=cookie)[0] == 403
+    assert phone(srv, "POST", "/api/clutter_send", dict(kind="papers"), cookie=cookie)[0] == 403
     assert photos_app.added == []
 
 
