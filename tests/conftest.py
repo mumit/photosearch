@@ -22,7 +22,7 @@ class NoPhotosOrModel:
 
 sys.meta_path.insert(0, NoPhotosOrModel())
 
-from photosearch import clutter, config, dupes, embed, people, search, smartbox, store, thennow, videos  # noqa: E402
+from photosearch import clutter, config, dupes, embed, people, recreate, search, smartbox, store, thennow, videos  # noqa: E402
 from photosearch import photos_app as photos  # noqa: E402  (the fixture below is called photos_app)
 import library  # noqa: E402
 
@@ -38,7 +38,7 @@ def reset_caches():
     store._vecs = (None, [], np.zeros((0, config.DIM), np.float32), {})
     search._interest = (None, None)
     clutter._found = (None, None)
-    thennow._pairs = thennow._people = (None, None)
+    thennow._pairs = thennow._people = recreate._ideas = (None, None)
     videos._clips = (None,)
     for c in (dupes._dupes, dupes._sharp, dupes._hash, dupes._px, store._ar):
         c.clear()

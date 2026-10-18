@@ -28,6 +28,9 @@ def db():
     # each video's sound and its later frames (videos.py)
     con.execute("create table if not exists clips(uuid text, kind text, t real, vec blob, primary key(uuid, kind, t))")
     con.execute("create table if not exists videos_done(uuid text primary key, frames int, sounds int, error text, at text)")
+    # old photos I'll shoot again (recreate.py): state todo or done, match the new shot, no the shots that weren't it
+    con.execute("""create table if not exists recreate(uuid text primary key, person text, picked text, state text,
+                   match text, no text)""")
     return con
 
 

@@ -246,8 +246,18 @@ footer { padding:40px clamp(16px, 4vw, 48px) 48px; color:var(--mut); font-size:1
 .tnpair img { display:block; width:100%; height:min(62vh, 560px); object-fit:contain; background:#000; border-radius:10px; }
 .tnpair figcaption { margin-top:6px; color:var(--mut); }
 .tnpair figcaption b { color:var(--fg); margin-right:4px; }
+.rcgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:10px; }
+.rcgrid figure, .rcrow figure { margin:0; cursor:zoom-in; }
+.rcgrid img { display:block; width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px; background:#000; }
+.rcgrid figcaption { display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:4px; color:var(--mut); font-size:13px; }
+.rcadd { padding:2px 10px; font-size:16px; }
+.rctodo { display:flex; flex-direction:column; gap:14px; }
+.rcrow { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding-bottom:14px; border-bottom:1px solid var(--line); }
+.rcrow img { display:block; width:150px; height:150px; object-fit:cover; border-radius:8px; background:#000; }
+.rcrow figcaption { color:var(--mut); font-size:13px; margin-top:4px; }
+.rcask { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .tnnav { display:flex; justify-content:center; gap:10px; margin-top:16px; }
-@media (max-width: 640px) { .tntitle { display:none; } .tnhead { gap:8px; } .tnhead .seg button { padding:5px 9px; } .tnpair { grid-template-columns:1fr; gap:6px; } .tnpair img { height:27vh; } .tnpair figcaption { margin-top:3px; } .tnnav { margin-top:10px; } }
+@media (max-width: 640px) { .rcgrid { grid-template-columns:repeat(2, 1fr); } .rcrow img { width:120px; height:120px; } .tntitle { display:none; } .tnhead { gap:8px; } .tnhead .seg button { padding:5px 9px; } .tnpair { grid-template-columns:1fr; gap:6px; } .tnpair img { height:27vh; } .tnpair figcaption { margin-top:3px; } .tnnav { margin-top:10px; } }
 .dtarea h3 { margin:0 0 8px; }
 .clues { margin:0 0 16px; padding-left:20px; line-height:1.5; }
 .dtalike { display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; }

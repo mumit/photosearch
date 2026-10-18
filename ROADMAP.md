@@ -4,6 +4,14 @@ What to build next, in order. Move an item to **Done** when it ships, with its c
 
 ## Next
 
+### 1. Recreate this
+
+**Built, waiting on a real recreation:** Play → Recreate This (`recreate.py`). Ideas are old posed photos of one or
+two named people; picks go on a list in this index; a newer photo of the same person that looks alike (0.80) is
+offered as the new shot to confirm. The 0.80 is a guess until a real recreation is matched.
+
+**Done when:** a photo I took again is found and shown with the old one.
+
 ## Later
 
 **Experiments with the model** (measure each with `photosearch eval`):
@@ -15,7 +23,6 @@ What to build next, in order. Move an item to **Done** when it ships, with its c
 - **Quick first index:** 70 tokens first, so search works in about 30 minutes, then upgrade to 280.
 
 **Fun:**
-- **Recreate this:** an old photo of someone in a pose, to shoot again today and show side by side.
 - **Family picks:** over LAN sharing, everyone stars favourites; the photo frame shows what the family liked.
 - **Photo book:** a story exported as a print-ready PDF.
 - **"Use as portrait"** on people pages.

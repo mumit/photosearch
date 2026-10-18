@@ -28,12 +28,15 @@ function playMenu() {
         <p>Photos without a real date. Your answer becomes the date.</p></div>
       <div class="card" id="tncard" style="--art:linear-gradient(180deg, transparent 10%, rgba(30,60,110,.55) 45%, #0d1a30 82%)"><div class="collage"></div><span class="glyph">⏳</span><h3>Then and Now</h3>
         <p>The same spot or the same person, years apart.</p></div>
+      <div class="card" id="rccard" style="--art:linear-gradient(180deg, transparent 10%, rgba(120,90,20,.55) 45%, #2e230a 82%)"><div class="collage"></div><span class="glyph">📸</span><h3>Recreate This</h3>
+        <p>Pick an old photo, take it again today, see them side by side.</p></div>
       <a class="card" href="#math" style="--art:linear-gradient(180deg, transparent 10%, rgba(110,25,70,.55) 45%, #2c0d1f 82%)"><div class="collage"></div><span class="glyph">∑</span><h3>Photo Math</h3>
         <p>This photo + snow − summer = ?</p></a>
     </div>`;
   $("playroot").querySelectorAll(".card[data-mode]").forEach(c => c.onclick = () => startGame(c.dataset.mode));
   $("detcard").onclick = () => detective();
   $("tncard").onclick = () => thenNow();
+  $("rccard").onclick = () => recreate();
   $("playroot").querySelector(".players").onclick = e => {
     const k = e.target.dataset.k; if (k == null) return;
     const ps = players(); ps.splice(+k, 1); store.set("players", ps); playMenu();
@@ -264,6 +267,69 @@ addEventListener("keydown", e => {
   if (e.key === "ArrowRight") thenNow(TN.at + 1);
   if (e.key === "ArrowLeft") thenNow(TN.at - 1);
 });
+
+/* ---------- recreate this: pick an old photo, shoot it again, see the two together (recreate.py) ---------- */
+const RC = { tab: "ideas", ideas: [], more: true, state: null };
+async function recreate(tab = RC.tab, note = "") {
+  if (P.mode !== "recreate" || tab !== RC.tab) scrollTo(0, 0);
+  P.mode = "recreate"; RC.tab = tab;
+  try {
+    RC.state = (await api("/api/recreate")).results;
+    if (tab === "ideas" && !RC.ideas.length) { RC.ideas = (await api("/api/recreate", { view: "ideas" })).results; RC.more = RC.ideas.length === 24; }
+  } catch (e) { $("playroot").innerHTML = `<p>${esc(e.message)}</p>`; return; }
+  const st = RC.state, found = st.todo.filter(x => x.shot).length;
+  const tabs = [["ideas", "💡 Ideas"], ["todo", `📋 To do${st.todo.length ? ` (${st.todo.length})` : ""}${found ? " ✨" : ""}`], ["done", `✅ Done${st.done.length ? ` (${st.done.length})` : ""}`]];
+  const head = `<div class="ghead tnhead"><span class="tntitle">Recreate This</span>
+    <span class="seg" id="rctabs">${tabs.map(([k, n]) => `<button data-t="${k}"${k === tab ? ' class="on"' : ""}>${n}</button>`).join("")}</span>
+    <span class="sp"></span><a href="#play" id="quit">done</a></div>${note ? `<div class="reveal dtdone">${note}</div>` : ""}`;
+  const who = x => x.who ? esc(firstName(x.who)) : "";
+  const when = x => photoDate(x, { month: "short", year: "numeric" });
+  let body;
+  if (tab === "ideas") {
+    body = `<h2 class="ask">Which would be fun to take again?</h2>
+      <p class="status">Old photos that look posed. Tap ＋ to add one to your list, then take it again with your phone. When the new photo is in Photos and <code>photosearch index</code> has run, it shows up under To do.</p>
+      <div class="rcgrid">${RC.ideas.map(x => `<figure data-u="${x.uuid}"><img src="/thumb/${x.uuid}.jpg" alt="" loading="lazy">
+        <figcaption><span>${who(x)} · ${when(x)}</span><button class="rcadd" data-u="${x.uuid}" aria-label="add to my list">＋</button></figcaption></figure>`).join("")}</div>
+      ${RC.more ? `<p style="text-align:center"><button class="ghost" id="rcmore">More ideas</button></p>` : ""}`;
+  } else if (tab === "todo") {
+    body = !st.todo.length ? `<h2 class="ask">Nothing on your list yet.</h2><p class="status">Pick some under Ideas.</p>`
+      : `<div class="rctodo">${st.todo.map(x => `<div class="rcrow">
+          <figure data-u="${x.then.uuid}"><img src="/thumb/${x.then.uuid}.jpg" alt=""><figcaption>${who(x)} · ${when(x.then)}</figcaption></figure>
+          ${x.shot ? `<figure data-u="${x.shot.uuid}" class="rcshot"><img src="/thumb/${x.shot.uuid}.jpg" alt=""><figcaption>${when(x.shot)}</figcaption></figure>
+            <div class="rcask"><b>Is this the new one?</b><button data-a="yes" data-u="${x.then.uuid}" data-m="${x.shot.uuid}">Yes</button><button class="ghost" data-a="no" data-u="${x.then.uuid}" data-m="${x.shot.uuid}">No</button></div>`
+            : `<div class="rcask"><span class="status">Not taken yet</span><button class="ghost" data-a="unpick" data-u="${x.then.uuid}">Remove</button></div>`}
+        </div>`).join("")}</div>`;
+  } else {
+    body = !st.done.length ? `<h2 class="ask">None done yet.</h2>`
+      : st.done.map(x => `<h2 class="ask">${who(x) ? `${who(x)} · ` : ""}${x.years} years apart</h2>
+          <div class="tnpair">${[["Then", x.then], ["Now", x.now]].map(([l, p]) => `<figure data-u="${p.uuid}"><img src="/photo/${p.uuid}.jpg" alt="" loading="lazy">
+            <figcaption><b>${l}</b> ${photoDate(p, { month: "long", year: "numeric" })}</figcaption></figure>`).join("")}</div>
+          <p style="text-align:right"><button class="ghost" data-a="undo" data-u="${x.then.uuid}">Not a match</button></p>`).join("");
+  }
+  $("playroot").innerHTML = head + `<div id="rcbody">${body}</div>`;
+  $("quit").onclick = e => { e.preventDefault(); playMenu(); };
+  $("rctabs").onclick = e => { const b = e.target.closest("button"); if (b) recreate(b.dataset.t); };
+  const all = [...RC.ideas, ...st.todo.flatMap(x => [x.then, x.shot].filter(Boolean)), ...st.done.flatMap(x => [x.then, x.now])];
+  $("rcbody").onclick = async e => {
+    const b = e.target.closest("button[data-u]");
+    if (b) {
+      e.stopPropagation(); b.disabled = true;
+      const action = b.classList.contains("rcadd") ? "pick" : b.dataset.a;
+      try { await post("/api/recreate", { uuid: b.dataset.u, action, match: b.dataset.m }); }
+      catch (err) { b.textContent = err.message; return; }
+      if (action === "pick") { RC.ideas = RC.ideas.filter(x => x.uuid !== b.dataset.u); return recreate("ideas", "Added to your list."); }
+      return recreate(tab, action === "yes" ? "Done! It's under Done." : "");
+    }
+    const f = e.target.closest("figure[data-u]");
+    if (f) { const i = all.findIndex(x => x.uuid === f.dataset.u); if (i >= 0) lightbox(all, i); }
+  };
+  const more = $("rcmore");
+  if (more) more.onclick = async () => {
+    more.disabled = true;
+    const r = (await api("/api/recreate", { view: "ideas", offset: RC.ideas.length })).results;
+    RC.ideas.push(...r); RC.more = r.length === 24; recreate("ideas");
+  };
+}
 
 function loadLeaflet() {
   if (window.L) return Promise.resolve();
