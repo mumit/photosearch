@@ -26,11 +26,14 @@ function playMenu() {
         <p>${g.text}</p><p style="margin-top:10px"><b>Best: ${best[m] ?? "–"}</b> / 1000</p></div>`).join("")}
       <div class="card" id="detcard" style="--art:linear-gradient(180deg, transparent 10%, rgba(40,70,40,.55) 45%, #142414 82%)"><div class="collage"></div><span class="glyph">🕵️</span><h3>Date Detective</h3>
         <p>Photos without a real date. Your answer becomes the date.</p></div>
+      <div class="card" id="tncard" style="--art:linear-gradient(180deg, transparent 10%, rgba(30,60,110,.55) 45%, #0d1a30 82%)"><div class="collage"></div><span class="glyph">⏳</span><h3>Then and Now</h3>
+        <p>The same spot, years apart.</p></div>
       <a class="card" href="#math" style="--art:linear-gradient(180deg, transparent 10%, rgba(110,25,70,.55) 45%, #2c0d1f 82%)"><div class="collage"></div><span class="glyph">∑</span><h3>Photo Math</h3>
         <p>This photo + snow − summer = ?</p></a>
     </div>`;
   $("playroot").querySelectorAll(".card[data-mode]").forEach(c => c.onclick = () => startGame(c.dataset.mode));
   $("detcard").onclick = () => detective();
+  $("tncard").onclick = () => thenNow();
   $("playroot").querySelector(".players").onclick = e => {
     const k = e.target.dataset.k; if (k == null) return;
     const ps = players(); ps.splice(+k, 1); store.set("players", ps); playMenu();
@@ -216,6 +219,41 @@ async function detective(done) {
   const un = $("dtundo");
   if (un) un.onclick = async e => { e.preventDefault(); await post("/api/undated_undo", { uuids: un.dataset.u.split(",") }); detective("Undone: back to no date."); };
 }
+
+/* ---------- then and now: the same spot, years apart (thennow.py) ---------- */
+const TN = { list: null, at: 0 };
+async function thenNow(at = 0) {
+  P.mode = "thennow"; scrollTo(0, 0);
+  if (!TN.list) {
+    $("playroot").innerHTML = `<p class="status">Looking for photos from the same spot, years apart…</p>`;
+    try { TN.list = (await api("/api/thennow")).results; }
+    catch (e) { $("playroot").innerHTML = `<p>${esc(e.message)}</p>`; return; }
+  }
+  const L = TN.list, n = L.length;
+  TN.at = at = n ? (at + n) % n : 0;
+  const head = `<div class="ghead"><span>Then and Now</span><span class="sp"></span><span>${n ? `${at + 1} of ${n}` : ""}</span><a href="#play" id="quit">done</a></div>`;
+  if (!n) {
+    $("playroot").innerHTML = head + `<h2 class="ask">No pairs yet.</h2><p class="status">It needs photos with GPS from the same spot, at least 4 years apart.</p>`;
+  } else {
+    const x = L[at], side = (p, label) => `<figure data-u="${p.uuid}"><img src="/photo/${p.uuid}.jpg" alt="">
+      <figcaption><b>${label}</b> ${photoDate(p, { month: "long", year: "numeric" })}</figcaption></figure>`;
+    $("playroot").innerHTML = head + `
+      <h2 class="ask">${x.years} years apart${x.now.place ? ` · ${esc(short(x.now.place))}` : ""}</h2>
+      <div class="tnpair">${side(x.then, "Then")}${side(x.now, "Now")}</div>
+      <div class="tnnav"><button class="ghost" id="tnprev">‹ Previous</button><button id="tnnext">Next ›</button></div>`;
+    $("tnprev").onclick = () => thenNow(at - 1);
+    $("tnnext").onclick = () => thenNow(at + 1);
+    $("playroot").querySelector(".tnpair").onclick = e => {
+      const f = e.target.closest("figure"); if (f) lightbox([x.then, x.now], f.dataset.u === x.then.uuid ? 0 : 1);
+    };
+  }
+  $("quit").onclick = e => { e.preventDefault(); playMenu(); };
+}
+addEventListener("keydown", e => {
+  if (P.mode !== "thennow" || $("lb").classList.contains("on") || location.hash !== "#play" || e.target.closest("input, textarea")) return;
+  if (e.key === "ArrowRight") thenNow(TN.at + 1);
+  if (e.key === "ArrowLeft") thenNow(TN.at - 1);
+});
 
 function loadLeaflet() {
   if (window.L) return Promise.resolve();

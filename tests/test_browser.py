@@ -49,6 +49,8 @@ STEPS = [
     ("game-reveal", "document.querySelector('.pair figure').click()", 2),
     ("game-year", "localStorage.removeItem('players'); playMenu(); document.querySelector('.card[data-mode=year]').click()", 3),
     ("detective", "playMenu(); document.getElementById('detcard').click()", 2),
+    ("thennow", "playMenu(); document.getElementById('tncard').click()", 3),
+    ("thennow-next", "document.getElementById('tnnext')?.click()", 2),
     ("math", "location.hash='math'; document.getElementById('mtext').value='a street'; document.getElementById('mplus').value='snow'; runMath()", 3),
     ("search-more", "location.hash='search/'+encodeURIComponent('a photo'); setTimeout(()=>document.getElementById('morebtn')?.click(), 2000)", 4),
     ("frame", "document.getElementById('rshow').click()", 3),

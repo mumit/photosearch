@@ -19,6 +19,7 @@ from .albums import album_preview, album_to_photos, album_view, albums, delete_a
 from .dupes import DUP_LEVELS, dupes, dupes_choose, dupes_send
 from .clutter import clutter, clutter_choose, clutter_send
 from .dates import next_group, set_date, undo as undo_dates
+from .thennow import then_and_now
 from .videos import FRAMES, frame_list
 from .photos_app import Fetcher
 from .lan import LOGIN, LanAccess
@@ -144,6 +145,7 @@ def make_server(a):
            "/api/clutter": lambda q: clutter(con, q.get("kind"), int(q.get("offset", 0)), min(200, int(q.get("limit", 60)))),
            "/api/undated": lambda q: next_group(con, (q.get("skip") or "").split("|")),
            "/api/frames": lambda q: frame_list(con, q.get("uuid", "")),
+           "/api/thennow": lambda q: then_and_now(con),
            "/api/math": lambda q: photo_math(con, q["base"], q.get("plus", ""), q.get("minus", ""),
                                              float(q.get("w", 1)), int(q.get("k", 24)))}
 

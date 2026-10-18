@@ -63,7 +63,8 @@ Update this section when something finishes or starts.
 
 - **Launch posts:** Highlight important changes so I can post those to X/LinkedIn.
 - **Demo leftovers:** the demo Photos library, its import folder, `data-demo/` and a separate Claude config folder for the demo takes are still on disk. I haven't decided whether to keep them. Before the demo library is deleted, Photos must be switched back to my library (hold Option while opening Photos).
-- **Date detective:** built (Play → Date Detective, `photosearch dates`). Waiting on me to date the groups.
+- **Date detective:** done. 851 of 1,042 undated photos are dated; the rest are small loose groups.
+- **Then and now:** done (Play → Then and Now, `thennow.py`).
 - **Video search:** done. All 752 videos are read; `index` reads new local ones, and `videos --icloud` the rest. `SOUND_AT` was set from my marks by ear (`data/sound-marks.json`, README → Videos).
 - **Clutter sweep:** built (Albums → Tidy up → Clutter and private photos). Sending a kind to Photos isn't tried on my library yet, and `photosearch index` needs one run to read Photos' screenshot marks.
 - **Vision tokens:** done. 70 tokens is 4.7× faster, changes the first result in more than half of searches, but is only slightly worse when judged by eye (see the README's Measurements). 280 stays the default.

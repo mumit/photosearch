@@ -241,6 +241,13 @@ footer { padding:40px clamp(16px, 4vw, 48px) 48px; color:var(--mut); font-size:1
 .dtgrid img, .dtalike img { display:block; width:100%; height:100%; object-fit:cover; }
 .dtgrid .out { opacity:.25; outline:2px dashed var(--mut); outline-offset:-2px; }
 .dtarea { margin-top:18px; }
+.tnpair { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.tnpair figure { margin:0; cursor:zoom-in; }
+.tnpair img { display:block; width:100%; height:min(62vh, 560px); object-fit:contain; background:#000; border-radius:10px; }
+.tnpair figcaption { margin-top:6px; color:var(--mut); }
+.tnpair figcaption b { color:var(--fg); margin-right:4px; }
+.tnnav { display:flex; justify-content:center; gap:10px; margin-top:16px; }
+@media (max-width: 640px) { .tnpair { grid-template-columns:1fr; gap:6px; } .tnpair img { height:28vh; } .tnpair figcaption { margin-top:3px; } .tnnav { margin-top:10px; } }
 .dtarea h3 { margin:0 0 8px; }
 .clues { margin:0 0 16px; padding-left:20px; line-height:1.5; }
 .dtalike { display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; }

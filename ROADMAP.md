@@ -4,23 +4,6 @@ What to build next, in order. Move an item to **Done** when it ships, with its c
 
 ## Next
 
-### 1. Date detective
-
-**Built, waiting on my answers:** Play → Date Detective, and `photosearch dates`. It uses album names, album series,
-people and look-alikes. Look-alikes turned out weak (25 of 105 years right when the whole event is hidden), so I
-confirm every group. Not built: Apple's labels as a month clue.
-
-1,042 photos carry a placeholder date (2002-01-01). They're missing from On this day, Time Machine, stories, Guess the Year and the galaxy's years.
-
-Estimate each one's date from:
-- its dated look-alikes;
-- who's in it, since children change a lot from year to year;
-- Apple's labels (snow, Christmas tree).
-
-Then play the best guesses as Guess the Year with real stakes: my answer becomes the date. Keep the dates in photosearch's index, never write them to Photos.
-
-**Done when:** most undated photos have a confirmed or confident date, and the features above include them.
-
 ## Later
 
 **Experiments with the model** (measure each with `photosearch eval`):
@@ -32,7 +15,6 @@ Then play the best guesses as Guess the Year with real stakes: my answer becomes
 - **Quick first index:** 70 tokens first, so search works in about 30 minutes, then upgrade to 280.
 
 **Fun:**
-- **Then and now:** photos from the same spot years apart, matched by GPS and by look.
 - **Recreate this:** an old photo of someone in a pose, to shoot again today and show side by side.
 - **Family picks:** over LAN sharing, everyone stars favourites; the photo frame shows what the family liked.
 - **Photo book:** a story exported as a print-ready PDF.
@@ -45,6 +27,8 @@ Then play the best guesses as Guess the Year with real stakes: my answer becomes
 
 ## Done
 
+- Then and Now: Play → Then and Now shows two photos from the same spot, years apart (`thennow.py`). Both need GPS (within 150 m), so only photos from 2016 on take part: matching old scans by look alone found different places that look alike. Often it's a younger sibling in the same spot years later. Not built: pairs with an old scan (they'd need a place), and pairs of the same person.
+- Date detective: Play → Date Detective and `photosearch dates` date the photos with a placeholder date, a group at a time, from album names, album series, people and look-alikes. 851 of 1,042 are dated (the rest are small loose groups). Look-alikes turned out a weak clue (25 of 105 years right when the whole event is hidden). Not built: Apple's labels as a month clue.
 - Real video search: `photosearch videos` embeds each video's sound (10 s pieces) and a frame every 3 s, and a search ranks a video by its best moment ("🔊 heard at 0:10"). Hovering flips through the frames. Sound matches were judged by ear to set `SOUND_AT`: Happy Birthday, laughing, clapping and music come up by sound; "a dog barking" finds kids shouting.
 - Clutter and sensitive-photo sweep: Albums → Tidy up → Clutter and private photos lists IDs and cards, screenshots, receipts and papers, and accidental shots, and sends a kind to its own album in Photos. Accidental shots turned out hard: blur and darkness also find dim family photos, so only the clearest (floors, black frames) count. Sending isn't tried on my library yet (bd7a318).
 - `photosearch eval`: compares two variants of the index (vision tokens, shorter or compressed vectors, another index), with blind sheets to judge. It reproduced the vision-token numbers (de6e9da).
