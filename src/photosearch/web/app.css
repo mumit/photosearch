@@ -247,7 +247,7 @@ footer { padding:40px clamp(16px, 4vw, 48px) 48px; color:var(--mut); font-size:1
 .tnpair figcaption { margin-top:6px; color:var(--mut); }
 .tnpair figcaption b { color:var(--fg); margin-right:4px; }
 .tnnav { display:flex; justify-content:center; gap:10px; margin-top:16px; }
-@media (max-width: 640px) { .tnpair { grid-template-columns:1fr; gap:6px; } .tnpair img { height:28vh; } .tnpair figcaption { margin-top:3px; } .tnnav { margin-top:10px; } }
+@media (max-width: 640px) { .tntitle { display:none; } .tnhead { gap:8px; } .tnhead .seg button { padding:5px 9px; } .tnpair { grid-template-columns:1fr; gap:6px; } .tnpair img { height:27vh; } .tnpair figcaption { margin-top:3px; } .tnnav { margin-top:10px; } }
 .dtarea h3 { margin:0 0 8px; }
 .clues { margin:0 0 16px; padding-left:20px; line-height:1.5; }
 .dtalike { display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; }

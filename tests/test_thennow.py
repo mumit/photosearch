@@ -66,3 +66,41 @@ def test_the_page_lists_pairs(con, spot):
         assert json.dumps(mine)  # plain JSON for the page
     finally:
         srv.close()
+
+
+@pytest.fixture
+def family(con):
+    """Sam on the couch over the years, no GPS: alone, with one more named, and in a crowd of four named people."""
+    rng = np.random.default_rng(9)
+    couch = unit(axis("face") + noise(rng, 0.3))
+    n = 0
+    def add(when, persons, vec=None):
+        nonlocal n
+        n += 1
+        u = f"COUCH-{n:03}"
+        v = unit(couch + noise(rng, 0.2)) if vec is None else vec
+        con.execute("insert into photos (uuid, date, kind, title, place, persons, albums, labels, src, vec, geo) "
+                    "values (?,?,?,?,?,?,?,?,?,?,?)", (u, when + "T10:00:00-08:00", "photo", "", "", json.dumps(persons),
+                    "[]", "[]", "", v.tobytes(), "{}"))
+        return u
+    out = dict(baby=add("2009-06-01", ["Sam Lee"]), boy=add("2015-06-01", ["Sam Lee", "Ana Lee"]),
+               crowd=add("2010-01-01", ["Sam Lee", "Ana Lee", "Ben Lee", "Cy Lee"]), crowd_now=add("2018-01-01", ["Sam Lee"]),
+               stranger=add("2020-06-01", ["Dee Roe"]))
+    con.commit(); store._vecs = (None,) + store._vecs[1:]; thennow._people = (None, None)
+    return out
+
+
+def test_the_same_person_years_apart_is_a_pair(con, family):
+    got = {(a, b): n for _, n, a, b in thennow.person_pairs(con) if a.startswith("COUCH-")}
+    assert [n for (a, b), n in got.items() if a == family["baby"]] == ["Sam Lee"]  # with a later Sam, 6 or 9 years on
+    assert all(family["crowd"] not in p and family["stranger"] not in p for p in got)  # a crowd; someone else
+
+
+def test_the_page_lists_pairs_of_a_person(con, family):
+    srv = Server()
+    try:
+        r = [x for x in srv.json("/api/thennow?by=person") if x["then"]["uuid"].startswith("COUCH-")]
+        assert r and r[0]["who"] == "Sam Lee" and r[0]["years"] >= 4
+        assert all("who" not in x for x in srv.json("/api/thennow"))
+    finally:
+        srv.close()

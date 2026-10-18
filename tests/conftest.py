@@ -38,7 +38,7 @@ def reset_caches():
     store._vecs = (None, [], np.zeros((0, config.DIM), np.float32), {})
     search._interest = (None, None)
     clutter._found = (None, None)
-    thennow._pairs = (None, None)
+    thennow._pairs = thennow._people = (None, None)
     videos._clips = (None,)
     for c in (dupes._dupes, dupes._sharp, dupes._hash, dupes._px, store._ar):
         c.clear()
