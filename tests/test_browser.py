@@ -14,6 +14,10 @@ from server import Server, free_port
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 pytestmark = [pytest.mark.browser, pytest.mark.skipif(not Path(CHROME).exists(), reason="needs Google Chrome")]
 
+# throws, so the step fails, unless this element is on top all over the screen (a 5 x 5 grid of points)
+ON_TOP = ("for (let i = 1; i < 6; i++) for (let j = 1; j < 6; j++) {{ const e = document.elementFromPoint(innerWidth * i / 6, innerHeight * j / 6); "
+          "if (!e?.closest('#{}')) throw new Error('covered by ' + e?.tagName + '#' + e?.id + '.' + e?.className) }}")
+
 # (name, JavaScript to run, seconds to wait after)
 STEPS = [
     ("home", "", 5),
@@ -35,6 +39,10 @@ STEPS = [
     ("world", "lbOff(); location.hash='world'", 5),
     ("world-region", "document.querySelector('#wregions [data-k=\"1\"]').click()", 3),
     ("world-sheet", "const c=[...WM.cells].sort((a,b)=>b.n-a.n)[0]; openPlace({cells:[c], n:c.n, head:c})", 3),
+    ("world-photo", "document.querySelector('#wgrid .tile').click()", 2),
+    ("world-photo-top", ON_TOP.format("lb"), 0),  # the map once covered photos opened from it
+    ("world-slideshow", "lbOff(); document.getElementById('wplay').click()", 3),
+    ("world-slideshow-top", ON_TOP.format("frame") + "; closeFrame()", 1),
     ("galaxy", "location.hash='galaxy/beach'", 12),
     ("galaxy-grow", "document.getElementById('gplay').click()", 4),
     ("galaxy-person", "stopGrow(); setUpto(null); location.hash='galaxy/?person=Sam'", 3),
