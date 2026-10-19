@@ -109,6 +109,17 @@ It prints progress, photos per second and an estimated time remaining. Then inde
 uv run photosearch index
 ```
 
+**In a hurry?** `--quick` indexes about 4× faster (around half an hour for 17,000 photos on an M3, not two and a
+half hours) at slightly lower quality, so you can start searching sooner:
+
+```bash
+uv run photosearch index --quick
+```
+
+The next plain `photosearch index` redoes those photos at full quality, newest first, and you can stop and restart it
+like any other run. Search keeps working throughout: photos still waiting are adjusted so they don't crowd out the
+redone ones (see [Measurements](#measurements)). Videos' sound and frames wait for the plain run.
+
 - Indexing is **incremental**: you can stop it (Ctrl-C) and re-run it later, and it continues where it left off.
   Run it again any time to add new photos.
 - Newest photos are indexed first.
@@ -122,6 +133,7 @@ uv run photosearch index --vision-tokens 70
 ```
 
 Use one setting for the whole index (it's recorded, and `index` refuses to mix). To switch, delete the `data/` folder and re-index.
+(`--quick` is different: it's a first pass that the next run replaces.)
 Each run also refreshes people, albums and places for photos already indexed, and drops photos you've deleted.
 
 ### Videos: what's heard in them, and later moments
@@ -490,7 +502,7 @@ thing, and they only import downwards in this list:
 | `store.py` | The index in `data/index.sqlite`: vectors in memory, photo details |
 | `embed.py` | The search model |
 | `images.py` | Reading photos, writing JPEGs, contact sheets |
-| `index.py` | `photosearch index` and `thumbs` |
+| `index.py` | `photosearch index` (and its `--quick` first pass) and `thumbs` |
 | `videos.py` | `photosearch videos`: each video's sound and frames, and its best moment for a search |
 | `search.py` | Search, look-alikes, filters, how interesting a photo looks |
 | `smartbox.py` | The optional ✨ smart search box (Jev) |
@@ -580,6 +592,14 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
   results and is only slightly worse. Judging the same sample again with `photosearch eval` (new blind order) gave 192
   and 185, and the same 4, 2 and 22. One judge (Claude) scored a 2,000-photo sample; a full library has more close
   calls.
+- `index --quick` (70 vision tokens, then redone at 280): about 9 photos/s against 2. A 70-token vector scores 0.019
+  higher against words than the same photo's 280-token one, so in a half-redone index the quick photos crowded the
+  results: with a quarter still quick, they were half of each search's first 24. Subtracting the gap from their
+  scores fixed that, as did moving each quick vector back along the direction the app's own words share, which also
+  covers features that compare photos with photos. Measured on 2,000 photos, the fix set on 1,000 and 25 searches
+  and tested on the others: with a quarter, half or three quarters still quick, each kind took its share of the
+  first 24, and 21.8, 19.5 and 18.2 of them were the same as with every photo at 280 (18.4, 15.8 and 15.6 without
+  the fix). A straight least-squares map from 70 to 280 overfit and made things worse.
 - Shorter or compressed vectors (`photosearch eval`, same sample and searches): int8 kept the same first photo in 49
   of 50 searches (23.1 of the first 24 in common); 256 numbers, 27 (18.4); 1 bit per number, 24 (14.4); 128
   numbers, 21 (11.6). 1 bit, then the best 100 rescored with the full vectors, kept 49 of 50 over the whole library.

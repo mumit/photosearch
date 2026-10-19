@@ -1,6 +1,6 @@
 """photosearch: semantic search over an Apple Photos library with EmbeddingGemma 2.
 
-  photosearch index [--limit N] [--library PATH]        embed photos, and new videos on this Mac (incremental)
+  photosearch index [--quick] [--limit N] [--library PATH]   embed photos, and new videos on this Mac (incremental)
   photosearch search "kids on a slide" [-k 24] [--person NAME] [--after 2020-01-01] [--before ...]
   photosearch similar UUID [-k 24]                      photos that look like this one
   photosearch serve [--port 8765] [--lan]               the web page: search, map, galaxy, time machine, games, albums
@@ -101,6 +101,8 @@ def main():
 
     p = sub.add_parser("index"); p.add_argument("--limit", type=int); p.add_argument("--library")
     p.add_argument("--batch", type=int, default=16)
+    p.add_argument("--quick", action="store_true", help="a first index about 5x faster, at slightly lower quality; "
+                   "a plain `index` later redoes it at full quality, newest first (stop it any time)")
     p.add_argument("--no-videos", action="store_true", help="skip reading new videos' sound and frames (`photosearch videos` does it later)")
     p.add_argument("--vision-tokens", type=int, default=embed.VISION_TOKENS,
                    help="per-image token budget; keep it the same for the whole index"); p.set_defaults(fn=cmd_index)

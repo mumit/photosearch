@@ -21,6 +21,8 @@ def db():
         con.execute("alter table photos add column geo text")
     if "flags" not in cols:  # e.g. ["screenshot"]; null until the next `photosearch index`
         con.execute("alter table photos add column flags text")
+    if "quick" not in cols:  # 1 while a photo still has its quick first vector (`index --quick`), until `index` redoes it
+        con.execute("alter table photos add column quick integer")
     con.execute("create table if not exists meta(key text primary key, value text)")
     # dates I gave photos whose date in Photos is a placeholder (dates.py), with the date Photos has
     con.execute("""create table if not exists redated(uuid text primary key, date text, photos_date text,
@@ -53,9 +55,10 @@ def load_matrix(con, where="", params=()):
 _vecs = (None, [], np.zeros((0, DIM), np.float32), {})
 
 def vectors(con):
-    """All vectors, held in memory and reloaded only when the index changes (e.g. while `index` runs)."""
+    """All vectors, held in memory and reloaded only when the index changes (e.g. while `index` runs, or redoes quick
+    first vectors in place)."""
     global _vecs
-    stamp = con.execute("select count(*), max(rowid) from photos").fetchone()
+    stamp = con.execute("select count(*), max(rowid), count(quick) from photos").fetchone()
     if _vecs[0] != stamp:
         uuids, M = load_matrix(con)
         _vecs = (stamp, uuids, M, {u: i for i, u in enumerate(uuids)})

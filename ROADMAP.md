@@ -17,7 +17,6 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 **Experiments with the model** (measure each with `photosearch eval`):
 - **Learn from ✕ and ☆:** train a small adjustment applied to every search from smart-album feedback.
 - **Judge eval sheets in the web page or through MCP,** not only with `photosearch eval score`.
-- **Quick first index:** 70 tokens first, so search works in about 30 minutes, then upgrade to 280.
 
 **Fun:**
 - **Family picks:** over LAN sharing, everyone stars favourites; the photo frame shows what the family liked.
@@ -31,6 +30,7 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 
 ## Done
 
+- Quick first index: `photosearch index --quick` indexes at 70 vision tokens (about 4× faster), and the next plain `index` redoes those photos at 280, newest first. Quick vectors are moved back along the words' direction so a half-redone index ranks fairly.
 - Other languages, measured: searches in Spanish, French, Hindi, Chinese, Arabic and Bengali fit about as well as English, judged blind (88 to 104 of 120 photos, English 94). Nothing to build; the README says so.
 - Shorter or compressed vectors, measured: int8 changes almost nothing, 256 numbers or 1 bit change a lot, and none is needed at 17,000 photos (52 MB, 0.6 ms a search).
 - Why did this match: **? Why** on a photo from a search, and `photosearch why`, show how much each word counts, what the model sees (Photos' labels as words) and where in the photo it matched (`why.py`). The map comes from the model's own squares in one pass (0.5 s), not by covering parts one at a time (16 s), and passed the same cover test better. A match on the whole scene is said, not drawn. Small things in busy photos light up weakly.

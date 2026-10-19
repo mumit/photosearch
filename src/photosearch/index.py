@@ -22,6 +22,22 @@ def check_settings(con):
     con.commit()
 
 
+# `index --quick`: a first index at 70 vision tokens, about 5x faster (27 min for 17,000 photos, not 2 h 20), redone
+# at the full 280 by the next plain `index`, newest first. A quick vector scores 0.019 higher against words than the
+# full one, so while some photos are quick they'd crowd every search: with a quarter left, half of each search's first
+# 24. Moving each quick vector that far back along the direction words share (QUICK_WORDS, the app's own) fixed it on
+# 2,000 photos and 25 searches held out: each kind took its share of the first 24, and 18.2-21.8 of them were the same
+# as with every photo at 280 (15.6-18.4 without the fix).
+QUICK_TOKENS, QUICK_GAP = 70, 0.019
+QUICK_WORDS = ["a photo", "people", "a room", "outdoors", "a child posing for the camera"]
+
+
+def quick_shift():
+    from .search import BORING, INTERESTING
+    m = np.stack([embed.embed_query(t) for t in INTERESTING + BORING + QUICK_WORDS]).mean(0)
+    return (QUICK_GAP * m / (m @ m)).astype(np.float32)
+
+
 def best_local_image(p):
     """Largest on-disk preview (fast to decode; for videos it's the poster frame), else a local original."""
     ders = [d for d in (p.path_derivatives or []) if Path(d).exists()]
@@ -88,10 +104,19 @@ def cmd_index(a):
         done = keep
     todo = [p for u, p in lib.items() if u not in done]
     todo.sort(key=lambda p: p.date, reverse=True)
+    quick = getattr(a, "quick", False)
+    if quick and embed.VISION_TOKENS != 280:
+        sys.exit("--quick is for an index at the default 280 vision tokens")
+    redo = [] if quick or embed.VISION_TOKENS != 280 else \
+        sorted((lib[u] for (u,) in con.execute("select uuid from photos where quick") if u in lib), key=lambda p: p.date, reverse=True)
+    todo += redo
     if a.limit:
         todo = todo[: a.limit]
-    print(f"{len(done)} already indexed, {len(todo)} to go (vision tokens: {embed.VISION_TOKENS})")
+    print(f"{len(done)} already indexed, {len(todo) - len(redo)} to go" + (f", {len(redo)} quick ones to redo" if redo else "") +
+          f" (vision tokens: {QUICK_TOKENS if quick else embed.VISION_TOKENS})")
     m = embed.model()
+    if quick:
+        embed.set_vision_tokens(m, QUICK_TOKENS); shift = quick_shift()
     t0, n, skipped, batch = time.time(), 0, 0, []
 
     def flush():
@@ -100,11 +125,13 @@ def cmd_index(a):
             return
         vecs = m.encode([{"image": im} for _, im, _ in batch], batch_size=len(batch),
                         normalize_embeddings=True).astype(np.float32)
+        if quick:
+            vecs = vecs - shift
         for (p, im, src), v in zip(batch, vecs):
             th = im.copy(); th.thumbnail((THUMB_PX, THUMB_PX))
             th.save(THUMBS / f"{p.uuid}.jpg", quality=82)
-            con.execute(f"insert or replace into photos (uuid, {META_COLS}, src, vec) values ({','.join('?' * (N_META + 3))})",
-                        (p.uuid, *meta(p), src, v.tobytes()))
+            con.execute(f"insert or replace into photos (uuid, {META_COLS}, src, vec, quick) values ({','.join('?' * (N_META + 4))})",
+                        (p.uuid, *meta(p), src, v.tobytes(), 1 if quick else None))
         con.commit()
         n += len(batch); batch.clear()
         rate = n / (time.time() - t0)
@@ -123,7 +150,10 @@ def cmd_index(a):
             flush()
     flush()
     print(f"\ndone: {n} embedded, {skipped} skipped (no local preview / unreadable) in {(time.time()-t0)/60:.1f} min")
-    if not a.limit and not a.no_videos:  # new videos already on this Mac: their sound and frames (videos.py)
+    if quick:
+        embed.set_vision_tokens(m, embed.VISION_TOKENS)
+        print("search works now; a plain `photosearch index` later redoes these at full quality, newest first")
+    if not a.limit and not a.no_videos and not quick:  # new videos already on this Mac: their sound and frames (videos.py)
         embed_videos(con, pdb)
 
 
