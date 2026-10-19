@@ -9,6 +9,7 @@ from .config import LARGE, MODEL, THUMBS, THUMB_PX
 from .dates import apply as apply_dates
 from .store import db, photos_db
 from .images import open_image
+from .text import read_all as read_text
 from .videos import embed_videos, forget as forget_video
 
 
@@ -92,6 +93,7 @@ def cmd_index(a):
         gone = done - lib.keys()
         for u in gone:
             con.execute("delete from photos where uuid=?", (u,))
+            con.execute("delete from texts where uuid=?", (u,))
             (THUMBS / f"{u}.jpg").unlink(missing_ok=True)
             (LARGE / f"{u}.jpg").unlink(missing_ok=True)  # and its full-size copy, if one was fetched
             forget_video(con, u)
@@ -155,6 +157,8 @@ def cmd_index(a):
         print("search works now; a plain `photosearch index` later redoes these at full quality, newest first")
     if not a.limit and not a.no_videos and not quick:  # new videos already on this Mac: their sound and frames (videos.py)
         embed_videos(con, pdb)
+    if not a.limit and not quick:  # the words in new photos (text.py), about 20 a second
+        read_text(con)
 
 
 def cmd_thumbs(a):

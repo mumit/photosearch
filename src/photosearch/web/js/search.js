@@ -175,7 +175,7 @@ function showResults() {
   if ($("morebtn")) $("morebtn").onclick = moreResults;
   $("racts").querySelector(".seg").onclick = e => { const s = e.target.dataset.s; if (s) { R.sort = s; store.set("sort", s); showResults(); } };
   const el = $("grid");
-  if (!r.results.length) { el.innerHTML = `<p class="status">Nothing found. Try fewer filters, or other words.</p>`; return; }
+  if (!r.results.length) { el.innerHTML = `<p class="status">${/["“”]/.test(R.q || "") ? "No photo has the words in quotes written in it, as far as this Mac could read." : "Nothing found. Try fewer filters, or other words."}</p>`; return; }
   if (R.sort === "best") { el._list = r.results; return bindGrid(el, r.results); }
   // by date: newest first, in years
   const sorted = [...r.results].sort((a, b) => (a.undated - b.undated) || b.date.localeCompare(a.date));

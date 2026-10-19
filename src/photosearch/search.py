@@ -1,13 +1,13 @@
 """Search by words or by example, with filters, and how interesting each photo looks."""
 import numpy as np
 
-from . import embed, videos
+from . import embed, text, videos
 from .store import photo_info, vec_of, vectors
 
 
-def filtered(con, person=None, after=None, before=None, kind=None, place=None, months=None):
+def filtered(con, person=None, after=None, before=None, kind=None, place=None, months=None, only=None):
     """person: a name or a list of names (all must be in the photo); names and place match on substrings.
-    months: month numbers to keep, e.g. (6, 7, 8) for summer."""
+    months: month numbers to keep, e.g. (6, 7, 8) for summer. only: a set of uuids to keep to."""
     clauses, params = [], []
     for name in [person] if isinstance(person, str) else person or []:
         clauses.append("exists (select 1 from json_each(persons) where lower(value) like ?)"); params.append(f"%{name.lower()}%")
@@ -22,10 +22,10 @@ def filtered(con, person=None, after=None, before=None, kind=None, place=None, m
     if kind:
         clauses.append("kind = ?"); params.append(kind)
     uuids, M, pos = vectors(con)
-    if not clauses:
+    if not clauses and only is None:
         return uuids, M
-    keep = [r[0] for r in con.execute("select uuid from photos where " + " and ".join(clauses), params)]
-    keep = [u for u in keep if u in pos]
+    keep = [r[0] for r in con.execute("select uuid from photos where " + " and ".join(clauses), params)] if clauses else uuids
+    keep = [u for u in keep if u in pos and (only is None or u in only)]
     return keep, M[[pos[u] for u in keep]]
 
 
@@ -80,7 +80,12 @@ EXCLUDE_W = 0.5  # how hard `exclude` pushes away; tested on "group photos at a 
 
 def search(con, query, k=24, exclude=None, **f):
     """exclude: what the photos should NOT show ("a selfie", or a list). The model is weak at negation inside the
-    query ("no selfies"), so each is subtracted from the query vector instead, as in photo_math."""
+    query ("no selfies"), so each is subtracted from the query vector instead, as in photo_math.
+    Words in "quotes" must be written in the photo (text.py), and the rest of the search ranks those photos."""
+    phrases, query = text.quoted(query)
+    if phrases:
+        f["only"] = text.written_in(con, phrases)
+        query = query or " ".join(phrases)
     q = embed.embed_query(query)
     for x in [exclude] if isinstance(exclude, str) else exclude or []:
         q = q - EXCLUDE_W * embed.embed_query(x)

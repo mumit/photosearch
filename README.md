@@ -123,6 +123,9 @@ redone ones (see [FINDINGS.md](FINDINGS.md)). Videos' sound and frames wait for 
 - Indexing is **incremental**: you can stop it (Ctrl-C) and re-run it later, and it continues where it left off.
   Run it again any time to add new photos.
 - Newest photos are indexed first.
+- Each run also reads the words in new photos (signs, receipts, documents) with the Mac's own text reader, about 20
+  photos a second, so a search can ask for words in quotes. The first run on an older index reads every photo once
+  (about 15 minutes for 16,000). `photosearch text` does only that step.
 - Expect the Mac to run warm while it works; it's using the GPU.
 
 **Speed vs. quality:** each image is given to the model as a number of "vision tokens" (default 280).
@@ -205,7 +208,7 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 | Mode | What it does |
 |---|---|
 | **Home** | Opens on **On this day**: a slow slideshow of today's date in earlier years, most striking first, which trip you were on (with a link to its story), and ‹ › to step through other days (`photosearch today` does the same in the terminal). Below it are shelves: *Rediscover* (random photos worth another look, ↻ to shuffle), the people you've tagged, your trips, ideas to search for, the other modes, *Day by day* (a calendar of the year, each day coloured by how many photos it has; hover for its best photo, click for the day) and your years. Photos that look like documents, screenshots or ID cards are left out. |
-| **Search** | Describe a photo (in English or most other languages: *une plage au coucher du soleil* works), or a sound in a video (see [Videos](#videos-whats-heard-in-them-and-later-moments)). Results keep their shape, in rows like a photo book, sorted by best match or by date. Picking a person or place from the suggestions shows their most interesting photos. Put what you *don't* want in **without…** (e.g. "selfies"): the model is weak at "no …" inside the description. Every search has its own address, so back and forward work. |
+| **Search** | Describe a photo (in English or most other languages: *une plage au coucher du soleil* works), or a sound in a video (see [Videos](#videos-whats-heard-in-them-and-later-moments)). Results keep their shape, in rows like a photo book, sorted by best match or by date. Picking a person or place from the suggestions shows their most interesting photos. Put what you *don't* want in **without…** (e.g. "selfies"): the model is weak at "no …" inside the description. Put words in "quotes" to find them written in the photo: *"Costco" receipt*. The model reads big, clear text by itself, so quotes are for exact words and small print. Every search has its own address, so back and forward work. |
 | **People** | A page per person tagged in Photos: their best photo from every year (**▶ through the years** plays them in turn), who they're most often photographed with, their places and favourite photos. Portraits are picked by the search model as the closest thing to a close-up of a face. Names anywhere (suggestions, the big photo view) lead here. |
 | **Map** | Everywhere you've been, each place as a pin showing its best photo and how many were taken there. It opens on home; chips along the bottom fly to the other regions (named like trips: "Lisbon", "Sintra & Cascais") or show everywhere. Nearby places merge until you zoom in. Tap a pin for that place's best photos, or **▶ Slideshow** them. Map tiles come from OpenStreetMap (so it needs internet); your photos never leave the Mac. |
 | **Galaxy** | Your whole library on one zoomable map, with similar photos next to each other and colored by year. Scroll to zoom, drag to pan, hover to peek. Type in the search box to see where, say, "beach" lives, and the map glides there; the faces along the bottom light up everyone's photos of one person. **▶** plays the years: the library grows from the first photo, each year's new ones standing out. The first visit takes a minute to lay out the map. |
@@ -288,6 +291,9 @@ uv run photosearch search "birthday cake" --person Sam --after 2022-01-01 --befo
 ```
 ```bash
 uv run photosearch search "group photos at a party" --exclude "a selfie" --place Portland
+```
+```bash
+uv run photosearch search 'a receipt "Costco"'
 ```
 ```bash
 uv run photosearch similar <uuid>
@@ -497,6 +503,9 @@ Don't switch the model to float16: it produces broken vectors (NaNs). The code u
 4. With `photosearch videos`, a video ranks by its best moment: its poster, a later frame, or a piece of its sound.
    Sounds land in the same space as text, but are scored by how much closer they are to the search than to everyday
    home-video sounds (talking, background noise). Otherwise a loud clip matches every search.
+5. Apple's **Vision** framework reads the words in each photo once, on the Mac. Words in "quotes" in a search must be
+   among them, and the model ranks the photos that have them. Read words don't change other searches: that made them
+   worse (see [FINDINGS.md](FINDINGS.md#words-in-photos-textpy)).
 
 ---
 
@@ -515,6 +524,7 @@ thing, and they only import downwards in this list:
 | `images.py` | Reading photos, writing JPEGs, contact sheets |
 | `index.py` | `photosearch index` (and its `--quick` first pass) and `thumbs` |
 | `videos.py` | `photosearch videos`: each video's sound and frames, and its best moment for a search |
+| `text.py` | `photosearch text`: the words in photos, read by Apple's Vision, for searches in "quotes" |
 | `search.py` | Search, look-alikes, filters, how interesting a photo looks |
 | `smartbox.py` | The optional ✨ smart search box (Jev) |
 | `places.py` | Home, trips, the map |

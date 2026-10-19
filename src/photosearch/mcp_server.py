@@ -39,6 +39,9 @@ def search_photos(query: str, exclude: str | None = None, people: list[str] | No
     people: names that must all appear (substring match on the names tagged in Photos).
     place: substring of the place name, e.g. "Portland" or "Lisbon". after/before: ISO dates (YYYY-MM-DD).
     Scores only mean something relative to each other within one query.
+    Words in double quotes must be written in the photo (signs, receipts, documents, as read by the Mac):
+    '"Costco" receipt' finds receipts that say Costco. Use quotes only for exact words, since the model already reads
+    big, clear text without them.
     Videos also match by what's heard in them ("people singing Happy Birthday", "a dog barking") and by later
     frames, once `photosearch videos` has read them: then "at" is the moment in seconds, and "heard" says it was a sound.
     """

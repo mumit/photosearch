@@ -31,7 +31,7 @@ Read this before working on photosearch. [README.md](README.md) covers what the 
 ## Commands
 
 ```bash
-uv run pytest                 # fast tests (about 190)
+uv run pytest                 # fast tests (about 250)
 uv run pytest -m browser      # headless-Chrome tours of the page (slow)
 uv run photosearch serve      # the web app on localhost:8765
 PHOTOSEARCH_DATA=data-demo uv run photosearch serve --demo --port 8766   # presenter mode on the demo index
@@ -72,4 +72,5 @@ Update this section when something finishes or starts.
 - **Why did this match:** done (? Why in the big photo view, `photosearch why`, `why.py`). A post is drafted.
 - **Family picks:** built (♡ Love in the big photo view, `picks.py`). Not tried by the family on phones yet.
 - **Quick first index:** done (`index --quick`, about 4× faster; the next `index` redoes those photos at full quality, newest first).
+- **Words in photos:** done (`text.py`, searches in "quotes"). An automatic boost was measured and made search worse (FINDINGS.md).
 - **Vision tokens:** done. 70 tokens is 4.7× faster, changes the first result in more than half of searches, but is only slightly worse when judged by eye (see FINDINGS.md). 280 stays the default.

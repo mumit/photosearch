@@ -29,6 +29,7 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 
 ## Done
 
+- Words in photos: `photosearch text` (and each `index` run) reads the words in every photo with Apple's Vision, in 14 minutes for 16,200 photos. Words in "quotes" in a search must be written in the photo. Measured first: the model already reads big, clear text, and a boost for read words made 34 word searches and 115 everyday ones worse, judged blind, but the model misses most small print (FINDINGS.md).
 - Where search breaks down, measured: 65 searches in 10 groups judged by eye (84% fit). Searches for how a photo looks (close-up, black and white, dusk) and printed pages did worst, mostly from accidental shots and plain textures that match everything. Those now count for a little less in searches by words (`hub_penalty`), which judged blind made the first 10 better on 115 searches (FINDINGS.md).
 - Family picks: ♡ Love in the big photo view, from the Mac or a phone with `serve --lan`, under the name each device gives. Home shows the family's picks, most loved first, and the photo frame plays everyone's or one person's, saying who loved each (`picks.py`). The frame's place and people line, hidden since a filter box took its id, shows again.
 - Quick first index: `photosearch index --quick` indexes at 70 vision tokens (about 4× faster), and the next plain `index` redoes those photos at 280, newest first. Quick vectors are moved back along the words' direction so a half-redone index ranks fairly.

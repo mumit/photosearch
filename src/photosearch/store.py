@@ -37,6 +37,8 @@ def db():
     con.execute("create table if not exists words(word text primary key, vec blob)")
     # family picks (picks.py): who loved which photo, and when
     con.execute("create table if not exists picks(uuid text, who text, at text, primary key(uuid, who))")
+    # the words in each photo, as Vision reads them (text.py); '' when it found none
+    con.execute("create table if not exists texts(uuid text primary key, text text, at text)")
     return con
 
 

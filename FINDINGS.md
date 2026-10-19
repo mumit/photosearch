@@ -27,6 +27,9 @@ move. New experiments go through `photosearch eval` (README → Experiments) and
    vector database, no compression.
 6. **Vectors from different settings don't mix.** The index refuses other models and vision tokens. The one exception,
    the quick first index, needs a correction to mix fairly.
+7. **Check what the model already does before adding a signal.** Reading the words in photos looked like a fix for
+   text searches, but the model already read big, clear text, and mixing the read words in made search worse. They
+   help only when asked for (Words in photos).
 
 ## Speed
 
@@ -266,6 +269,44 @@ frames for "a street at night") but changed only 12 photos over 115 searches, wo
 photo", and the hub penalty already pushes them down.
 
 **Measure again** with a new model, or if `why.vocab`'s words change a lot.
+
+## Words in photos (`text.py`)
+
+Text and documents were among the weakest searches above, so the Mac's own text reader (Apple's Vision framework)
+now reads every photo once. The question was how to use what it reads.
+
+**Reading.** The accurate level takes 0.05 s a photo after a slow first call, so all 16,200 photos took 14 minutes;
+2,600 (16%) have words in them. The fast level is 3× quicker but misreads most text, and missed a third of the photos
+the accurate one read (a passport, a door sign). Lines below 0.5 confidence are dropped: they're mostly guesses at a
+texture.
+
+**The model already reads big, clear text.** Before any change, 34 searches for words that are in the library (a
+greeting on a banner, a garden's entrance sign, a game, a stock app, a store, a pharmacy label) found 189 fitting
+photos in their first 10s, judged blind by eye. Several were 10 of 10 with no help.
+
+**Adding a boost for read words made search worse.** Each photo got up to W more for the share of the search's
+words written in it (rare words counting for more). Judged blind, all photos in the first 10s pooled:
+
+| W | 34 searches for words: fits | of them, better / worse | 115 everyday searches: worse |
+|---|---|---|---|
+| 0 (now) | 189 | | |
+| 0.03 | 187 | 3 / 3 | 7 |
+| 0.06 | 179 | 4 / 9 | 21 |
+| 0.1 | 173 | 4 / 10 | 40 |
+
+It helped where the word was on paper (a store's name on receipts, an invoice) and hurt where the word is also
+somewhere else: a city's name brought up passports that give it as a birthplace (9 fits to 0), "a marathon race" an
+electric motor's label, "a cat" whiteboards and part numbers, "a happy moment" birthday banners, "a realtor for sale
+sign" every listing photo with a REALTOR watermark. On the everyday searches it never helped.
+
+**Small print is where the model can't read.** For 60 random words that are in 3 to 30 photos, the model's first 50
+for the bare word held only 31% of the photos with that word written in them. So reading the text finds what
+search can't, but only when asked for.
+
+**What's used:** words in "quotes" must be written in the photo, and the rest of the search ranks those photos
+(`"Costco" receipt`). Searches without quotes are unchanged.
+
+**Measure again** with a new model (it may read more), or before trying a boost again: start from the cases above.
 
 ## Search, negation and the search box
 
