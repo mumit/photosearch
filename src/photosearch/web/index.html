@@ -60,6 +60,8 @@
     <div class="hsec" id="hmore" hidden><div class="shead"><h2 id="hmoreh">More from this day</h2><p id="hmorep"></p></div><div class="shelf" id="todayshelf"></div></div>
     <div class="hsec"><div class="shead"><h2>Rediscover</h2><p>moments you may have forgotten</p><span class="sp"></span><button class="ghost tiny" id="shuffle">↻ Shuffle</button></div>
       <div class="shelf" id="rediscover"></div></div>
+    <div class="hsec" id="pickbox" hidden><div class="shead"><h2>Family picks</h2><p id="pickp"></p><span class="sp"></span><a href="#frame/?picks=1">▶ In the photo frame</a></div>
+      <div class="shelf" id="pickshelf"></div></div>
     <div class="hsec"><div class="shead"><h2>People</h2><p>everyone you've tagged in Photos</p></div><div class="shelf people" id="peopleshelf"></div></div>
     <div class="hsec"><div class="shead"><h2>Trips</h2><p>found from where the photos were taken</p><span class="sp"></span><a href="#stories">All stories →</a></div>
       <div class="shelf" id="tripshelf"></div></div>
@@ -234,7 +236,7 @@
 
 <div id="frame">
   <div id="fslides"></div><div class="fshade"></div>
-  <div id="fmeta"><div id="fdate"></div><div id="fplace"></div></div>
+  <div id="fmeta"><div id="fdate"></div><div id="fwhere"></div><div id="fby"></div></div>
   <div id="fclockbox"><div id="fclock"></div><div id="fday"></div></div>
   <div id="fpick" hidden></div>
   <div id="fctl"><b id="ftitle"></b><span id="fpos"></span><button class="ghost tiny" id="fsrc">⚙ What to show</button><span class="sp"></span>
@@ -258,12 +260,14 @@
     <div id="lbppl"></div>
     <div id="lbfilm" hidden></div>
     <div id="lbacts">
+      <button id="lbpick" title="love this one: the family's picks show on Home and in the photo frame">♡ Love</button>
       <button id="lbwhy" title="why this photo matches the search" hidden>? Why</button>
       <button id="lbshow" title="play these as a slideshow">▶ Slideshow</button>
       <button id="lbday" title="this day in other years">📅 This day</button>
       <button id="lbmath" title="use in Photo Math">∑ Math</button>
       <button id="lbopen" title="show it in the Photos app">Open in Photos</button>
     </div>
+    <form id="lbwho" hidden></form>
   </div>
   <div id="whypanel" hidden></div>
   <button class="ibtn" id="lbclose" title="close (Esc)">✕</button>

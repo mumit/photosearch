@@ -70,5 +70,6 @@ Update this section when something finishes or starts.
 - **Video search:** done. All 752 videos are read; `index` reads new local ones, and `videos --icloud` the rest. `SOUND_AT` was set from my marks by ear (`data/sound-marks.json`, README → Videos).
 - **Clutter sweep:** built (Albums → Tidy up → Clutter and private photos). Sending a kind to Photos isn't tried on my library yet, and `photosearch index` needs one run to read Photos' screenshot marks.
 - **Why did this match:** done (? Why in the big photo view, `photosearch why`, `why.py`). A post is drafted.
+- **Family picks:** built (♡ Love in the big photo view, `picks.py`). Not tried by the family on phones yet.
 - **Quick first index:** done (`index --quick`, about 4× faster; the next `index` redoes those photos at full quality, newest first).
 - **Vision tokens:** done. 70 tokens is 4.7× faster, changes the first result in more than half of searches, but is only slightly worse when judged by eye (see FINDINGS.md). 280 stays the default.

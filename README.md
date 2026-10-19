@@ -265,6 +265,12 @@ In Safari, **Share → Add to Home Screen** keeps it as an app with its own icon
 good photo frame: open 🖼 Photo frame and pick what it shows. *Open in Photos* only appears on the Mac, since it opens
 Photos there.
 
+**Family picks.** Anyone can tap **♡ Love** on a photo in the big view. The first time, a device asks who's picking
+(a name already used, or a new one) and remembers it. Loved photos show on Home under *Family picks*, most loved first,
+and in the photo frame (⚙ What to show → ♥ Family picks, everyone's or one person's), with who loved each one. Picks
+are kept in this index (table `picks`), not in Photos, so a phone can add them. Names aren't checked: it's for a family
+that trusts each other. On Home, *change* next to your name lets the next person pick on the same device.
+
 Good to know: the connection is plain HTTP, so the passcode and photos cross your home Wi-Fi unencrypted. That's fine on
 a home network you trust, but don't use `--lan` on public Wi-Fi. The first time, macOS may ask whether Python may
 accept incoming connections: allow it. Without `--lan`, the server only answers on this Mac.
@@ -520,6 +526,7 @@ thing, and they only import downwards in this list:
 | `thennow.py` | Then and now: pairs of photos from the same spot or of the same person, years apart |
 | `recreate.py` | Recreate this: old photos worth taking again, your list, and the new shot when it arrives |
 | `why.py` | Why a photo matches a search: each word, what the model sees, and where in the photo |
+| `picks.py` | Family picks: who loved which photo, for Home and the photo frame |
 | `evals.py` | `photosearch eval`: comparing two variants of the index, judged blind (searches in `eval_queries.txt`) |
 | `lan.py`, `server.py` | Phones on the home Wi-Fi; the web server and its API |
 

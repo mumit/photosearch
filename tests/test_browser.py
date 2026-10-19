@@ -48,6 +48,11 @@ STEPS = [
                   "if (!document.getElementById('lbimg').style.webkitMaskImage) throw new Error('no heat map')", 0),
     ("wander", "document.querySelector('#lbsims img').click()", 3),
     ("wander-no-why", "if (!document.getElementById('lbwhy').hidden || !document.getElementById('whypanel').hidden) throw new Error('why on a look-alike')", 0),
+    ("love-who", "localStorage.removeItem('who'); document.getElementById('lbpick').click()", 2),
+    ("love", "if (document.getElementById('lbwho').hidden) throw new Error('no who chooser'); "
+             "document.getElementById('lbwhoi').value='Sam'; document.getElementById('lbwho').requestSubmit()", 2),
+    ("loved", "if (!document.getElementById('lbpick').classList.contains('on') || !document.getElementById('lbpick').textContent.includes('Sam')) "
+              "throw new Error('not loved: ' + document.getElementById('lbpick').textContent)", 0),
     ("filtered", "lbOff(); location.hash='search/?person=Sam'", 3),
     ("filters", "document.getElementById('ftoggle').click()", 1),
     ("person", "closePanel(); location.hash='person/Sam'", 3),
@@ -86,6 +91,10 @@ STEPS = [
     ("frame-ambient", "closeFrame(); location.hash='frame'", 3),
     ("frame-pick", "setTimeout(()=>document.getElementById('fsrc').click(), 500)", 2),
     ("frame-person", "location.hash='frame/?person=Sam'", 3),
+    ("frame-picks", "location.hash='frame/?picks=1'", 3),
+    ("frame-picks-by", "if (!document.getElementById('fby').textContent.includes('Sam')) throw new Error('no picker in the frame')", 0),
+    ("home-picks", "location.hash='home'; setTimeout(()=>document.getElementById('pickbox').scrollIntoView({block:'center'}), 1500)", 3),
+    ("home-picks-shown", "if (document.getElementById('pickbox').hidden || !document.querySelector('#pickshelf .tile')) throw new Error('no family picks on home')", 0),
     ("keys", "closeFrame(); setTimeout(()=>dispatchEvent(new KeyboardEvent('keydown',{key:'?'})), 800)", 2),
     ("stories", "dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'})); location.hash='stories'", 3),
     ("edit", "location.hash='edit/trip-2025-03-10'", 4),

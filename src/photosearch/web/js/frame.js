@@ -37,7 +37,8 @@ async function frameNext(step = 1) {
     requestAnimationFrame(() => { el.classList.add("on"); });
     setTimeout(() => [...$("fslides").children].slice(0, -1).forEach(o => o.remove()), 1800);
     $("fdate").textContent = x.undated ? "" : longDate(x.date, { month:"long", day:"numeric", year:"numeric" });
-    $("fplace").textContent = [short(x.place), (x.persons || []).slice(0, 3).join(", ")].filter(Boolean).join(" · ");
+    $("fwhere").textContent = [short(x.place), (x.persons || []).slice(0, 3).join(", ")].filter(Boolean).join(" · ");
+    $("fby").textContent = x.by?.length ? `♥ ${x.by.join(", ")}` : "";
     $("fpos").textContent = FR.ambient ? "" : `${FR.at + 1} / ${n}`;
     sharpen(img, x.uuid);
   };
@@ -87,6 +88,10 @@ views.frame = async arg => {
   try {
     if (p.get("person")) { title = p.get("person"); list = shuffled((await api("/api/search", { person: title, k: 240 })).results); }
     else if (p.get("q")) { title = `“${p.get("q")}”`; list = shuffled((await api("/api/search", { q: p.get("q"), k: 160 })).results); }
+    else if (p.get("picks")) {  // the family's picks, everyone's or one person's
+      title = p.get("who") ? `${p.get("who")}'s picks` : "Family picks";
+      list = shuffled((await api("/api/picks", p.get("who") ? { who: p.get("who") } : {})).results.photos);
+    }
     else if (p.get("day")) { title = "On this day"; list = (await api("/api/today", {})).results.years.flatMap(y => y.photos); }
   } catch {}
   openFrame({ list: list?.length ? list : null, title, ambient: true });
@@ -94,8 +99,9 @@ views.frame = async arg => {
 async function framePick() {
   FR.picking = true; frameUI(); framePause(true);
   const ppl = await loadPeople().catch(() => []);
+  const fam = await api("/api/picks").then(r => r.results.people).catch(() => []);
   $("fpick").innerHTML = `<div class="kick">Show in the frame</div>
-    <div class="fopts"><a href="#frame">✨ The best of everything</a><a href="#frame/?day=today">📅 On this day</a></div>
+    <div class="fopts"><a href="#frame">✨ The best of everything</a><a href="#frame/?day=today">📅 On this day</a>${fam.length ? `<a href="#frame/?picks=1">♥ Family picks</a>` : ""}${fam.length > 1 ? fam.map(f => `<a href="#frame/?picks=1&who=${encodeURIComponent(f.who)}">♥ ${esc(f.who)}'s</a>`).join("") : ""}</div>
     <div class="favs">${ppl.slice(0, 10).map(p => `<a href="#frame/?person=${encodeURIComponent(p.name)}"><img src="/thumb/${p.cover}.jpg" alt=""><span>${esc(firstName(p.name))}</span></a>`).join("")}</div>
     <form id="fq"><input id="fqi" placeholder="or anything… e.g. sunsets at the beach"><button>Show</button></form>
     <button class="ibtn" id="fpickx" title="close">✕</button>`;

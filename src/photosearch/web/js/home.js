@@ -10,7 +10,7 @@ const HERO_MS = 7000;
 views.home = arg => {
   const day = /^\d{2}-\d{2}$/.test(arg) ? arg : md(new Date());
   if (day !== HOME.day) loadHero(day); else heroShow(HOME.at);
-  loadShelves();
+  loadShelves(); loadPicks();
 };
 leave.home = () => clearTimeout(HOME.timer);
 async function loadHero(day) {
@@ -88,6 +88,16 @@ async function loadShelves() {
     const n = s.filter(x => x.kind === "year").reduce((a, x) => a + x.photos, 0);
     $("hfoot").textContent = `${n.toLocaleString()} dated photos across ${s.filter(x => x.kind === "year").length} years and ${s.filter(x => x.kind === "trip").length} trips · press / to search from anywhere, ? for all shortcuts`;
   } catch (e) { $("tripshelf").innerHTML = `<p class="status">${esc(e.message)}</p>`; }
+}
+// Family picks: the photos anyone loved (♡ in the big photo view), most loved first
+async function loadPicks() {
+  let r; try { r = (await api("/api/picks")).results; } catch { return; }
+  $("pickbox").hidden = !r.photos.length; if (!r.photos.length) return;
+  const me = picker();
+  $("pickp").innerHTML = `${r.photos.length} photo${r.photos.length > 1 ? "s" : ""} loved by ${r.people.map(p => esc(p.who)).join(", ")}` +
+    (me ? ` · picking as ${esc(me)} <a href="" id="pickme">change</a>` : "");
+  bindShelf($("pickshelf"), r.photos.slice(0, 40), x => "♥" + (x.by.length > 1 ? " " + x.by.length : ""));
+  if ($("pickme")) $("pickme").onclick = e => { e.preventDefault(); store.set("who", ""); loadPicks(); };
 }
 async function shuffle() {
   try { const r = (await api("/api/rediscover", { n: 24 })).results; bindShelf($("rediscover"), r, x => x.date.slice(0, 4)); }

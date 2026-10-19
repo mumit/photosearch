@@ -155,6 +155,7 @@ function lightbox(list, i, keepTrail = false) {
   $("lbpos").textContent = list.length > 1 ? `${i + 1} of ${list.length}` : "";
   $("lbtrail").innerHTML = LB.trail.map((t, k) => `<img src="/thumb/${t.uuid}.jpg" data-k="${k}" title="back to here">`).join("");
   const wq = x.kind === "photo" ? whyQuery() : "";
+  lovedShow(x);
   $("lbwhy").hidden = !wq;
   if (WHY.on && wq) explainPhoto(x, wq); else whyClear();
   $("lb").classList.add("on"); lbTop();
@@ -194,7 +195,40 @@ $("lbfilm").onclick = e => {
   $("lbfilm").querySelectorAll("img").forEach(i => i.classList.toggle("on", i === im));
   $("lbimg").src = im.src;
 };
-function lbOff() { $("lb").classList.remove("on"); LB.simsFor = null; WHY.on = false; whyClear(); }
+function lbOff() { $("lb").classList.remove("on"); LB.simsFor = null; WHY.on = false; whyClear(); $("lbwho").hidden = true; }
+
+/* ---------- family picks: ♡ a photo under your own name (each device remembers who's picking) ---------- */
+const picker = () => store.get("who", "");
+async function lovedShow(x) {
+  const b = $("lbpick"); b.textContent = "♡ Love"; b.classList.remove("on"); b.title = "love this one: the family's picks show on Home and in the photo frame";
+  $("lbwho").hidden = true;
+  try { lovedSet(x, (await api("/api/loved", { uuid: x.uuid })).results); } catch {}
+}
+function lovedSet(x, by) {
+  if (LB.list[LB.at] !== x) return;
+  const b = $("lbpick"), me = by.includes(picker());
+  b.classList.toggle("on", me);
+  b.textContent = by.length ? `♥ ${by.length > 2 ? `${by.slice(0, 2).join(", ")} +${by.length - 2}` : by.join(", ")}` : "♡ Love";
+  b.title = by.length ? `loved by ${by.join(", ")}${me ? " (tap to undo yours)" : ""}` : b.title;
+}
+async function lovedToggle() {
+  const x = LB.list[LB.at];
+  if (!picker()) return askWho(lovedToggle);
+  try { lovedSet(x, await post("/api/pick", { uuid: x.uuid, who: picker(), on: !$("lbpick").classList.contains("on") })); loadPicks(); }
+  catch (e) { $("lbpick").textContent = e.message; }
+}
+// Who's picking: the names already used, or a new one. Asked once per device (and on Home, "change").
+async function askWho(then) {
+  const f = $("lbwho"); f.hidden = false; lbTop();
+  let ppl = []; try { ppl = (await api("/api/picks")).results.people.map(p => p.who); } catch {}
+  f.innerHTML = `<span>Who's picking?</span>${ppl.map(w => `<button type="button" data-w="${esc(w)}">${esc(w)}</button>`).join("")}
+    <input id="lbwhoi" placeholder="${ppl.length ? "or a new name" : "your name"}" maxlength="24" autocomplete="off"><button>OK</button>`;
+  const done = w => { w = w.trim(); if (!w) return; store.set("who", w); f.hidden = true; lbTop(); then?.(); };
+  f.onclick = e => { const w = e.target.dataset?.w; if (w) done(w); };
+  f.onsubmit = e => { e.preventDefault(); done($("lbwhoi").value); };
+  if (!ppl.length) $("lbwhoi").focus();
+}
+$("lbpick").onclick = lovedToggle;
 
 /* ---------- why: which words of the search the photo fits, what the model sees in it, and where it matched ---------- */
 const WHY = { on: false, key: null };

@@ -134,6 +134,12 @@ def test_some_things_only_work_on_the_mac(srv, cookie, photos_app):
 
 
 @needs_wifi
+def test_phones_can_pick_favourites(srv, cookie, lib):
+    status, _, body = phone(srv, "POST", "/api/pick", dict(uuid=lib["dog0"], who="Sam"), cookie=cookie)
+    assert status == 200 and json.loads(body)["results"] == ["Sam"]
+
+
+@needs_wifi
 def test_a_made_up_cookie_doesnt_work(srv):
     assert phone(srv, "GET", "/api/people", cookie="ps_session=guess")[0] == 401
 

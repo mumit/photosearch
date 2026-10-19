@@ -19,7 +19,6 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 - **Judge eval sheets in the web page or through MCP,** not only with `photosearch eval score`.
 
 **Fun:**
-- **Family picks:** over LAN sharing, everyone stars favourites; the photo frame shows what the family liked.
 - **Photo book:** a story exported as a print-ready PDF.
 - **"Use as portrait"** on people pages.
 
@@ -30,6 +29,7 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 
 ## Done
 
+- Family picks: ♡ Love in the big photo view, from the Mac or a phone with `serve --lan`, under the name each device gives. Home shows the family's picks, most loved first, and the photo frame plays everyone's or one person's, saying who loved each (`picks.py`). The frame's place and people line, hidden since a filter box took its id, shows again.
 - Quick first index: `photosearch index --quick` indexes at 70 vision tokens (about 4× faster), and the next plain `index` redoes those photos at 280, newest first. Quick vectors are moved back along the words' direction so a half-redone index ranks fairly.
 - Other languages, measured: searches in Spanish, French, Hindi, Chinese, Arabic and Bengali fit about as well as English, judged blind (88 to 104 of 120 photos, English 94). Nothing to build; the README says so.
 - Shorter or compressed vectors, measured: int8 changes almost nothing, 256 numbers or 1 bit change a lot, and none is needed at 17,000 photos (52 MB, 0.6 ms a search).

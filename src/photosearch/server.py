@@ -20,6 +20,7 @@ from .dupes import DUP_LEVELS, dupes, dupes_choose, dupes_send
 from .clutter import clutter, clutter_choose, clutter_send
 from .dates import next_group, set_date, undo as undo_dates
 from .thennow import then_and_now
+from .picks import loved_by, pick, picks
 from .recreate import ideas as recreate_ideas, post as recreate_post, recreations
 from .videos import FRAMES, frame_list
 from .why import explain, vocab
@@ -150,6 +151,7 @@ def make_server(a):
            "/api/frames": lambda q: frame_list(con, q.get("uuid", "")),
            "/api/recreate": lambda q: recreate_ideas(con, int(q.get("offset", 0)), min(60, int(q.get("limit", 24)))) if q.get("view") == "ideas" else recreations(con),
            "/api/why": lambda q: explain(con, q.get("q", ""), q.get("uuid", "")),
+           "/api/picks": lambda q: picks(con, q.get("who")), "/api/loved": lambda q: loved_by(con, q.get("uuid", "")),
            "/api/thennow": lambda q: then_and_now(con, q.get("by") == "person"),
            "/api/math": lambda q: photo_math(con, q["base"], q.get("plus", ""), q.get("minus", ""),
                                              float(q.get("w", 1)), int(q.get("k", 24)))}
@@ -266,6 +268,8 @@ def make_server(a):
                       "/api/dupes": lambda b: dupes_choose(con, b),
                       "/api/dupes_send": lambda b: dupes_send(con, b.get("level") if b.get("level") in DUP_LEVELS else "same"),
                       "/api/recreate": lambda b: recreate_post(con, b),
+                      # family picks: from phones too, that's the point
+                      "/api/pick": lambda b: pick(con, str(b.get("uuid", "")), b.get("who"), bool(b.get("on", True))),
                       "/api/clutter": lambda b: clutter_choose(con, b), "/api/clutter_send": lambda b: clutter_send(con, str(b.get("kind", ""))),
                       # dates go in this index, not Photos; still only from this Mac, so a guest's guess doesn't stick
                       "/api/undated": lambda b: set_date(con, [str(u) for u in b["uuids"]][:2000], b["year"], b.get("month")),

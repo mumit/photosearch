@@ -35,6 +35,8 @@ def db():
                    match text, no text)""")
     # Photos' labels as the model reads them, for "what it sees" (why.py)
     con.execute("create table if not exists words(word text primary key, vec blob)")
+    # family picks (picks.py): who loved which photo, and when
+    con.execute("create table if not exists picks(uuid text, who text, at text, primary key(uuid, who))")
     return con
 
 
