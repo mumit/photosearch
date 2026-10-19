@@ -222,8 +222,13 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 
 **✨ Smart search (optional).** With a [TypeSafe](https://typesafe.ai) API key, the search box fills in the
 filters from your description: *"Sam at the beach last summer, no selfies"* becomes person Sam, summer 2025,
-without selfies. The chips it adds are amber, so you can see and remove what it understood; untick ✨ in the filters
-to turn it off. Put the key in a `.env` file at the top of the checkout, next to `pyproject.toml` (it's git-ignored):
+without selfies. The chips it adds are amber, so you can see and remove what it understood. It also checks the first
+40 photos: each is described in words (when it was taken, Photos' labels, what the model sees, how many named people,
+how bright and colourful it is) and Jev says which look right, which nudges their order. That helps most with how a
+photo looks ("black and white", "a storm"), adds about a third of a second, and says "✨ checked" by the results (see
+[FINDINGS.md](FINDINGS.md#checking-the-first-results-with-jev)). Jev gets your words, with names replaced by
+"someone", and those descriptions: never a photo, a name, a place or words read from a photo. Untick ✨ in the
+filters to turn both off. Put the key in a `.env` file at the top of the checkout, next to `pyproject.toml` (it's git-ignored):
 
 ```
 TYPESAFE_API_KEY=...
@@ -537,6 +542,7 @@ thing, and they only import downwards in this list:
 | `thennow.py` | Then and now: pairs of photos from the same spot or of the same person, years apart |
 | `recreate.py` | Recreate this: old photos worth taking again, your list, and the new shot when it arrives |
 | `why.py` | Why a photo matches a search: each word, what the model sees, and where in the photo |
+| `checks.py` | ✨ smart search's second step: Jev checks a search's first photos, from descriptions in words |
 | `picks.py` | Family picks: who loved which photo, for Home and the photo frame |
 | `evals.py` | `photosearch eval`: comparing two variants of the index, judged blind (searches in `eval_queries.txt`) |
 | `lan.py`, `server.py` | Phones on the home Wi-Fi; the web server and its API |

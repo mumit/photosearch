@@ -136,6 +136,7 @@ views.search = async arg => {
   if (key === R.key) return showResults();
   R.key = key; R.q = q; R.like = like; R.k = 48;
   const params = R.params = { ...(like ? { like } : { q }), ...Object.fromEntries(FIELDS.filter(k => F[k]).map(k => [k, F[k]])) };
+  if (q && !like && SMART.enabled && $("smart").checked) params.check = 1;  // ✨: Jev checks the first photos too
   $("rtitle").innerHTML = title(); $("status").textContent = "searching…"; $("racts").innerHTML = ""; $("grid").innerHTML = ""; $("more").innerHTML = "";
   try {
     const r = await api("/api/search", params);
@@ -166,7 +167,7 @@ function showResults() {
   $("rtitle").innerHTML = title();
   const oneDay = !R.q && !R.like && F.after && nextDay(F.after) === F.before;
   $("status").textContent = `${r.results.length} ${R.q || R.like ? "best matches" : oneDay ? `photo${r.results.length > 1 ? "s" : ""} from this day` : "favourites, by how interesting they look"} · from ${r.total.toLocaleString()} photos · ${r.ms} ms`
-    + (auto ? ` · ✨ ${auto}` : "");
+    + (auto ? ` · ✨ ${auto}` : "") + (r.checked ? " · ✨ checked" : "");
   const albumHash = "#album/new?" + new URLSearchParams({ ...(R.q ? { q: R.q } : {}), ...Object.fromEntries(FIELDS.filter(k => F[k]).map(k => [k, F[k]])) });
   $("racts").innerHTML = `${R.like ? "" : `<a class="pill" href="${albumHash}" title="save as an album that keeps itself up to date">＋ Album</a>`}<button class="pill" id="rshow">▶ Slideshow</button>${F.person && !F.person.includes(",") ? `<a class="pill" href="#person/${encodeURIComponent(F.person)}">👤 ${esc(firstName(F.person))}'s page</a>` : ""}${R.q ? `<a class="pill" href="#time/${encodeURIComponent(R.q)}">⏳ Through the years</a><a class="pill" href="#galaxy/${encodeURIComponent(R.q)}">✦ In the galaxy</a>` : ""}
     <div class="seg"><button data-s="best" class="${R.sort === "best" ? "on" : ""}">Best match</button><button data-s="date" class="${R.sort === "date" ? "on" : ""}">By date</button></div>`;

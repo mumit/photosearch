@@ -47,10 +47,8 @@ def ask_jev(text):
         return json.load(r)["answers"]
 
 
-def parse_query(con, text, today=None):
-    """Turn "Sam at the beach last summer, no selfies" into search filters. Names and years are found locally;
-    the rest is asked of Jev, which only ever sees the text with tagged names replaced by "someone"."""
-    today = today or date.today()
+def mask(con, text):
+    """(the tagged people named in text, text with each of them replaced by "someone"): Jev never sees a name."""
     people = sorted({p for (j,) in con.execute("select persons from photos") for p in json.loads(j)}, key=len, reverse=True)
     firsts = Counter(p.split()[0].lower() for p in people)
     found, masked = [], text
@@ -59,6 +57,14 @@ def parse_query(con, text, today=None):
             pat = re.compile(rf"\b{re.escape(name)}\b", re.I)
             if pat.search(masked):
                 masked = pat.sub("someone", masked); found.append(p); break
+    return found, masked
+
+
+def parse_query(con, text, today=None):
+    """Turn "Sam at the beach last summer, no selfies" into search filters. Names and years are found locally;
+    the rest is asked of Jev, which only ever sees the text with tagged names replaced by "someone"."""
+    today = today or date.today()
+    found, masked = mask(con, text)
     a = ask_jev(masked)
     pick = lambda k: a[k]["choice"] if a[k].get("confidence", 1) >= CHOICE_P else None
     f = dict(person=", ".join(found), kind="", after="", before="", season="", exclude="")

@@ -10,6 +10,7 @@ from .config import DATA, LIBRARY, ROOT, THUMBS, WEB
 from .store import ThreadCon, index_library, photo_info
 from .images import photo_jpeg
 from .search import SEASONS, best_of, search, similar
+from .checks import CHECK_N, check
 from .smartbox import parse_query
 from .places import near, world
 from .people import people, person
@@ -82,6 +83,12 @@ def presenter_library(a):
     return Path(lib).stem
 
 
+class Checked(list):
+    """Search results, and whether Jev checked them (✨, checks.py)."""
+    def __init__(self, items, checked):
+        super().__init__(items); self.checked = checked
+
+
 def cmd_serve(a):
     make_server(a).serve_forever()
 
@@ -108,7 +115,11 @@ def make_server(a):
             return similar(con, q["like"], k, **f)
         if not q.get("q"):  # just filters, e.g. a person picked from the suggestions
             return best_of(con, k, **f)
-        return search(con, q["q"], k, split(q.get("exclude")), **f)
+        res = search(con, q["q"], max(k, CHECK_N) if q.get("check") else k, split(q.get("exclude")), **f)
+        if q.get("check"):  # ✨ on: Jev checks the first photos (checks.py)
+            res, done = check(con, q["q"], res)
+            return Checked(res[:k], checked=done)
+        return res
 
     def api_parse(q):  # the smart search box: {"enabled": False} when there's no Jev key
         if not smartbox.jev_key():
@@ -228,7 +239,8 @@ def make_server(a):
                 if u.path in api:
                     t = time.time(); res = api[u.path](q)
                     total = con.execute("select count(*) from photos").fetchone()[0]
-                    return self.send(json.dumps(dict(results=res, ms=int((time.time()-t)*1000), total=total)).encode(),
+                    extra = dict(checked=res.checked) if isinstance(res, Checked) else {}
+                    return self.send(json.dumps(dict(results=res, ms=int((time.time()-t)*1000), total=total, **extra)).encode(),
                                      "application/json")
             except LookupError as ex:
                 return self.send(json.dumps(dict(error=str(ex))).encode(), "application/json", 404)

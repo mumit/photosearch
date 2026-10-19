@@ -28,7 +28,7 @@ def test_page_is_served_with_what_it_needs_to_know(srv):
     "/api/person?name=Sam", "/api/days?year=2025", "/api/near?lat=38.72&lon=-9.14", "/api/timeline?q=cake",
     "/api/game?mode=place", "/api/math?base=dog&plus=snow", "/api/albums", "/api/dupes", "/api/dupes?level=similar",
     "/api/info?uuid={beach0}", "/api/parse?q=beach", "/api/sharp?uuids={beach0}",
-    "/api/picks", "/api/picks?who=Sam", "/api/loved?uuid={beach0}",
+    "/api/picks", "/api/picks?who=Sam", "/api/loved?uuid={beach0}", "/api/search?q=beach&check=1",
 ])
 def test_every_api_answers(srv, lib, path):
     status, h, body = srv.get(path.format(**lib))

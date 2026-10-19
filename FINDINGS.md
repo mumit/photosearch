@@ -308,6 +308,43 @@ search can't, but only when asked for.
 
 **Measure again** with a new model (it may read more), or before trying a boost again: start from the cases above.
 
+## Checking the first results with Jev
+
+Jev (TypeSafe's text-only decision model) can't see a photo, so each of a search's first 40 photos was described
+in words: the month and time it was taken, Photos' labels, what the search model sees (`why.sees`), how many named
+people are in it, and its brightness, colour and detail measured from the thumbnail. Jev then answered "is this
+likely a good result for the search?", and that answer, times W, was added to the photo's score.
+
+**Measured on 16 of the weakest searches** (how a photo looks, counting and mood, small objects): all 640 photos
+labelled by eye before Jev was asked, then the first 10 counted.
+
+| How Jev was asked | AUC | Fits in the first 10s at W = 0 / 0.02 / 0.04 / 0.08 (of 160) |
+|---|---|---|
+| one photo per call | 0.71 | 121 / 129 / 128 / 133 |
+| one photo per call, no image line | 0.70 | 121 / 128 / 129 / 130 |
+| all 40 photos in one call | 0.75 | 121 / 132 / **136** / 135 |
+| all 40 in one call, no image line | 0.72 | 121 / 127 / 133 / 136 |
+
+Asking about all 40 photos in one call was better and much faster (0.1 to 0.2 s for a search, against 40 calls of
+0.13 s). At 0.04 it helped most for "a black and white photo" (6 to 10), "a storm" (7 to 10), "a happy moment" and
+"a ball" (7 to 9). It did nothing for "a close-up" or "one person alone", where the words can't tell skin from a face
+or a lone person from an empty room, and "a vase" lost one.
+
+**On 20 everyday searches** (a waterfall, a pool, a group photo), only the photos that move in or out of the first
+10 were judged, blind. With all 40 in one call: W = 0.02 gained 6 fitting photos (5 searches better, 1 worse), 0.04
+gained 9 (8 better, 2 worse), 0.08 gained 11 (8 better, 2 worse).
+
+**What goes to TypeSafe:** the search and those descriptions, never the photo, names or places. An early run also
+sent up to 12 words read from each photo (text.py). They're left out, since document photos hold IDs and forms, and
+the numbers above are without them.
+
+**Caveats:** one judge, and W was picked on the same searches it was measured on. 0.04 is the middle of a flat range.
+
+**What's used** (`checks.py`): with ✨ smart search on, the first 40 photos are described, all in one call, at W =
+0.04. It adds about 0.35 s to a search (0.25 s Jev, 0.1 s describing). Videos keep their place: they weren't measured.
+
+**Measure again** with a new Jev model, or before using it for more than the first 40.
+
 ## Search, negation and the search box
 
 - **Photos that match everything.** A CSLS-style penalty on every photo, using Apple's labels as a query bank, was
