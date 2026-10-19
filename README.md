@@ -492,7 +492,8 @@ Don't switch the model to float16: it produces broken vectors (NaNs). The code u
 2. **EmbeddingGemma 2** turns each preview into a 768-number vector, and turns your search text into a vector
    in the same space (with the prefix `task: search result | query:`).
 3. Search ranks every photo by cosine similarity to the query vector. At this scale that's a few
-   milliseconds in NumPy, so no vector database is needed.
+   milliseconds in NumPy, so no vector database is needed. Photos that come up for almost any words (accidental
+   shots, close textures) count for a little less (see [FINDINGS.md](FINDINGS.md#where-search-breaks-down)).
 4. With `photosearch videos`, a video ranks by its best moment: its poster, a later frame, or a piece of its sound.
    Sounds land in the same space as text, but are scored by how much closer they are to the search than to everyday
    home-video sounds (talking, background noise). Otherwise a loud clip matches every search.

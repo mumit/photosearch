@@ -36,7 +36,7 @@ def fake_embed(text):
 
 def reset_caches():
     store._vecs = (None, [], np.zeros((0, config.DIM), np.float32), {})
-    search._interest = (None, None)
+    search._interest = search._hubs = (None, None)
     clutter._found = (None, None)
     thennow._pairs = thennow._people = recreate._ideas = (None, None)
     videos._clips = (None,)

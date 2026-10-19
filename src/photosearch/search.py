@@ -29,12 +29,38 @@ def filtered(con, person=None, after=None, before=None, kind=None, place=None, m
     return keep, M[[pos[u] for u in keep]]
 
 
-def rank(con, qvec, k, sounds=False, **filters):
-    """A video scores by its best moment (videos.py): a later frame, or with sounds, what's heard. at: when."""
+# Some photos come up for almost any words: accidental shots, black frames, close textures (leaves, rocks, dry
+# grass). Each loses up to HUB_W by how many first pages (HUB_K) it is in when Photos' own labels are searched for,
+# counted up to HUB_CAP. Judged blind on 115 searches, the photos this changes in the first 10 fit better: 98
+# coming in against 75 going out, most where search was weakest (dark, black-and-white, dusk, printed pages).
+HUB_W, HUB_K, HUB_CAP, HUB_WORDS = 0.04, 24, 40, 100
+_hubs = (None, None)
+
+def hub_penalty(con):
+    """{uuid: how much to take off its score for words}, from the photos that match everything."""
+    global _hubs
+    uuids, M, _ = vectors(con)
+    if _hubs[0] is not M:
+        from .why import vocab
+        _, V = vocab(con)
+        pen = {}
+        if len(V) >= HUB_WORDS and len(uuids) > HUB_K:  # too few labels (a new library) to tell
+            top = np.argpartition(-(V @ M.T), HUB_K, axis=1)[:, :HUB_K]
+            n = np.bincount(top.ravel(), minlength=len(uuids))
+            pen = {uuids[i]: HUB_W * min(int(n[i]), HUB_CAP) / HUB_CAP for i in np.nonzero(n)[0]}
+        _hubs = (M, pen)
+    return _hubs[1]
+
+
+def rank(con, qvec, k, sounds=False, words=False, **filters):
+    """A video scores by its best moment (videos.py): a later frame, or with sounds, what's heard. at: when.
+    words: qvec is a search for words, so photos that match everything count for less (hub_penalty)."""
     uuids, M = filtered(con, **filters)
     if not uuids:
         return []
     scores, at = M @ qvec, {}
+    if words and (pen := hub_penalty(con)):
+        scores = scores - np.array([pen.get(u, 0.0) for u in uuids], np.float32)
     if filters.get("kind") != "photo":
         mo = videos.moments(con, qvec, sounds)
         if mo:
@@ -60,7 +86,7 @@ def search(con, query, k=24, exclude=None, **f):
         q = q - EXCLUDE_W * embed.embed_query(x)
     if exclude:
         q = (q / np.linalg.norm(q)).astype(np.float32)
-    return rank(con, q, k, sounds=True, **f)
+    return rank(con, q, k, sounds=True, words=True, **f)
 
 
 def similar(con, uuid, k=24, **f):

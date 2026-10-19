@@ -16,7 +16,8 @@ move. New experiments go through `photosearch eval` (README → Experiments) and
 2. **Some things score high against everything. Subtract a baseline.** A loud video clip, a patch of sky and a quick
    vector all sit close to *any* words, so their raw scores flatter them. The fix that worked each time: score by how
    much closer something is to the search than to everyday descriptions (`SOUND_BASE` for sound, `BASE` for Why, the
-   app's own search words for quick vectors). A general penalty learned from Apple's labels (CSLS) made things worse.
+   app's own search words for quick vectors). For photos that match everything, a CSLS penalty on every photo made
+   things worse, but a small one only for the photos that crowd many first pages helped (see Where search breaks down).
 3. **Each search's scores sit at their own level.** No single score splits right from wrong across searches: a wrong
    sound for "a baby crying" scored higher than a right one for "music playing". Cut-offs are compromises, set where
    most right ones stay in the first page.
@@ -208,11 +209,69 @@ parent holding a baby, posing for a photo") found kid portraits and parent-with-
 found busy scenes (a trampoline, a party) that can't be redone. Matching the new shot (0.80, then you confirm) isn't
 measured yet: it needs a real recreation.
 
+## Where search breaks down
+
+Which kinds of search the model gets wrong, and which photos it gets wrong for every search.
+
+**Searches by kind.** 65 searches in 10 groups, over the whole library, each first 10 judged by eye (650 photos):
+
+| Group | Photos that fit | Weakest |
+|---|---|---|
+| Activities (swimming, martial arts, a trampoline) | 67 of 70 | |
+| Rooms (a kitchen, a bathroom, a classroom) | 54 of 60 | a living room, 8 |
+| Events (a birthday cake, a wedding, a stage performance) | 54 of 60 | a Christmas tree, an amusement park, 8 |
+| Big scenes (snowy mountains, a lake, a city skyline) | 60 of 70 | a sunset, 6 |
+| People (a baby, a crowd, a man in a suit) | 60 of 70 | a selfie, 6 |
+| Animals (a parrot, a shark, a dinosaur) | 59 of 70 | a cat, 1 (there are hardly any cats) |
+| Counting and mood (three people, a happy moment) | 50 of 60 | one person alone, 4 |
+| Small objects (a candle, a vase, a ball) | 57 of 70 | a bicycle, a candle, a vase, a ball, 7 |
+| Text and documents (a receipt, a whiteboard) | 47 of 60 | a printed page, 3; a chart, 6 |
+| Light and style (dusk, fog, black and white) | 38 of 60 | a close-up, 3; black and white, dusk, 5 |
+
+546 of 650 in all (84%). What went wrong:
+- **Searches for how a photo looks, not what's in it.** "A close-up" found accidental shots of skin and fingers.
+  "Black and white" and "one person alone" found black frames. "Dusk" found a red sun in midday wildfire smoke.
+  "Fog" and "a very dark photo" were fine.
+- **Printed pages and charts** brought up whiteboards, screenshots and blank paper.
+- **Small things** do worse than scenes, as Why found: a bicycle in a garage, a candle on a lamp.
+- **Counting** did better than expected ("three people" 10 of 10, "exactly two children" 9 of 10), but "one person
+  alone" didn't.
+- **"A cat" and "a dog"** fail because the library has almost none (Photos labels 1 photo "Canine"; its 31
+  "Feline" are tigers). Earlier low scores for fireworks, a church interior and a picnic were the same: nothing to
+  find. So a low score alone doesn't mean the model failed.
+- **Photos' labels can't stand in for judging.** "People eating" was 10 of 10 by eye, yet held only 1 of the 34
+  photos Photos labels "Eating" in its first 100; "a graduation or ceremony" had 8 of 10, and 11% of its label.
+
+**Photos that match everything.** Searching for each of Photos' 639 label words (`why.vocab`), a photo would be in
+0.9 first pages (24 photos) by chance. A few are in 20 to 42, and 62% of the library is in none. The worst, by eye:
+accidental shots (a finger over the lens, a pocket, orange blur, a floor), close textures with no subject (rock
+pools, leaves, dry grass, ground), and small animals far off in dry fields. A model like this puts such photos near
+the middle of the space, close to everything.
+
+**The fix (`hub_penalty` in `search.py`).** For a search by words, a photo loses up to 0.04 by how many of those
+first pages it's in (up to 40). Judged blind, on photos only, the photos it changes in the first 10:
+
+| Searches | Photos changed | Fit, of those leaving | Fit, of those coming in |
+|---|---|---|---|
+| 50 from `photosearch eval` | 41 | 25 | 30 |
+| the 65 above, new to it | 74 | 50 | 68 |
+
+On the 65, it helped most where search was weakest: in light and style, 1 of the 10 photos leaving fit and 9 of
+those coming in; text, 2 against 5; small objects, 6 against 9. A gentler 0.02 changed half as many and was even
+(15 against 15). The counts take 0.12 s, once per index change. Looks like this (photo to photo) is unchanged.
+Needs 100+ label words, so a new library's searches stay plain.
+
+**Not used: leaving accidental shots out of search** (the 30 from Tidy up). It helped where they crowded in (black
+frames for "a street at night") but changed only 12 photos over 115 searches, would hide them from "a very dark
+photo", and the hub penalty already pushes them down.
+
+**Measure again** with a new model, or if `why.vocab`'s words change a lot.
+
 ## Search, negation and the search box
 
-- **Photos that match everything.** Some photos (very dark, very plain) score fairly high for any query. A CSLS-style
-  penalty using Apple's labels as a query bank was tried on ~5k photos and made results worse (it boosted documents
-  and handwriting), so search uses plain cosine.
+- **Photos that match everything.** A CSLS-style penalty on every photo, using Apple's labels as a query bank, was
+  tried on ~5k photos and made results worse (it boosted documents and handwriting). A smaller penalty for only the
+  photos that crowd many first pages works; see Where search breaks down.
 - **Negation.** The model is weak at "no selfies" inside a query. `exclude` subtracts 0.5× the excluded text's vector
   from the query instead (as Photo Math does). On "group photos at a party" minus "a selfie" it removed the selfies;
   for "no people" in landscapes the plain query already worked.

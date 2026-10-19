@@ -22,6 +22,27 @@ def test_exclude_pushes_matches_away(lib, con):
     assert not any(n.startswith("dog") for n in without[:8])
 
 
+def test_photos_that_match_everything_count_for_less(lib, con, monkeypatch):
+    """A photo in the first page of every label's search loses HUB_W for words, but not as an example."""
+    import numpy as np
+    from photosearch import why
+    _, M, pos = store.vectors(con)
+    hub = M[pos[lib["copy0"]]]
+    rng = np.random.default_rng(0)
+    V = np.stack([hub + 0.01 * rng.standard_normal(len(hub)) for _ in range(search.HUB_WORDS)]).astype(np.float32)
+    monkeypatch.setattr(why, "vocab", lambda con: ([f"w{i}" for i in range(len(V))], V))
+    pen = search.hub_penalty(con)
+    assert pen[lib["copy0"]] == search.HUB_W and pen.get(lib["dog0"], 0) < search.HUB_W
+    plain = {r["uuid"]: r["score"] for r in search.rank(con, search.embed.embed_query("snow"), 400)}
+    worded = {r["uuid"]: r["score"] for r in search.search(con, "snow", 400)}
+    assert worded[lib["copy0"]] == pytest.approx(plain[lib["copy0"]] - search.HUB_W, abs=1e-5)
+    assert lib["copy0"] in {r["uuid"] for r in search.similar(con, lib["copy1"], 3)}  # look-alikes don't change
+
+
+def test_too_few_labels_turn_it_off(con):
+    assert search.hub_penalty(con) == {}  # the made-up library has few labels
+
+
 def test_scores_come_best_first(con):
     scores = [r["score"] for r in search.search(con, "snow", 20)]
     assert scores == sorted(scores, reverse=True)
