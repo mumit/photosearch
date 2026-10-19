@@ -7,8 +7,11 @@ libraries the page loads), so it only runs when asked:
 import asyncio, base64, json, os, shutil, subprocess, tempfile, time, urllib.request
 from pathlib import Path
 
+import numpy as np
 import pytest
 
+from photosearch import why
+from library import axis, noise, unit
 from server import Server, free_port
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -17,6 +20,16 @@ pytestmark = [pytest.mark.browser, pytest.mark.skipif(not Path(CHROME).exists(),
 # throws, so the step fails, unless this element is on top all over the screen (a 5 x 5 grid of points)
 ON_TOP = ("for (let i = 1; i < 6; i++) for (let j = 1; j < 6; j++) {{ const e = document.elementFromPoint(innerWidth * i / 6, innerHeight * j / 6); "
           "if (!e?.closest('#{}')) throw new Error('covered by ' + e?.tagName + '#' + e?.id + '.' + e?.className) }}")
+
+
+def beach_corner(im):
+    """The fake model's squares for Why?: a beach in the top left corner of every photo."""
+    rng = np.random.default_rng(5)
+    T = np.stack([unit(noise(rng, 1)) for _ in range(24)])
+    for i in (0, 1, 6, 7):
+        T[i] = unit(axis("beach") + 0.3 * T[i])
+    return T, 6, 4
+
 
 # (name, JavaScript to run, seconds to wait after)
 STEPS = [
@@ -30,7 +43,11 @@ STEPS = [
     ("search", "document.getElementById('sugg').classList.remove('on'); location.hash='search/'+encodeURIComponent('sunset at the beach')", 3),
     ("by-date", "document.querySelector('.seg [data-s=date]').click()", 1),
     ("lightbox", "document.querySelector('.seg [data-s=best]').click(); document.querySelector('#grid .tile').click()", 3),
+    ("why", "document.getElementById('lbwhy').click()", 2),
+    ("why-shown", "if (!document.querySelector('#whypanel .wsees span') || !document.querySelector('#whypanel .wrow')) throw new Error('no why panel'); "
+                  "if (!document.getElementById('lbimg').style.webkitMaskImage) throw new Error('no heat map')", 0),
     ("wander", "document.querySelector('#lbsims img').click()", 3),
+    ("wander-no-why", "if (!document.getElementById('lbwhy').hidden || !document.getElementById('whypanel').hidden) throw new Error('why on a look-alike')", 0),
     ("filtered", "lbOff(); location.hash='search/?person=Sam'", 3),
     ("filters", "document.getElementById('ftoggle').click()", 1),
     ("person", "closePanel(); location.hash='person/Sam'", 3),
@@ -160,6 +177,8 @@ def test_tour(monkeypatch, width, height, phone):
     shots = os.environ.get("PHOTOSEARCH_SHOTS")
     if shots:
         Path(shots).mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(why, "tokens", beach_corner)
+    monkeypatch.setattr(why, "COMMON", 0)  # the made-up library has too few labels to leave out the common ones
     s = Server(monkeypatch)
     try:
         problems = tour(f"http://localhost:{s.port}/", width, height, phone, shots)

@@ -11,6 +11,7 @@
   photosearch eval run NAME tokens=70 | score | report   compare two variants of the index, judged blind
   photosearch dates [set GROUP 2007-01 | undo GROUP|all]  date the photos whose date is a placeholder
   photosearch videos [--icloud] [--limit N]             embed each video's sound and a frame every 3 s
+  photosearch why "a red balloon" UUID [--out F.jpg]     why a photo matches: where in it, which words, what it sees
 
 Nothing is downloaded from iCloud: with "Optimize Mac Storage" on we embed the
 local preview Photos keeps (the model only sees ~280 visual tokens anyway).
@@ -32,6 +33,7 @@ from .demo import cmd_demo_check
 from .evals import cmd_eval
 from .videos import cmd_download_videos, cmd_videos
 from .dates import cmd_dates
+from .why import cmd_why
 
 
 def cmd_album(a):
@@ -151,6 +153,9 @@ def main():
     p = sub.add_parser("videos", help="embed each video's sound and a frame every 3 s, so searches find what's heard and when")
     p.add_argument("--icloud", action="store_true", help="also download videos only in iCloud (~2 s each; Photos keeps the original)")
     p.add_argument("--limit", type=int); p.set_defaults(fn=cmd_videos)
+    p = sub.add_parser("why", help="why a photo matches a search: where in it (a lit copy), which words, what it sees")
+    p.add_argument("query"); p.add_argument("uuid", help="the photo's uuid, or its first few characters")
+    p.add_argument("--out", metavar="F.jpg", help="where to write the lit copy (default why-UUID.jpg)"); p.set_defaults(fn=cmd_why)
     p = sub.add_parser("download-videos", help="download videos (by uuid) from iCloud into a folder; used by `videos --icloud`")
     p.add_argument("dir"); p.add_argument("uuids", nargs="+"); p.set_defaults(fn=cmd_download_videos)
     a = ap.parse_args()

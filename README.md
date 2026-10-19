@@ -220,6 +220,14 @@ of them; **📅 This day** shows the same date in other years; **∑ Math** star
 shows it in the Photos app (the first time, macOS asks whether your terminal may control Photos; click OK).
 ← → or a swipe browse; Esc or a swipe down closes. Press **?** anywhere for all the shortcuts.
 
+**? Why** (on a photo opened from a search) says why it matched. *How much each word counts*: each word is left out
+of the search in turn, and a word the photo doesn't fit is marked: "a red balloon in the sky" matched a red sun in
+wildfire smoke, and *balloon* doesn't fit. *What the model sees*: the words from Photos' own labels that are closest
+to the photo (a "pumpkin" match that sees *mask, helmet, cloak* is a Halloween costume). *Where*: the part of the
+photo that matched stays lit and the rest dims, or, for a match on the whole scene (a backyard, a pool), it says so.
+It stays open as you step through the results. The first `serve` after an update reads Photos' labels once (about
+30 s).
+
 Search results come 48 at a time; **Show more** at the bottom fetches the next batch.
 
 *Guess the Place* loads its map from OpenStreetMap, so it needs internet; only map tiles are fetched, never your photos.
@@ -265,6 +273,13 @@ uv run photosearch similar <uuid>
 ```
 
 Each result line shows score, date, photo/video, the photo's ID (uuid), place and people.
+
+```bash
+uv run photosearch why "a red balloon in the sky" 1A2B3C4D
+```
+
+Why a photo matches (its uuid, or the first few characters): how much each word counts, what the model sees, and
+`why-1A2B3C4D.jpg`, a copy with the part that matched lit.
 
 ### Ask Claude about your photos (MCP)
 
@@ -488,6 +503,7 @@ thing, and they only import downwards in this list:
 | `dates.py` | The date detective: grouping undated photos, their clues, and the dates you give them |
 | `thennow.py` | Then and now: pairs of photos from the same spot or of the same person, years apart |
 | `recreate.py` | Recreate this: old photos worth taking again, your list, and the new shot when it arrives |
+| `why.py` | Why a photo matches a search: each word, what the model sees, and where in the photo |
 | `evals.py` | `photosearch eval`: comparing two variants of the index, judged blind (searches in `eval_queries.txt`) |
 | `lan.py`, `server.py` | Phones on the home Wi-Fi; the web server and its API |
 
@@ -588,6 +604,18 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
   ("a child posing for the camera", "a parent holding a baby, posing for a photo") found kid portraits and
   parent-with-baby shots. The general interest score found busy scenes (a trampoline, a party) that can't be redone.
   Matching the new shot (0.80, then you confirm) isn't measured yet: it needs a real recreation.
+- Why (`why.py`): the model's vector for a photo is the mean of its squares' vectors (a grid of about 19 × 14), so
+  each square's score is its exact share of the photo's score, from one pass of the model (0.5 s). Tested by
+  covering the hottest quarter of 17 photos (6 searches) and measuring how far the score fell: 0.032 on average when
+  each square counts by how much closer it is to the search than to everyday descriptions, 0.025 by its plain score
+  (stray squares of sky scored high for anything), 0.027 covering squares one at a time (16 s a photo), 0.002 for a
+  random quarter. Searches for a whole scene barely fall whatever is covered: there, 64-74% of the lit part sits in
+  the hottest quarter, against 80-92% for a dog or a balloon, so below 77% it says the whole scene matches. Judged by
+  eye on 20 searches: small, clear things light up well (a soccer ball, a lighthouse, a bowl of noodles); a small dog
+  in a group photo or an airplane wing don't. Leaving a word out was right each time it said a word didn't fit
+  (a balloon that was the sun, fishing with nobody fishing). What it sees uses Photos' labels as words (those on 3+
+  photos, without the 40 most common): on 1,500 photos, one of its top five was among Photos' own labels for 71%,
+  against 5% for the five most used labels.
 - Some photos (very dark, very plain) score fairly high for any query. A CSLS-style penalty using Apple's labels as a
   query bank was tried on ~5k photos and made results worse (it boosted documents and handwriting), so search uses
   plain cosine.

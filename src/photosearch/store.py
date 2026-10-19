@@ -31,6 +31,8 @@ def db():
     # old photos I'll shoot again (recreate.py): state todo or done, match the new shot, no the shots that weren't it
     con.execute("""create table if not exists recreate(uuid text primary key, person text, picked text, state text,
                    match text, no text)""")
+    # Photos' labels as the model reads them, for "what it sees" (why.py)
+    con.execute("create table if not exists words(word text primary key, vec blob)")
     return con
 
 

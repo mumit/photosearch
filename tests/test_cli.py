@@ -14,7 +14,7 @@ def run(*args):
 
 def test_help_lists_every_command():
     out = run("--help")
-    for cmd in ("index", "search", "serve", "fetch", "add-to-album", "trips", "today", "review"):
+    for cmd in ("index", "search", "serve", "fetch", "add-to-album", "trips", "today", "review", "why"):
         assert cmd in out
     assert out.startswith("usage: photosearch")
 

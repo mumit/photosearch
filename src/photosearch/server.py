@@ -22,6 +22,7 @@ from .dates import next_group, set_date, undo as undo_dates
 from .thennow import then_and_now
 from .recreate import ideas as recreate_ideas, post as recreate_post, recreations
 from .videos import FRAMES, frame_list
+from .why import explain, vocab
 from .photos_app import Fetcher
 from .lan import LOGIN, LanAccess
 
@@ -93,6 +94,7 @@ def make_server(a):
     lan = LanAccess(a.port, a.new_passcode) if a.lan else None
     allowed = {f"localhost:{a.port}", f"127.0.0.1:{a.port}"} | (lan.hosts if lan else set())
     embed.model()  # warm up before first request
+    vocab(con)  # Photos' labels for the Why? panel: read by the model once (~30 s), then kept in the index
     fetcher = Fetcher(con)
 
     split = lambda v: [x.strip() for x in (v or "").split(",") if x.strip()]
@@ -147,6 +149,7 @@ def make_server(a):
            "/api/undated": lambda q: next_group(con, (q.get("skip") or "").split("|")),
            "/api/frames": lambda q: frame_list(con, q.get("uuid", "")),
            "/api/recreate": lambda q: recreate_ideas(con, int(q.get("offset", 0)), min(60, int(q.get("limit", 24)))) if q.get("view") == "ideas" else recreations(con),
+           "/api/why": lambda q: explain(con, q.get("q", ""), q.get("uuid", "")),
            "/api/thennow": lambda q: then_and_now(con, q.get("by") == "person"),
            "/api/math": lambda q: photo_math(con, q["base"], q.get("plus", ""), q.get("minus", ""),
                                              float(q.get("w", 1)), int(q.get("k", 24)))}

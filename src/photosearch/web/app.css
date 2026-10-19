@@ -372,7 +372,23 @@ footer { padding:40px clamp(16px, 4vw, 48px) 48px; color:var(--mut); font-size:1
 #lbsims { display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; }
 #lbsims img { height:76px; width:auto; min-width:40px; border-radius:6px; cursor:pointer; opacity:.75; transition:opacity .2s, transform .2s; flex:none; }
 #lbsims img:hover { opacity:1; transform:translateY(-3px); }
+#lbacts button.on { background:#fff; color:#000; }
+#whypanel { position:absolute; top:84px; right:72px; z-index:3; width:260px; max-height:calc(100% - 240px); overflow-y:auto; padding:12px 14px 6px;
+  border-radius:12px; background:rgba(0,0,0,.6); border:1px solid rgba(255,255,255,.12); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); font-size:13px; }
+#whypanel[hidden] { display:none; }
+#whypanel .wh { display:flex; align-items:flex-start; gap:8px; font-weight:600; line-height:1.3; }
+#whypanel .wh .ibtn { margin-left:auto; flex:none; width:26px; height:26px; font-size:12px; }
+#whypanel .wsub { margin:12px 0 6px; color:#aaa; font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+#whypanel .wnote { margin:0 0 8px; color:#ddd; }
+.wrow { display:grid; grid-template-columns:minmax(60px, auto) 1fr 64px; align-items:center; gap:8px; margin-bottom:5px; }
+.wrow i { height:6px; border-radius:3px; background:rgba(255,255,255,.1); overflow:hidden; }
+.wrow b { display:block; height:100%; border-radius:3px; background:#8fd694; }
+.wrow.neg b { background:#ff8f7a; }
+.wrow em { font-style:normal; font-size:11px; color:#ff8f7a; }
+.wsees { display:flex; flex-wrap:wrap; gap:5px; }
+.wsees span { padding:3px 9px; border-radius:999px; background:rgba(255,255,255,.12); }
 @media (max-width: 760px) {
+  #whypanel { top:auto; bottom:10px; left:10px; right:10px; width:auto; max-height:46%; }
   #lbstage { padding:var(--lbtop, 96px) 0 0; }  /* below the info, however many lines it takes */
   .lbnav { display:none !important; }
   #lbinfo { right:60px; gap:8px; }

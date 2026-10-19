@@ -154,6 +154,9 @@ function lightbox(list, i, keepTrail = false) {
   $("lbprev").style.visibility = i > 0 ? "" : "hidden"; $("lbnext").style.visibility = i < list.length - 1 ? "" : "hidden";
   $("lbpos").textContent = list.length > 1 ? `${i + 1} of ${list.length}` : "";
   $("lbtrail").innerHTML = LB.trail.map((t, k) => `<img src="/thumb/${t.uuid}.jpg" data-k="${k}" title="back to here">`).join("");
+  const wq = x.kind === "photo" ? whyQuery() : "";
+  $("lbwhy").hidden = !wq;
+  if (WHY.on && wq) explainPhoto(x, wq); else whyClear();
   $("lb").classList.add("on"); lbTop();
   clearTimeout(LB.timer); LB.timer = setTimeout(() => loadSims(x), 220);  // not on every arrow press while flicking through
 }
@@ -191,7 +194,44 @@ $("lbfilm").onclick = e => {
   $("lbfilm").querySelectorAll("img").forEach(i => i.classList.toggle("on", i === im));
   $("lbimg").src = im.src;
 };
-function lbOff() { $("lb").classList.remove("on"); LB.simsFor = null; }
+function lbOff() { $("lb").classList.remove("on"); LB.simsFor = null; WHY.on = false; whyClear(); }
+
+/* ---------- why: which words of the search the photo fits, what the model sees in it, and where it matched ---------- */
+const WHY = { on: false, key: null };
+// The words behind the photos in the lightbox, when they came straight from a search (look-alikes have none)
+const whyQuery = () => tab === "search" && R.q && !R.like && (LB.list === R.results || LB.list === $("grid")._list) ? R.q : "";
+function whyClear() {
+  WHY.key = null; $("whypanel").hidden = true; $("lbwhy").classList.remove("on");
+  const s = $("lbimg").style; s.maskImage = s.webkitMaskImage = "";
+}
+async function explainPhoto(x, q) {
+  const key = x.uuid + "|" + q; if (WHY.key === key) return;
+  whyClear(); WHY.key = key; $("lbwhy").classList.add("on");
+  const p = $("whypanel"), head = `<div class="wh">Why it matches “${esc(q)}”<button class="ibtn" id="whyx" title="close">✕</button></div>`;
+  p.innerHTML = head + `<p class="wnote">looking…</p>`; p.hidden = false;
+  let r;
+  try { r = (await api("/api/why", { q, uuid: x.uuid })).results; }
+  catch (e) { if (WHY.key === key) p.innerHTML = head + `<p class="wnote">${esc(e.message)}</p>`; return; }
+  if (WHY.key !== key) return;
+  const top = Math.max(1e-6, ...r.words.map(w => Math.abs(w.change)));
+  p.innerHTML = head +
+    (r.words.length ? `<div class="wsub">How much each word counts</div>` + r.words.map(w =>
+      `<div class="wrow ${w.misfit ? "neg" : ""}"><span>${esc(w.word)}</span><i><b style="width:${(Math.abs(w.change) / top * 100).toFixed(0)}%"></b></i><em>${w.misfit ? "doesn’t fit" : ""}</em></div>`).join("") : "") +
+    (r.sees.length ? `<div class="wsub">What the model sees</div><div class="wsees">${r.sees.map(s => `<span>${esc(s.toLowerCase())}</span>`).join("")}</div>` : "") +
+    `<div class="wsub">Where</div><p class="wnote">${r.whole ? "The whole scene matches, not one part of it." : "Lit where it matches; the rest is dimmed."}</p>`;
+  if (!r.whole) whyMask(r.heat);
+}
+// The heat map as a mask on the photo itself: one pixel per square of the model's grid, stretched smoothly over it
+function whyMask(h) {
+  const c = document.createElement("canvas"); c.width = h[0].length; c.height = h.length;
+  const g = c.getContext("2d"), d = g.createImageData(c.width, c.height);
+  h.flat().forEach((v, i) => { d.data[i * 4 + 3] = 255 * (0.3 + 0.7 * v ** 1.5); });
+  g.putImageData(d, 0, 0);
+  const s = $("lbimg").style;
+  s.maskImage = s.webkitMaskImage = `url(${c.toDataURL()})`; s.maskSize = s.webkitMaskSize = "100% 100%";
+}
+$("lbwhy").onclick = () => { WHY.on = !WHY.on; WHY.on ? explainPhoto(LB.list[LB.at], whyQuery()) : whyClear(); };
+$("whypanel").onclick = e => { if (e.target.id === "whyx") $("lbwhy").click(); };
 $("lbclose").onclick = lbOff;
 $("lbmode").onclick = e => {
   const w = e.target.dataset.w; if (!w || w === LB.mode) return;
