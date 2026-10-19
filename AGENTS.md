@@ -19,6 +19,7 @@ Read this before working on photosearch. [README.md](README.md) covers what the 
 | `src/photosearch/` | The package. `cli.py` has the commands, `server.py` the web app, `mcp_server.py` the tools Claude uses, `embed.py` the model. |
 | `src/photosearch/evals.py` | `photosearch eval`: measures a change to the index (vision tokens, shorter or compressed vectors), judged blind. Use it for any experiment with the model. |
 | `src/photosearch/web/` | The page: `index.html`, `app.css`, `js/*.js`. Re-read on every request, so no build step. |
+| `FINDINGS.md` | What experiments found and how each setting was chosen. Add a section for each new one. |
 | `tests/` | pytest, on a made-up library with a fake model. |
 | `tools/director/` | Records the web app in headless Chrome from a storyboard. |
 | `tools/launch/` | Reshoots the launch video. Its README is the step-by-step guide. |
@@ -70,4 +71,4 @@ Update this section when something finishes or starts.
 - **Clutter sweep:** built (Albums → Tidy up → Clutter and private photos). Sending a kind to Photos isn't tried on my library yet, and `photosearch index` needs one run to read Photos' screenshot marks.
 - **Why did this match:** done (? Why in the big photo view, `photosearch why`, `why.py`). A post is drafted.
 - **Quick first index:** done (`index --quick`, about 4× faster; the next `index` redoes those photos at full quality, newest first).
-- **Vision tokens:** done. 70 tokens is 4.7× faster, changes the first result in more than half of searches, but is only slightly worse when judged by eye (see the README's Measurements). 280 stays the default.
+- **Vision tokens:** done. 70 tokens is 4.7× faster, changes the first result in more than half of searches, but is only slightly worse when judged by eye (see FINDINGS.md). 280 stays the default.

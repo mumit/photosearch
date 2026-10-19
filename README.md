@@ -118,7 +118,7 @@ uv run photosearch index --quick
 
 The next plain `photosearch index` redoes those photos at full quality, newest first, and you can stop and restart it
 like any other run. Search keeps working throughout: photos still waiting are adjusted so they don't crowd out the
-redone ones (see [Measurements](#measurements)). Videos' sound and frames wait for the plain run.
+redone ones (see [FINDINGS.md](FINDINGS.md)). Videos' sound and frames wait for the plain run.
 
 - Indexing is **incremental**: you can stop it (Ctrl-C) and re-run it later, and it continues where it left off.
   Run it again any time to add new photos.
@@ -126,7 +126,7 @@ redone ones (see [Measurements](#measurements)). Videos' sound and frames wait f
 - Expect the Mac to run warm while it works; it's using the GPU.
 
 **Speed vs. quality:** each image is given to the model as a number of "vision tokens" (default 280).
-`--vision-tokens 70` is about 4× faster, but changes which photos come first (see [Measurements](#measurements)):
+`--vision-tokens 70` is about 4× faster, but changes which photos come first (see [FINDINGS.md](FINDINGS.md)):
 
 ```bash
 uv run photosearch index --vision-tokens 70
@@ -167,17 +167,20 @@ For each video:
    that's done isn't read again. Deleting a video in Photos removes its moments at the next `index`.
 
 **How a search uses them.** A video ranks by its best moment: its poster, a later frame, or a piece of sound.
-A frame scores like a photo. A sound scores by how much closer it is to the search than to everyday home-video
-sounds (talking, background noise, `SOUND_BASE` in `videos.py`), because a loud clip, like a trampoline park, is
-close to every sound. `SOUND_AT` then sets where a sound match ranks among photos. Searching for photos like a photo
-(✦ Looks like this) uses frames, not sound.
+A frame scores like a photo. A sound needs two corrections, both in `videos.py`:
 
-**How `SOUND_AT` is set.** By ear. For 12 searches ("people laughing", "a dog barking", "waves crashing on a
-beach"), the sound matches ranked 1 to 4, 8 and 16 were played back in random order, without their scores, and each
-was marked as the searched sound, something else, or can't tell. The marks are in `data/sound-marks.json`. Then each
-value of `SOUND_AT` was tried, counting the heard videos in each search's top 24 that were marked right or wrong.
-At 0.59 there were 19 right and 6 wrong; at 0.62, the first guess, 24 right and 18 wrong. Adding videos doesn't need
-this again. A new model, or a change to `SOUND_BASE`, does.
+- **`SOUND_BASE`** is a list of everyday home-video sounds ("people talking", "background noise", "voices"…). A loud
+  clip, like a trampoline park, is close to *every* search, so a sound scores by how much closer it is to your search
+  than to that list. Real matches stand out by about +0.1 to +0.2; the rest by about 0.
+- **`SOUND_AT`** (0.59) is added to that margin, to put sound on the same scale as photos (good photo matches score
+  0.65 to 0.80). It's the dial for how much sound shows up: higher brings more videos by sound, wrong ones too.
+
+Searching for photos like a photo (✦ Looks like this) uses frames, not sound.
+
+**How `SOUND_AT` is set.** By ear. For 12 searches, sound matches were played back in random order, without their
+scores, and marked right or wrong (`data/sound-marks.json`). At 0.59, the heard videos in the first 24 were 19 right
+and 6 wrong; at 0.62, 24 right and 18 wrong. Adding videos doesn't need this again. A new model, or a change to
+`SOUND_BASE`, does. The full story is in [FINDINGS.md](FINDINGS.md#sound-in-videos-sound_base-and-sound_at).
 
 **What it hears well, and what it doesn't.** Happy Birthday, laughing, clapping and cheering, and music come up
 by sound. The model hears the kind of sound more than its source: kids shouting matched "a dog barking", people
@@ -430,6 +433,7 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 | `tools/director/`, `tools/launch/` | Recording and cutting a demo video from a separate demo library (see [Demo videos](#demo-videos)) |
 | `AGENTS.md`, `CLAUDE.md` | Notes for coding agents working on photosearch |
 | `ROADMAP.md` | What to build next, in order |
+| `FINDINGS.md` | What the experiments found, and how each setting was chosen |
 | `data/reviews/` | Saved story picks and captions, one JSON file per year (`2025.json`) or trip (`trip-2024-05-02.json`) |
 | `.env` | Optional `TYPESAFE_API_KEY` for ✨ smart search (git-ignored) |
 | `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector. Also the dates you gave photos without a real one (table `redated`, with the date Photos has), and with `photosearch videos`, a vector for each video's frames and pieces of sound (table `clips`) |
@@ -567,7 +571,7 @@ An agent that can look at images can do the judging too (give it `--judge claude
 
 ### Measurements
 
-Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 videos, 13.3k originals in iCloud only):
+Indexing speed on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 videos, 13.3k originals in iCloud only):
 
 | Setup | Photos/s | Full library |
 |---|---|---|
@@ -576,93 +580,8 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
 | MLX (`mlx-community/embeddinggemma-2-bf16` via mlx-vlm) | ~1.3 | no gain, dropped |
 | CPU fp32 | ~0.3 | — |
 
-- 70 tokens changes the rankings more than its vectors suggest. On 2,000 random photos, the 70-token vectors have mean
-  cosine 0.95 to the 280-token ones (5% of photos are below 0.91, the lowest 0.73). Over 50 searches of those 2,000:
-
-  | 70 tokens vs. 280 | Result |
-  |---|---|
-  | Same photo first | 22 of 50 searches |
-  | 280's first photo still in 70's top 5 | 45 of 50 |
-  | Top 10 in common | 6.4 on average |
-  | First 24 (one page) in common | 16.5 on average |
-
-  That measures agreement, not quality, so the same top 5s were also judged by eye, blind (the two settings in random
-  order). At 280 tokens, 194 of the 250 photos fit the search; at 70, 187. Where the first photo differed (28
-  searches), it was about as good in 22, better at 280 in 4 and better at 70 in 2. So 70 tokens mostly reorders
-  results and is only slightly worse. Judging the same sample again with `photosearch eval` (new blind order) gave 192
-  and 185, and the same 4, 2 and 22. One judge (Claude) scored a 2,000-photo sample; a full library has more close
-  calls.
-- `index --quick` (70 vision tokens, then redone at 280): about 9 photos/s against 2. A 70-token vector scores 0.019
-  higher against words than the same photo's 280-token one, so in a half-redone index the quick photos crowded the
-  results: with a quarter still quick, they were half of each search's first 24. Subtracting the gap from their
-  scores fixed that, as did moving each quick vector back along the direction the app's own words share, which also
-  covers features that compare photos with photos. Measured on 2,000 photos, the fix set on 1,000 and 25 searches
-  and tested on the others: with a quarter, half or three quarters still quick, each kind took its share of the
-  first 24, and 21.8, 19.5 and 18.2 of them were the same as with every photo at 280 (18.4, 15.8 and 15.6 without
-  the fix). A straight least-squares map from 70 to 280 overfit and made things worse.
-- Shorter or compressed vectors (`photosearch eval`, same sample and searches): int8 kept the same first photo in 49
-  of 50 searches (23.1 of the first 24 in common); 256 numbers, 27 (18.4); 1 bit per number, 24 (14.4); 128
-  numbers, 21 (11.6). 1 bit, then the best 100 rescored with the full vectors, kept 49 of 50 over the whole library.
-  None is used: the whole library's vectors are 52 MB and a search over them takes 0.6 ms.
-- Other languages: 24 searches in Spanish, French, Hindi, Chinese, Arabic and Bengali, over the whole library,
-  judged blind against the English ones (the top 5 of all seven in random order). Photos that fit, of 120: Hindi
-  104, Chinese 102, English 94, French 93, Spanish 92, Arabic 91, Bengali 88. So a search works in any of them,
-  with no change: the results differ from the English ones (10 to 16 of the first 24 in common) but fit as well.
-  Bengali was the weakest, on mountains, group photos, trains and babies. One judge (Claude); the differences
-  between the first six are within what a second judging would move.
-- The "photo anchor" published by pastel-labs on Hugging Face only matters for 1- or 4-bit compressed vectors. It isn't needed at this size.
-
-- Sound (`photosearch videos`): the audio encoder's vectors land in the same space as text. Spoken and made-up test
-  sounds (a weather forecast, "happy birthday", beeps, noise) each scored highest on their own description. Text and
-  image vectors are the same with the audio encoder loaded or not. On 50 videos, a matching sound stood out from
-  everyday home-video sounds by +0.09 to +0.19 (Happy Birthday over a cake, laughing on a couch). A trampoline park
-  or stadium was close to every sound until that adjustment. Judged by ear (72 clips from the 752 videos, 12
-  searches): 38 right, 33 wrong, 1 can't tell. The score separated right from wrong only a little (0.62, where 0.5
-  is chance), because each search's scores sit at their own level: "a baby crying" got six wrong matches at +0.10 to
-  +0.12, and "music playing" six right ones at +0.03 to +0.05. Scoring each sound against all sounds for that search,
-  or adding "children playing" to `SOUND_BASE`, didn't help. `SOUND_AT` = 0.59 keeps most of the right ones in the
-  top 24 and drops most of the wrong ones; "a dog barking" still brings up kids shouting.
-- Then and Now, judged by eye on sheets of the best pairs: with GPS (within 150 m, 4+ years apart), pairs above
-  0.8 were nearly all the same spot. Matching by look alone, without GPS on the older photo, found places that
-  look alike instead (Angkor Wat and Teotihuacán, two different aquariums), so both photos need GPS. Above 0.97 a
-  pair is one photo saved twice. Clutter (an ID shot twice, floors, price tags) is left out. 32 pairs on 16,000
-  photos; only photos from 2016 on have GPS here. The scene decides, not who's in it, so many are one child, then a
-  younger sibling in the same spot. Same person: pairs above 0.88, in photos with at most 2 named people, were
-  nearly all good (45 pairs, from 2009 on). Below that, or with more people named, they were parties: one face
-  among many in a dining room that looks like every other.
-- Recreate This ideas, judged by eye: ranking old photos of one or two named people by a few posing descriptions
-  ("a child posing for the camera", "a parent holding a baby, posing for a photo") found kid portraits and
-  parent-with-baby shots. The general interest score found busy scenes (a trampoline, a party) that can't be redone.
-  Matching the new shot (0.80, then you confirm) isn't measured yet: it needs a real recreation.
-- Why (`why.py`): the model's vector for a photo is the mean of its squares' vectors (a grid of about 19 × 14), so
-  each square's score is its exact share of the photo's score, from one pass of the model (0.5 s). Tested by
-  covering the hottest quarter of 17 photos (6 searches) and measuring how far the score fell: 0.032 on average when
-  each square counts by how much closer it is to the search than to everyday descriptions, 0.025 by its plain score
-  (stray squares of sky scored high for anything), 0.027 covering squares one at a time (16 s a photo), 0.002 for a
-  random quarter. Searches for a whole scene barely fall whatever is covered: there, 64-74% of the lit part sits in
-  the hottest quarter, against 80-92% for a dog or a balloon, so below 77% it says the whole scene matches. Judged by
-  eye on 20 searches: small, clear things light up well (a soccer ball, a lighthouse, a bowl of noodles); a small dog
-  in a group photo or an airplane wing don't. Leaving a word out was right each time it said a word didn't fit
-  (a balloon that was the sun, fishing with nobody fishing). What it sees uses Photos' labels as words (those on 3+
-  photos, without the 40 most common): on 1,500 photos, one of its top five was among Photos' own labels for 71%,
-  against 5% for the five most used labels.
-- Some photos (very dark, very plain) score fairly high for any query. A CSLS-style penalty using Apple's labels as a
-  query bank was tried on ~5k photos and made results worse (it boosted documents and handwriting), so search uses
-  plain cosine.
-- Galaxy uses UMAP (`min_dist=0.6`, so near-duplicates spread out instead of piling up) and k-means regions named by
-  the Apple labels that are most distinctive for each region.
-
-- Negation: `exclude` subtracts 0.5× the excluded text's vector from the query (as Photo Math does). On
-  "group photos at a party" minus "a selfie" it removed the selfies; for "no people" in landscapes the plain query
-  already worked.
-- Laya (open "System One" decision model) was trialled for parsing the search box on 20 labelled queries: 20/20 on
-  "wants no people" / "no selfies", but 12/20 photo-vs-video, 14/20 time period, 17/20 season, ~430 ms per query on CPU
-  and ~1.5 GB. Not adopted: keyword rules beat it on the choice questions, and the explicit **without…** field covers
-  negation for free. Through MCP, Claude does the parsing anyway.
-- Jev (TypeSafe's hosted System One model) on the same 20 queries: 19/20 photo-vs-video, 20/20 time period, 18/20
-  season, ~115 ms. Its yes/no answers needed higher cut-offs than 0.5 (0.7 for "no people", 0.85 for "no selfies");
-  on 20 fresh queries with those cut-offs it got 95/100. It powers the optional ✨ smart search. Choices under 60%
-  confidence are ignored.
+Everything else measured, and how each setting was chosen (vision tokens, the quick index, compressed vectors, other
+languages, sound, Why, Then and Now, the search box), is in [FINDINGS.md](FINDINGS.md).
 
 **Status:** full library indexed (16,975 items in 140 min on an M3 Pro; 42 skipped for lack of a local preview). Every web tab checked in headless
 Chrome. `album`, `make_album`, **Copy to Photos** and **Send the extras** all use the same add-only path (osxphotos'
