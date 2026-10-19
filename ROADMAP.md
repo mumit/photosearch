@@ -15,8 +15,6 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 ## Later
 
 **Experiments with the model** (measure each with `photosearch eval`):
-- **Shorter or compressed vectors:** check whether the vectors can be cut to 256 numbers, or stored as int8 or 1-bit, and what that costs.
-- **Other languages:** EmbeddingGemma is multilingual; test searches in other languages.
 - **Learn from ✕ and ☆:** train a small adjustment applied to every search from smart-album feedback.
 - **Judge eval sheets in the web page or through MCP,** not only with `photosearch eval score`.
 - **Quick first index:** 70 tokens first, so search works in about 30 minutes, then upgrade to 280.
@@ -33,6 +31,8 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 
 ## Done
 
+- Other languages, measured: searches in Spanish, French, Hindi, Chinese, Arabic and Bengali fit about as well as English, judged blind (88 to 104 of 120 photos, English 94). Nothing to build; the README says so.
+- Shorter or compressed vectors, measured: int8 changes almost nothing, 256 numbers or 1 bit change a lot, and none is needed at 17,000 photos (52 MB, 0.6 ms a search).
 - Why did this match: **? Why** on a photo from a search, and `photosearch why`, show how much each word counts, what the model sees (Photos' labels as words) and where in the photo it matched (`why.py`). The map comes from the model's own squares in one pass (0.5 s), not by covering parts one at a time (16 s), and passed the same cover test better. A match on the whole scene is said, not drawn. Small things in busy photos light up weakly.
 - Then and Now: Play → Then and Now shows two photos years apart (`thennow.py`). *Same spot* needs GPS on both (within 150 m), so only photos from 2016 on take part: matching old scans by look alone found different places that look alike. Often it's a younger sibling in the same spot years later. *Same person* pairs photos where Photos names the same person, back to 2009. Not built: same-spot pairs with an old scan (they'd need a place).
 - Date detective: Play → Date Detective and `photosearch dates` date the photos with a placeholder date, a group at a time, from album names, album series, people and look-alikes. 851 of 1,042 are dated (the rest are small loose groups). Look-alikes turned out a weak clue (25 of 105 years right when the whole event is hidden). Not built: Apple's labels as a month clue.

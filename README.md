@@ -190,7 +190,7 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 | Mode | What it does |
 |---|---|
 | **Home** | Opens on **On this day**: a slow slideshow of today's date in earlier years, most striking first, which trip you were on (with a link to its story), and ‹ › to step through other days (`photosearch today` does the same in the terminal). Below it are shelves: *Rediscover* (random photos worth another look, ↻ to shuffle), the people you've tagged, your trips, ideas to search for, the other modes, *Day by day* (a calendar of the year, each day coloured by how many photos it has; hover for its best photo, click for the day) and your years. Photos that look like documents, screenshots or ID cards are left out. |
-| **Search** | Describe a photo, or a sound in a video (see [Videos](#videos-whats-heard-in-them-and-later-moments)). Results keep their shape, in rows like a photo book, sorted by best match or by date. Picking a person or place from the suggestions shows their most interesting photos. Put what you *don't* want in **without…** (e.g. "selfies"): the model is weak at "no …" inside the description. Every search has its own address, so back and forward work. |
+| **Search** | Describe a photo (in English or most other languages: *une plage au coucher du soleil* works), or a sound in a video (see [Videos](#videos-whats-heard-in-them-and-later-moments)). Results keep their shape, in rows like a photo book, sorted by best match or by date. Picking a person or place from the suggestions shows their most interesting photos. Put what you *don't* want in **without…** (e.g. "selfies"): the model is weak at "no …" inside the description. Every search has its own address, so back and forward work. |
 | **People** | A page per person tagged in Photos: their best photo from every year (**▶ through the years** plays them in turn), who they're most often photographed with, their places and favourite photos. Portraits are picked by the search model as the closest thing to a close-up of a face. Names anywhere (suggestions, the big photo view) lead here. |
 | **Map** | Everywhere you've been, each place as a pin showing its best photo and how many were taken there. It opens on home; chips along the bottom fly to the other regions (named like trips: "Lisbon", "Sintra & Cascais") or show everywhere. Nearby places merge until you zoom in. Tap a pin for that place's best photos, or **▶ Slideshow** them. Map tiles come from OpenStreetMap (so it needs internet); your photos never leave the Mac. |
 | **Galaxy** | Your whole library on one zoomable map, with similar photos next to each other and colored by year. Scroll to zoom, drag to pan, hover to peek. Type in the search box to see where, say, "beach" lives, and the map glides there; the faces along the bottom light up everyone's photos of one person. **▶** plays the years: the library grows from the first photo, each year's new ones standing out. The first visit takes a minute to lay out the map. |
@@ -580,6 +580,16 @@ Measured on an M3 MacBook (16 GB) with a 17k-item library (16.2k photos, 750 vid
   results and is only slightly worse. Judging the same sample again with `photosearch eval` (new blind order) gave 192
   and 185, and the same 4, 2 and 22. One judge (Claude) scored a 2,000-photo sample; a full library has more close
   calls.
+- Shorter or compressed vectors (`photosearch eval`, same sample and searches): int8 kept the same first photo in 49
+  of 50 searches (23.1 of the first 24 in common); 256 numbers, 27 (18.4); 1 bit per number, 24 (14.4); 128
+  numbers, 21 (11.6). 1 bit, then the best 100 rescored with the full vectors, kept 49 of 50 over the whole library.
+  None is used: the whole library's vectors are 52 MB and a search over them takes 0.6 ms.
+- Other languages: 24 searches in Spanish, French, Hindi, Chinese, Arabic and Bengali, over the whole library,
+  judged blind against the English ones (the top 5 of all seven in random order). Photos that fit, of 120: Hindi
+  104, Chinese 102, English 94, French 93, Spanish 92, Arabic 91, Bengali 88. So a search works in any of them,
+  with no change: the results differ from the English ones (10 to 16 of the first 24 in common) but fit as well.
+  Bengali was the weakest, on mountains, group photos, trains and babies. One judge (Claude); the differences
+  between the first six are within what a second judging would move.
 - The "photo anchor" published by pastel-labs on Hugging Face only matters for 1- or 4-bit compressed vectors. It isn't needed at this size.
 
 - Sound (`photosearch videos`): the audio encoder's vectors land in the same space as text. Spoken and made-up test
