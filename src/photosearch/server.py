@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import embed, photos_app, smartbox
+from . import embed, evals, photos_app, smartbox
 from .config import DATA, LIBRARY, ROOT, THUMBS, WEB
 from .store import ThreadCon, index_library, photo_info
 from .images import photo_jpeg
@@ -121,6 +121,13 @@ def make_server(a):
             return Checked(res[:k], checked=done)
         return res
 
+    def api_eval_sheet(q):  # a blind sheet to judge (Play → Judge a test), with what the tiles need to lay out
+        sh = evals.sheet(q.get("name", ""), int(q["n"]) if q.get("n") else None, q.get("who", ""))
+        if not sh.get("done"):
+            info = photo_info(con, sh["x"] + sh["y"])
+            sh["x"], sh["y"] = ([info.get(u, dict(uuid=u, gone=True)) for u in sh[r]] for r in ("x", "y"))  # numbers stay put
+        return sh
+
     def api_parse(q):  # the smart search box: {"enabled": False} when there's no Jev key
         if not smartbox.jev_key():
             return dict(enabled=False)
@@ -146,6 +153,8 @@ def make_server(a):
     api = {"/api/today": lambda q: on_this_day(con, q.get("day")), "/api/stories": lambda q: stories(con), "/api/story": lambda q: story_for_editor(con, q.get("id", "")),
            "/api/sharp": lambda q: {u: fetcher.status(u) for u in q.get("uuids", "").split(",") if u},
            "/api/story_photos": lambda q: story_candidates(con, q.get("id", ""), q.get("q"), q.get("like")),
+           "/api/evals": lambda q: evals.runs(), "/api/eval_sheet": api_eval_sheet,
+           "/api/eval_results": lambda q: evals.results(q.get("name", ""), q.get("who", "")),
            "/api/search": api_search, "/api/open": api_open, "/api/info": api_info, "/api/parse": api_parse,
            "/api/galaxy": lambda q: galaxy(con), "/api/overview": lambda q: overview(con),
            "/api/rediscover": lambda q: rediscover(con, min(60, int(q.get("n", 24)))),
@@ -282,6 +291,9 @@ def make_server(a):
                       "/api/recreate": lambda b: recreate_post(con, b),
                       # family picks: from phones too, that's the point
                       "/api/pick": lambda b: pick(con, str(b.get("uuid", "")), b.get("who"), bool(b.get("on", True))),
+                      # a second judge for an experiment, on any device
+                      "/api/eval_score": lambda b: dict(left=evals.record(str(b.get("name", "")), int(b.get("n", 0)), b.get("who"),
+                                                                          b.get("x") or [], b.get("y") or [], b.get("first", "same"))),
                       "/api/clutter": lambda b: clutter_choose(con, b), "/api/clutter_send": lambda b: clutter_send(con, str(b.get("kind", ""))),
                       # dates go in this index, not Photos; still only from this Mac, so a guest's guess doesn't stick
                       "/api/undated": lambda b: set_date(con, [str(u) for u in b["uuids"]][:2000], b["year"], b.get("month")),

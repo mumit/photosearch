@@ -16,7 +16,6 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 
 **Experiments with the model** (measure each with `photosearch eval`):
 - **Learn from ✕ and ☆:** train a small adjustment applied to every search from smart-album feedback.
-- **Judge eval sheets in the web page or through MCP,** not only with `photosearch eval score`.
 
 **Fun:**
 - **Photo book:** a story exported as a print-ready PDF.
@@ -29,6 +28,7 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 
 ## Done
 
+- Judge a test: Play → Judge a Test shows an experiment's blind sheets on any device, one search at a time, each judge under their own name, with the results once every search is judged and how often two judges agree. Claude judges through MCP (`eval_sheet`, `score_eval_sheet`). `photosearch eval` also compares rules for ranking over the whole library (`search`, `search=nohub`, `search=check`).
 - ✨ smart search checks the first photos: Jev, given each of the first 40 photos described in words (labels, what the model sees, time, people count, brightness and colour; never the photo or a name), nudges their order. Judged blind, the first 10s of 16 weak searches held 136 fitting photos of 160, not 121; 8 of 20 everyday searches got better and 2 worse. About 0.35 s a search (`checks.py`, FINDINGS.md).
 - Words in photos: `photosearch text` (and each `index` run) reads the words in every photo with Apple's Vision, in 14 minutes for 16,200 photos. Words in "quotes" in a search must be written in the photo. Measured first: the model already reads big, clear text, and a boost for read words made 34 word searches and 115 everyday ones worse, judged blind, but the model misses most small print (FINDINGS.md).
 - Where search breaks down, measured: 65 searches in 10 groups judged by eye (84% fit). Searches for how a photo looks (close-up, black and white, dusk) and printed pages did worst, mostly from accidental shots and plain textures that match everything. Those now count for a little less in searches by words (`hub_penalty`), which judged blind made the first 10 better on 115 searches (FINDINGS.md).

@@ -32,6 +32,8 @@ function playMenu() {
         <p>Pick an old photo, take it again today, see them side by side.</p></div>
       <a class="card" href="#math" style="--art:linear-gradient(180deg, transparent 10%, rgba(110,25,70,.55) 45%, #2c0d1f 82%)"><div class="collage"></div><span class="glyph">∑</span><h3>Photo Math</h3>
         <p>This photo + snow − summer = ?</p></a>
+      <a class="card" href="#judge" style="--art:linear-gradient(180deg, transparent 10%, rgba(60,60,60,.55) 45%, #1a1a1a 82%)"><div class="collage"></div><span class="glyph">⚖︎</span><h3>Judge a Test</h3>
+        <p>Two rows of photos for a search. Which fit? Helps tune search.</p></a>
     </div>`;
   $("playroot").querySelectorAll(".card[data-mode]").forEach(c => c.onclick = () => startGame(c.dataset.mode));
   $("detcard").onclick = () => detective();

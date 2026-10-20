@@ -5,7 +5,8 @@ What the experiments on photosearch found, how each setting in the code was chos
 
 Everything here was measured on one library: about 17,000 items (16,200 photos, 750 videos), on an M3 MacBook. Most
 judging by eye was done blind by one judge (Claude), so small differences are within what a second judging would
-move. New experiments go through `photosearch eval` (README → Experiments) and get a section here.
+move. New experiments go through `photosearch eval` (README → Experiments) and get a section here. A second judge
+can now judge the same sheets in the page (Play → Judge a Test), and the report says how often two judges agree.
 
 ## Lessons that keep coming back
 

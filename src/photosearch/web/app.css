@@ -656,3 +656,28 @@ nav#tabs { view-transition-name:dock; }
   .clrow figure { height:110px; } .clrow figure.keep { height:132px; }
   .tart img { width:48px; height:48px; }
 }
+
+/* ---------- judge a test: two blind rows of photos per search ---------- */
+.jlist { display:grid; gap:10px; margin-top:20px; max-width:720px; }
+.jrun { display:flex; align-items:center; gap:14px; padding:14px 16px; border:1px solid var(--line); border-radius:14px; background:var(--card); text-decoration:none; }
+.jrun b { font-size:16px; } .jrun small { color:var(--mut); display:block; } .jrun .sp { flex:1; }
+.jq { font:600 clamp(24px, 4vw, 34px)/1.15 var(--serif); margin:10px 0 18px; }
+.jrow { display:grid; grid-template-columns:28px repeat(var(--k), minmax(0, 1fr)); gap:8px; align-items:center; margin-bottom:10px;
+        max-width:calc(28px + var(--k) * 230px); }
+.jrow > b { font:600 20px var(--serif); color:var(--mut); text-align:center; }
+.jrow figure { position:relative; margin:0; border-radius:10px; overflow:hidden; aspect-ratio:1; background:#000; cursor:pointer;
+               outline:3px solid transparent; outline-offset:-3px; }
+.jrow img { display:block; width:100%; height:100%; object-fit:cover; }
+.jrow figure.fit { outline-color:var(--good); }
+.jrow figure .n { position:absolute; top:5px; left:5px; min-width:22px; height:22px; padding:0 6px; border-radius:11px; background:rgba(0,0,0,.6);
+                  color:#fff; font-size:12px; line-height:22px; text-align:center; white-space:nowrap; }
+.jrow figure.fit .n { background:var(--good); color:#06130a; }
+.jrow figure.fit .n::after { content:" ✓"; }
+.jrow .zoom { position:absolute; top:5px; right:5px; width:26px; height:26px; padding:0; border-radius:50%; border:0; background:rgba(0,0,0,.55); color:#fff; font-size:13px; }
+.jfirst { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:18px 0; }
+.jnav { display:flex; align-items:center; gap:10px; margin-top:8px; }
+.jnav .sp { flex:1; }
+.jwho { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:16px; }
+.jres { border-collapse:collapse; margin:14px 0 6px; } .jres td, .jres th { padding:6px 14px 6px 0; text-align:left; border-bottom:1px solid var(--line); }
+.jres td + td, .jres th + th { text-align:right; } .jres th { overflow-wrap:anywhere; }
+@media (max-width: 600px) { .jrow { grid-template-columns:20px repeat(var(--k), minmax(0, 1fr)); gap:4px; } .jrow .zoom { width:22px; height:22px; font-size:11px; } }

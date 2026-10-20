@@ -17,7 +17,7 @@ Read this before working on photosearch. [README.md](README.md) covers what the 
 | Path | What it is |
 |---|---|
 | `src/photosearch/` | The package. `cli.py` has the commands, `server.py` the web app, `mcp_server.py` the tools Claude uses, `embed.py` the model. |
-| `src/photosearch/evals.py` | `photosearch eval`: measures a change to the index (vision tokens, shorter or compressed vectors), judged blind. Use it for any experiment with the model. |
+| `src/photosearch/evals.py` | `photosearch eval`: measures a change to the index (vision tokens, shorter or compressed vectors) or to how search ranks (`search=...`), judged blind (Play → Judge a Test, MCP, or the terminal). Use it for any experiment with the model. |
 | `src/photosearch/web/` | The page: `index.html`, `app.css`, `js/*.js`. Re-read on every request, so no build step. |
 | `FINDINGS.md` | What experiments found and how each setting was chosen. Add a section for each new one. |
 | `tests/` | pytest, on a made-up library with a fake model. |
@@ -73,5 +73,6 @@ Update this section when something finishes or starts.
 - **Family picks:** built (♡ Love in the big photo view, `picks.py`). Not tried by the family on phones yet.
 - **Quick first index:** done (`index --quick`, about 4× faster; the next `index` redoes those photos at full quality, newest first).
 - **Jev checks results:** done (`checks.py`, part of ✨ smart search). Judged by Claude alone; worth a second judge.
+- **Judge a test:** built (Play → Judge a Test). The `jev` and `hubs` tests in `data/eval/` wait for me as a second judge.
 - **Words in photos:** done (`text.py`, searches in "quotes"). An automatic boost was measured and made search worse (FINDINGS.md).
 - **Vision tokens:** done. 70 tokens is 4.7× faster, changes the first result in more than half of searches, but is only slightly worse when judged by eye (see FINDINGS.md). 280 stays the default.

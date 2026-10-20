@@ -11,7 +11,7 @@ from typing import Literal, TypedDict
 from mcp.server.mcpserver import Image, MCPServer
 from mcp.types import ToolAnnotations
 
-from . import explore, images, photos_app, search, store, stories
+from . import evals, explore, images, photos_app, search, store, stories
 
 mcp = MCPServer("photosearch", instructions="""\
 Search the user's Apple Photos library by what's in the pictures.
@@ -167,6 +167,31 @@ def save_story(story: str, title: str, intro: str, chapters: list[Chapter], outr
     return (f"saved {n} photos in {len(chapters)} chapters. Slideshow: http://localhost:8765/review/{story} "
             f"(needs `photosearch serve`; also listed under Stories). One-file copy to share: "
             f"`uv run photosearch review {story} --export {story}.html`")
+
+
+@mcp.tool(annotations=READ)
+def eval_sheet(test: str | None = None, n: int | None = None, judge: str = "claude") -> list:
+    """Judge an experiment (`photosearch eval`) blind. Without a test: the tests and how far each judge has got.
+    With one: sheet n, or this judge's next one: the search and two rows, X and Y, of numbered photos from two
+    versions of search, in random order. Judge each photo against the search only, then call score_eval_sheet.
+    Don't try to work out which row is which version."""
+    if not test:
+        return [json.dumps(evals.runs())]
+    sh = evals.sheet(test, n, judge)
+    if sh.get("done"):
+        return [json.dumps(dict(sh, next="every sheet is judged; the results are in `photosearch eval report`"))]
+    image = (evals.EVALS / test / "sheets" / f"{sh['n']:02d}.jpg").read_bytes()  # rows X and Y, each numbered 1..k
+    key = dict(test=test, n=sh["n"], of=sh["total"], left=sh["left"], search=sh["q"], already=sh["verdict"])
+    return [Image(data=image, format="jpeg"), json.dumps(key)]
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False))
+def score_eval_sheet(test: str, n: int, x: list[int], y: list[int], first: Literal["x", "y", "same"],
+                     judge: str = "claude") -> str:
+    """Record a verdict on sheet n of a test: the numbers (1..k within each row) of the photos in row X and in row Y
+    that fit the search, and whose first photo fits it better. Kept under the judge's name; scoring a sheet again replaces it."""
+    left = evals.record(test, n, judge, x, y, first)
+    return f"saved; {left} sheets left" if left else "saved; every sheet is judged"
 
 
 def main():

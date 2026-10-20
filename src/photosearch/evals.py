@@ -8,12 +8,15 @@ order) for a person or an agent to judge. The report then says which variant's p
   photosearch eval run short dims=256            the index's vectors cut to their first 256 numbers
   photosearch eval run binary bits=1             the index's vectors stored as 1 bit per number
   photosearch eval run other index=data-other    another index of the same library
+  photosearch eval run jev search=check --a search   how search ranks the whole library: with Jev's check (✨)...
+  photosearch eval run hubs search --a search=nohub  ...or without the penalty for photos that match everything
   photosearch eval score tokens70 7 --x 1,2,4 --y 1,3 --first x
   photosearch eval report tokens70
 
 Everything is written to eval/<name>/ in the data folder: run.json, sheets/, judgments.json and report.md.
+Sheets can also be judged in the web page (Play → Judge a test) or by Claude (MCP), each judge under their own name.
 """
-import json, random, sqlite3, sys, time
+import json, random, re, sqlite3, sys, time
 from pathlib import Path
 
 import numpy as np
@@ -97,6 +100,37 @@ def variant(spec, rows, con, speed):
     sys.exit(f"don't know the variant {spec!r}: use index, index=PATH, tokens=N, dims=N, bits=1 or bits=8")
 
 
+SEARCH_RULES = ("", "nohub", "check")
+
+
+def searcher(spec, con):
+    """For a search=... variant: query -> its first TOP uuids over the whole library, ranked as the app ranks them.
+    search: as it is; search=nohub: no penalty for photos that match everything; search=check: with Jev's check (✨)."""
+    from . import search as s
+    from .checks import CHECK_N, check
+    rule = spec.partition("=")[2]
+    if rule not in SEARCH_RULES:
+        sys.exit(f"search variants: search, search=nohub, search=check")
+
+    def top(q):
+        if rule == "nohub":
+            res = s.rank(con, embed.embed_query(q), TOP, sounds=True)
+        else:
+            res = s.search(con, q, max(TOP, CHECK_N))
+            if rule == "check":
+                res, done = check(con, q, res)
+                if not done:
+                    sys.exit("search=check needs Jev: a TYPESAFE_API_KEY, and the network")
+        return [r["uuid"] for r in res[:TOP]]
+    return top
+
+
+def agreement_top(a, b):
+    """agreement() for two first pages, when only those are known."""
+    return dict(first_same=a[0] == b[0], a_first_rank_in_b=b.index(a[0]) + 1 if a[0] in b else TOP + 1,
+                overlap10=len(set(a[:10]) & set(b[:10])), overlap24=len(set(a) & set(b)))
+
+
 def agreement(a, b):
     """How alike two rankings (indexes into the sample, best first) are."""
     pos = np.empty(len(b), int); pos[b] = np.arange(len(b))
@@ -109,28 +143,38 @@ def run(name, b, a="index", n=2000, seed=7, k=5, queries=None, speed=0):
     if (out / "judgments.json").exists():
         sys.exit(f"{out} has been judged already; pick another name")
     con = db()
-    rows = sample(con, n, seed)
-    if not rows:
-        sys.exit("the index has no photos whose preview is on disk")
     qs = [q.strip() for q in Path(queries or QUERIES).read_text().splitlines() if q.strip()]
-    (MA, qa, na), (MB, qb, nb) = variant(a, rows, con, speed), variant(b, rows, con, speed)
     rng, per = random.Random(seed + 1), []
-    for q in qs:
-        v = embed.embed_query(q)
-        ra, rb = np.argsort(-(MA @ qa(v))), np.argsort(-(MB @ qb(v)))
-        per.append(dict(q=q, A=[rows[i][0] for i in ra[:TOP]], B=[rows[i][0] for i in rb[:TOP]], x=rng.choice("AB"),
-                        **agreement(ra, rb)))
+    whole = [spec.split("=")[0] == "search" for spec in (a, b)]
+    if any(whole) and not all(whole):
+        sys.exit("compare a search=... variant with another one (e.g. --a search), not with a sample of the index")
+    if all(whole):  # rules for ranking: over the whole library, as the app searches
+        rows, na, nb, MA, MB = [None] * con.execute("select count(*) from photos").fetchone()[0], {}, {}, None, None
+        sa, sb = searcher(a, con), searcher(b, con)
+        for q in qs:
+            ta, tb = sa(q), sb(q)
+            per.append(dict(q=q, A=ta, B=tb, x=rng.choice("AB"), **agreement_top(ta, tb)))
+    else:
+        rows = sample(con, n, seed)
+        if not rows:
+            sys.exit("the index has no photos whose preview is on disk")
+        (MA, qa, na), (MB, qb, nb) = variant(a, rows, con, speed), variant(b, rows, con, speed)
+        for q in qs:
+            v = embed.embed_query(q)
+            ra, rb = np.argsort(-(MA @ qa(v))), np.argsort(-(MB @ qb(v)))
+            per.append(dict(q=q, A=[rows[i][0] for i in ra[:TOP]], B=[rows[i][0] for i in rb[:TOP]], x=rng.choice("AB"),
+                            **agreement(ra, rb)))
     summary = dict(searches=len(per), first_same=sum(p["first_same"] for p in per),
                    a_first_in_b_top5=sum(p["a_first_rank_in_b"] <= 5 for p in per),
                    overlap10=round(sum(p["overlap10"] for p in per) / len(per), 2),
                    overlap24=round(sum(p["overlap24"] for p in per) / len(per), 2))
-    if MA.shape == MB.shape:
+    if MA is not None and MA.shape == MB.shape:
         cos = (MA * MB).sum(1)
         summary["cos"] = dict(mean=round(float(cos.mean()), 4), p5=round(float(np.percentile(cos, 5)), 4),
                               min=round(float(cos.min()), 4))
     out.mkdir(parents=True, exist_ok=True)
     meta = dict(con.execute("select key, value from meta"))
-    (out / "run.json").write_text(json.dumps(dict(a=a, b=b, photos=len(rows), seed=seed, k=k, index=meta, notes={a: na, b: nb},
+    (out / "run.json").write_text(json.dumps(dict(a=a, b=b, photos=len(rows), whole=all(whole), seed=seed, k=k, index=meta, notes={a: na, b: nb},
                                                   summary=summary, searches=per), indent=1))
     sheets(out, per, k)
     print(report(name))
@@ -159,9 +203,9 @@ def sheets(out, per, k, cell=220):
 
 
 def load(name):
-    out = EVALS / name
-    if not (out / "run.json").exists():
-        sys.exit(f"no eval called {name!r}; start one with `photosearch eval run {name} VARIANT`")
+    out = EVALS / str(name)
+    if not re.fullmatch(r"[\w-][\w.-]*", str(name)) or not (out / "run.json").exists():
+        raise LookupError(f"no eval called {name!r}; start one with `photosearch eval run NAME VARIANT`")
     run_ = json.loads((out / "run.json").read_text())
     j = out / "judgments.json"
     return out, run_, json.loads(j.read_text()) if j.exists() else {}
@@ -174,17 +218,106 @@ def positions(s, k):
     return got
 
 
+JUDGE_MAX = 24  # a first name, as for family picks
+
+
+def record(name, n, judge, x, y, first):
+    """Save one judge's verdict on sheet n: the numbers (1..k) of the photos that fit in rows X and Y, and whose
+    first photo fits better. Returns how many sheets this judge has left. Raises ValueError for a bad verdict."""
+    judge = " ".join(str(judge or "").split())[:JUDGE_MAX]
+    if not judge:
+        raise ValueError("say who's judging")
+    out, run_, judged = load(name)
+    k = run_["k"]
+    if not 1 <= n <= len(run_["searches"]):
+        raise ValueError(f"sheets go from 1 to {len(run_['searches'])}")
+    if first not in ("x", "y", "same"):
+        raise ValueError("first is x, y or same")
+    x, y = (sorted({int(i) for i in row}) for row in (x, y))
+    if any(not 1 <= i <= k for i in x + y):
+        raise ValueError(f"photo numbers go from 1 to {k}")
+    judged.setdefault(judge, {})[str(n)] = dict(x=x, y=y, first=first)
+    (out / "judgments.json").write_text(json.dumps(judged, indent=1))
+    return sum(str(i) not in judged[judge] for i in range(1, len(run_["searches"]) + 1))
+
+
 def score(name, n, x="", y="", first="same", judge="me"):
     """Record which of sheet n's photos fit its search, in each row, and which row's first photo fits better."""
-    out, run_, judged = load(name)
-    if not 1 <= n <= len(run_["searches"]):
-        sys.exit(f"sheets go from 1 to {len(run_['searches'])}")
-    if first not in ("x", "y", "same"):
-        sys.exit("--first is x, y or same")
-    judged.setdefault(judge, {})[str(n)] = dict(x=positions(x, run_["k"]), y=positions(y, run_["k"]), first=first)
-    (out / "judgments.json").write_text(json.dumps(judged, indent=1))
-    left = [i for i in range(1, len(run_["searches"]) + 1) if str(i) not in judged[judge]]
-    print(f"sheet {n} scored; {len(left)} to go" + (f", next: {out / 'sheets' / f'{left[0]:02d}.jpg'}" if left else ""))
+    out, run_, _ = load(name)
+    try:
+        left = record(name, n, judge, positions(x, run_["k"]), positions(y, run_["k"]), first)
+    except ValueError as ex:
+        sys.exit(str(ex))
+    nxt = next((i for i in range(1, len(run_["searches"]) + 1) if str(i) not in load(name)[2][judge]), None)
+    print(f"sheet {n} scored; {left} to go" + (f", next: {out / 'sheets' / f'{nxt:02d}.jpg'}" if nxt else ""))
+
+
+def runs():
+    """Every eval in the data folder, newest first: [{name, searches, k, judges: {judge: sheets judged}}]. Which
+    variants they compare stays out until a judge is done, so the judging stays blind."""
+    out = []
+    for d in sorted(EVALS.glob("*/run.json"), key=lambda f: -f.stat().st_mtime) if EVALS.exists() else []:
+        _, run_, judged = load(d.parent.name)
+        out.append(dict(name=d.parent.name, searches=len(run_["searches"]), k=run_["k"],
+                        judges={j: len(sc) for j, sc in judged.items()}))
+    return out
+
+
+def rows(p, k):
+    """A search's two rows as a judge sees them: {"x": uuids, "y": uuids}."""
+    return {"x": p[p["x"]][:k], "y": p["AB".replace(p["x"], "")][:k]}
+
+
+def sheet(name, n=None, judge=""):
+    """Sheet n (or this judge's next one) for judging: the search and rows X and Y, k photos each, with no sign of
+    which variant is which; and this judge's verdict, if any."""
+    _, run_, judged = load(name)
+    per, k, mine = run_["searches"], run_["k"], judged.get(judge, {})
+    if n is None:
+        n = next((i for i in range(1, len(per) + 1) if str(i) not in mine), None)
+        if n is None:
+            return dict(name=name, done=True, total=len(per))
+    if not 1 <= n <= len(per):
+        raise LookupError(f"sheets go from 1 to {len(per)}")
+    p, r = per[n - 1], rows(per[n - 1], k)
+    return dict(name=name, n=n, total=len(per), k=k, q=p["q"], x=r["x"], y=r["y"],
+                verdict=mine.get(str(n)), left=sum(str(i) not in mine for i in range(1, len(per) + 1)))
+
+
+def tally(run_, scores):
+    """One judge's scores, unblinded: {fit: {A, B}, better: {A, B, same}, differ, sheets}."""
+    per = run_["searches"]
+    fit, better, differ = {"A": 0, "B": 0}, {"A": 0, "B": 0, "same": 0}, 0
+    for n, sc in scores.items():
+        p = per[int(n) - 1]
+        side = {"x": p["x"], "y": "AB".replace(p["x"], ""), "same": "same"}
+        for row in "xy":
+            fit[side[row]] += len(sc[row])
+        if not p["first_same"]:
+            differ += 1
+            better[side[sc["first"]]] += 1
+    return dict(fit=fit, better=better, differ=differ, sheets=len(scores))
+
+
+def agree(run_, one, two):
+    """How two judges compare on the sheets both judged: photos both looked at (a photo in both rows counts once
+    per row), and how many they called the same way."""
+    k, both, same = run_["k"], 0, 0
+    for n in set(one) & set(two):
+        for row, shown in rows(run_["searches"][int(n) - 1], k).items():
+            both += len(shown); same += len(shown) - len(set(one[n][row]) ^ set(two[n][row]))
+    return dict(sheets=len(set(one) & set(two)), photos=both, same=same)
+
+
+def results(name, judge):
+    """The unblinded results, for a judge who has judged every sheet (or anyone, once every judge has finished one)."""
+    _, run_, judged = load(name)
+    mine = judged.get(judge, {})
+    if len(mine) < len(run_["searches"]):
+        raise LookupError("judge every sheet first: the results would give away which row is which")
+    others = {j: agree(run_, mine, sc) for j, sc in judged.items() if j != judge}
+    return dict(name=name, a=run_["a"], b=run_["b"], k=run_["k"], searches=len(run_["searches"]),
+                judges={j: tally(run_, sc) for j, sc in judged.items()}, agree=others)
 
 
 def report(name):
@@ -192,7 +325,8 @@ def report(name):
     out, run_, judged = load(name)
     a, b, s, per, k = run_["a"], run_["b"], run_["summary"], run_["searches"], run_["k"]
     lines = [f"# {name}: {a} vs {b}", "",
-             f"{run_['photos']} random photos (seed {run_['seed']}), {s['searches']} searches.", "",
+             (f"The whole library ({run_['photos']:,} items), {s['searches']} searches." if run_.get("whole") else
+              f"{run_['photos']} random photos (seed {run_['seed']}), {s['searches']} searches."), "",
              f"| {a} vs {b} | Result |", "|---|---|",
              f"| Same photo first | {s['first_same']} of {s['searches']} searches |",
              f"| {a}'s first photo in {b}'s top 5 | {s['a_first_in_b_top5']} of {s['searches']} |",
@@ -205,20 +339,20 @@ def report(name):
         if notes:
             lines.append(f"| {spec} | " + ", ".join(f"{key}: {v}" for key, v in notes.items()) + " |")
     for judge, scores in judged.items():
-        fit, better, differ = {"A": 0, "B": 0}, {"A": 0, "B": 0, "same": 0}, 0
-        for n, sc in scores.items():
-            p = per[int(n) - 1]
-            side = {"x": p["x"], "y": "AB".replace(p["x"], ""), "same": "same"}
-            for row in "xy":
-                fit[side[row]] += len(sc[row])
-            if not p["first_same"]:
-                differ += 1
-                better[side[sc["first"]]] += 1
+        t = tally(run_, scores)
+        fit, better, differ = t["fit"], t["better"], t["differ"]
         lines += ["", f"Judged blind by {judge}: {len(scores)} of {len(per)} searches.", "",
                   f"| | {a} | {b} |", "|---|---|---|",
                   f"| Top-{k} photos that fit the search (of {len(scores) * k}) | {fit['A']} | {fit['B']} |",
                   f"| Better first photo, of the {differ} searches where it differs | {better['A']} | {better['B']} |",
                   f"| About as good | {better['same']} | |"]
+    names = list(judged)
+    for i, j1 in enumerate(names):
+        for j2 in names[i + 1:]:
+            g = agree(run_, judged[j1], judged[j2])
+            if g["sheets"]:
+                lines += ["", f"{j1} and {j2} both judged {g['sheets']} sheets and called {g['same']} of "
+                              f"{g['photos']} photos the same way ({g['same'] / g['photos']:.0%})."]
     text = "\n".join(lines) + "\n"
     (out / "report.md").write_text(text)
     return text

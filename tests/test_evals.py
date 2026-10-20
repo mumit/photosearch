@@ -86,3 +86,64 @@ def test_scores_are_checked():
     for bad in (dict(n=99), dict(n=1, x="7"), dict(n=1, first="z")):
         with pytest.raises(SystemExit):
             evals.score("checked", **bad)
+
+
+def two_searches(tmp_path):
+    f = tmp_path / "q.txt"; f.write_text("a beach at sunset\nsnow\n")
+    return str(f)
+
+
+def test_rules_for_ranking_are_compared_over_the_whole_library(tmp_path, con):
+    r = run("rules", "search", a="search=nohub", queries=two_searches(tmp_path))
+    assert r["whole"] and r["photos"] == con.execute("select count(*) from photos").fetchone()[0]
+    assert r["summary"]["first_same"] == 2  # the made-up library has too few labels for the hub penalty
+    assert "The whole library" in evals.report("rules")
+    with pytest.raises(SystemExit, match="not with a sample"):
+        run("mixed", "search", a="index")
+    with pytest.raises(SystemExit, match="needs Jev"):  # no key in the tests
+        run("nojev", "search=check", a="search", queries=two_searches(tmp_path))
+
+
+def test_jevs_check_can_be_a_variant(tmp_path, monkeypatch):
+    from photosearch import checks, smartbox
+    monkeypatch.setattr(smartbox, "jev_key", lambda: "test-key")
+    monkeypatch.setattr(checks, "ask", lambda q, ds: [1.0] * len(ds))
+    r = run("jev", "search=check", a="search", queries=two_searches(tmp_path))
+    assert len(r["searches"]) == 2 and all(len(p["B"]) == evals.TOP for p in r["searches"])
+
+
+def test_a_sheet_is_blind_and_comes_in_order(tmp_path):
+    run("blind", "dims=64", queries=two_searches(tmp_path))
+    s = evals.sheet("blind", judge="Sam")
+    assert s["n"] == 1 and s["left"] == 2 and len(s["x"]) == len(s["y"]) == 3 and s["verdict"] is None
+    assert not {"A", "B", "a", "b"} & set(s)  # nothing says which row is which
+    assert evals.record("blind", 1, "Sam", [1, 3], [], "x") == 1
+    assert evals.sheet("blind", judge="Sam")["n"] == 2
+    assert evals.sheet("blind", 1, judge="Sam")["verdict"] == dict(x=[1, 3], y=[], first="x")
+    assert evals.sheet("blind", judge="Alex")["n"] == 1  # each judge has their own place
+    evals.record("blind", 2, "Sam", [], [2], "same")
+    assert evals.sheet("blind", judge="Sam")["done"]
+
+
+def test_verdicts_are_checked(tmp_path):
+    run("bad", "dims=64", queries=two_searches(tmp_path))
+    for n, who, x, first in ((9, "Sam", [], "x"), (1, "Sam", [4], "x"), (1, "Sam", [], "z"), (1, " ", [], "x")):
+        with pytest.raises(ValueError):
+            evals.record("bad", n, who, x, [], first)
+    for name in ("../bad", ".hidden", "nope"):
+        with pytest.raises(LookupError):
+            evals.sheet(name)
+
+
+def test_results_wait_for_every_sheet_then_compare_judges(tmp_path):
+    r = run("two", "dims=64", queries=two_searches(tmp_path))
+    evals.record("two", 1, "Sam", [1, 2, 3], [1], "x")
+    with pytest.raises(LookupError, match="judge every sheet"):
+        evals.results("two", "Sam")
+    evals.record("two", 2, "Sam", [], [], "same")
+    evals.record("two", 1, "Alex", [1, 2], [1], "x")  # one photo called the other way
+    res = evals.results("two", "Sam")
+    a_fit = 3 if r["searches"][0]["x"] == "A" else 1
+    assert res["judges"]["Sam"]["fit"] == {"A": a_fit, "B": 4 - a_fit} and res["judges"]["Alex"]["sheets"] == 1
+    assert res["agree"]["Alex"] == dict(sheets=1, photos=6, same=5)
+    assert "called 5 of 6 photos the same way (83%)" in evals.report("two")

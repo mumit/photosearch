@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from photosearch import why
+from photosearch import evals, why
 from library import axis, noise, unit
 from server import Server, free_port
 
@@ -85,6 +85,14 @@ STEPS = [
     ("recreate", "playMenu(); document.getElementById('rccard').click()", 3),
     ("recreate-pick", "document.querySelector('.rcadd')?.click()", 2),
     ("recreate-todo", "document.querySelector('#rctabs [data-t=todo]').click()", 2),
+    ("judge", "location.hash='judge'", 2),
+    ("judge-sheet", "document.querySelector('.jrun').click()", 2),
+    ("judge-tap", "document.querySelector('.jrow[data-r=x] figure').click(); document.querySelector('#jfirst [data-v=x]').click(); "
+                  "if (!document.querySelector('.jrow figure.fit')) throw new Error('no fit mark')", 1),
+    ("judge-next", "document.getElementById('jnext').click()", 2),
+    ("judge-last", "if (!document.querySelector('.jq').textContent.includes('snow')) throw new Error('not the second search'); "
+                   "document.getElementById('jnext').click()", 3),
+    ("judge-results", "if (!document.querySelector('.jres')) throw new Error('no results')", 0),
     ("math", "location.hash='math'; document.getElementById('mtext').value='a street'; document.getElementById('mplus').value='snow'; runMath()", 3),
     ("search-more", "location.hash='search/'+encodeURIComponent('a photo'); setTimeout(()=>document.getElementById('morebtn')?.click(), 2000)", 4),
     ("frame", "document.getElementById('rshow').click()", 3),
@@ -188,6 +196,8 @@ def test_tour(monkeypatch, width, height, phone):
         Path(shots).mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(why, "tokens", beach_corner)
     monkeypatch.setattr(why, "COMMON", 0)  # the made-up library has too few labels to leave out the common ones
+    q = Path(tempfile.mkdtemp()) / "q.txt"; q.write_text("a beach at sunset\nsnow\n")
+    evals.run("tour", "dims=64", n=500, k=3, queries=str(q))  # a test to judge
     s = Server(monkeypatch)
     try:
         problems = tour(f"http://localhost:{s.port}/", width, height, phone, shots)

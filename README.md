@@ -213,7 +213,7 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 | **Map** | Everywhere you've been, each place as a pin showing its best photo and how many were taken there. It opens on home; chips along the bottom fly to the other regions (named like trips: "Lisbon", "Sintra & Cascais") or show everywhere. Nearby places merge until you zoom in. Tap a pin for that place's best photos, or **▶ Slideshow** them. Map tiles come from OpenStreetMap (so it needs internet); your photos never leave the Mac. |
 | **Galaxy** | Your whole library on one zoomable map, with similar photos next to each other and colored by year. Scroll to zoom, drag to pan, hover to peek. Type in the search box to see where, say, "beach" lives, and the map glides there; the faces along the bottom light up everyone's photos of one person. **▶** plays the years: the library grows from the first photo, each year's new ones standing out. The first visit takes a minute to lay out the map. |
 | **Time Machine** | Pick something that happens every year ("birthday cake", "christmas tree") and flip through the best match from each year, or follow one person (👤): their best photo each year, or just their birthdays. ▶ or space plays them in turn, slowly dissolving or as a quick **Flipbook**. |
-| **Play** | *Guess the Year*, *Guess the Place* and *Which Came First?* (two photos: tap the older one). Play alone (10 rounds, best scores kept) or add players to pass the phone around: everyone gets 5 turns and the end shows who won. **Photo Math** lives here too: start from a photo or words, then add and take away ideas, *this photo + snow − summer*. **Date Detective** asks when photos without a real date were taken, and your answer becomes their date (see [Date the undated photos](#date-the-undated-photos)). **Then and Now** shows two photos years apart, side by side. *Same spot* pairs photos with GPS within 150 m (the same lookout, the backyard in the snow); *Same person* pairs photos where Photos names the same person, so it reaches back before GPS (a toddler on the couch, then a boy on it). Both need at least 4 years between the photos and a close look-alike; ‹ › or the arrow keys step through them. **Recreate This** suggests old photos worth taking again (kid portraits, a parent holding a baby); tap ＋ to add one to your list, take it again with your phone, and once it's in Photos and `photosearch index` has run, it asks *Is this the new one?* and shows the two side by side (see [Recreate an old photo](#recreate-an-old-photo)). |
+| **Play** | *Guess the Year*, *Guess the Place* and *Which Came First?* (two photos: tap the older one). Play alone (10 rounds, best scores kept) or add players to pass the phone around: everyone gets 5 turns and the end shows who won. **Photo Math** lives here too: start from a photo or words, then add and take away ideas, *this photo + snow − summer*. **Date Detective** asks when photos without a real date were taken, and your answer becomes their date (see [Date the undated photos](#date-the-undated-photos)). **Then and Now** shows two photos years apart, side by side. *Same spot* pairs photos with GPS within 150 m (the same lookout, the backyard in the snow); *Same person* pairs photos where Photos names the same person, so it reaches back before GPS (a toddler on the couch, then a boy on it). Both need at least 4 years between the photos and a close look-alike; ‹ › or the arrow keys step through them. **Judge a Test** lets you judge an experiment's blind sheets (see [Experiments](#experiments-photosearch-eval)). **Recreate This** suggests old photos worth taking again (kid portraits, a parent holding a baby); tap ＋ to add one to your list, take it again with your phone, and once it's in Photos and `photosearch index` has run, it asks *Is this the new one?* and shows the two side by side (see [Recreate an old photo](#recreate-an-old-photo)). |
 | **Albums** | Smart albums: **＋ Album** on any search (words, a person, a place, dates) saves it as an album that keeps itself up to date: new photos that match as well as the ones in it join by themselves. A slider sets how strict it is. ✕ takes a photo out *and teaches the album* to find fewer like it; ☆ keeps one in for good (both nudge what the album looks for). **Copy to Photos** (on the Mac) makes or updates an album of the same name in the Photos app, adding only what's new. Kept in `data/albums/`. |
 | **Tidy up** | Under Albums: near-duplicates, as groups of bursts and copies of the same picture. Each group has a suggested keeper (the sharpest, judged from the detail in its thumbnail); tap another to keep that instead, or **Not duplicates** to stop suggesting the group. **Send the extras** adds every non-keeper to an album in Photos called *Photosearch · maybe delete*, so you can look through it and delete there. Nothing is ever deleted by Photosearch. *Near-identical* is the default; *Also similar shots* includes shots of the same moment that differ a little more. Receipts, ID cards and screenshots only count when they're practically the same pixels, so two different receipts are never paired. |
 | **Clutter** | Also under Tidy up: photos that are probably not memories, in four kinds: *IDs and cards*, *Screenshots*, *Receipts and papers* and *Accidental shots* (floors, black frames). Tap ✕ on any that don't belong. **Send** adds a kind to its own album in Photos (*Photosearch · screenshots* and so on) to look through there. IDs are worth moving to Photos' locked Hidden album. Nothing is deleted. Screenshots are the ones Photos marks as screenshots; run `photosearch index` once to read those marks (until then, they're found by their phone-screen shape). The other kinds come from the search model, with cut-offs set by eye on a 17,000-photo library (`clutter.py` says how). |
@@ -544,7 +544,7 @@ thing, and they only import downwards in this list:
 | `why.py` | Why a photo matches a search: each word, what the model sees, and where in the photo |
 | `checks.py` | ✨ smart search's second step: Jev checks a search's first photos, from descriptions in words |
 | `picks.py` | Family picks: who loved which photo, for Home and the photo frame |
-| `evals.py` | `photosearch eval`: comparing two variants of the index, judged blind (searches in `eval_queries.txt`) |
+| `evals.py` | `photosearch eval`: comparing two variants of the index or of search, judged blind in the page, by Claude or in the terminal (searches in `eval_queries.txt`) |
 | `lan.py`, `server.py` | Phones on the home Wi-Fi; the web server and its API |
 
 The web page has no build step: plain scripts that share one global scope, loaded in order by `index.html`, and re-read
@@ -582,7 +582,15 @@ uv run photosearch eval run tokens70 tokens=70 --speed 200   # re-embed 2,000 ph
 ```
 
 Other variants: `dims=256` (the vectors cut short), `bits=1` or `bits=8` (compressed vectors), `index=PATH` (another
-index of the same library). The run prints how much the two agree over 50 searches. It also writes one blind sheet per
+index of the same library). Rules for ranking are compared over the whole library instead, two at a time:
+`search` (as the app searches), `search=nohub` (without the penalty for photos that match everything) and
+`search=check` (with ✨ smart search's Jev check):
+
+```bash
+uv run photosearch eval run jev search=check --a search --queries my-searches.txt
+```
+
+The run prints how much the two agree over 50 searches. It also writes one blind sheet per
 search to `data/eval/<name>/sheets/`, with each variant's top 5 as rows X and Y in random order. Judge each sheet by
 noting which photos fit the search, and which row's first photo fits better:
 
@@ -591,7 +599,11 @@ uv run photosearch eval score tokens70 7 --x 1,2,4 --y 1,3 --first x
 uv run photosearch eval report tokens70     # unblinded: which variant's photos fit better
 ```
 
-An agent that can look at images can do the judging too (give it `--judge claude`, so scores stay separate).
+The easier way to judge is in the page: **Play → Judge a Test** shows each search with its two rows; tap the photos
+that fit and say whose first photo is better. It works on a phone too (`serve --lan`), so someone else can be a second
+judge. Each judge's answers are kept under their name, the results are shown once they've judged every search, and
+the report says how often two judges called a photo the same way. Claude can judge through MCP (`eval_sheet` and
+`score_eval_sheet`, as `claude`), or from the terminal with `--judge claude`.
 
 ### Measurements
 

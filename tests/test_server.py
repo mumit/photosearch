@@ -193,3 +193,32 @@ def test_galaxy_forgets_deleted_photos(srv, lib, con):
     assert lib["beach0"] in srv.json("/api/galaxy", timeout=300)["uuids"]
     con.execute("delete from photos where uuid=?", (lib["beach0"],)); con.commit()
     assert lib["beach0"] not in srv.json("/api/galaxy", timeout=300)["uuids"]
+
+
+def test_a_test_is_judged_from_the_page(srv, lib, tmp_path):
+    from photosearch import evals
+    q = tmp_path / "q.txt"; q.write_text("a beach at sunset\nsnow\n")
+    evals.run("page", "dims=64", n=500, k=3, queries=str(q))
+    assert srv.json("/api/evals")[0] == dict(name="page", searches=2, k=3, judges={})
+    s = srv.json("/api/eval_sheet?name=page&who=Sam")
+    assert s["n"] == 1 and len(s["x"]) == 3 and "date" in s["x"][0] and not {"A", "B"} & set(s)
+    assert srv.json("/api/eval_score", dict(name="page", n=1, who="Sam", x=[1], y=[2, 3], first="y")) == dict(left=1)
+    status, _, body = srv.post("/api/eval_score", dict(name="page", n=1, who="Sam", x=[9], y=[], first="y"))
+    assert status == 400 and b"photo numbers" in body
+    status, _, body = srv.get("/api/eval_results?name=page&who=Sam")
+    assert status == 404 and b"judge every sheet" in body
+    srv.json("/api/eval_score", dict(name="page", n=2, who="Sam", x=[], y=[], first="same"))
+    assert srv.json("/api/eval_results?name=page&who=Sam")["judges"]["Sam"]["sheets"] == 2
+    status, _, _ = srv.get("/api/eval_sheet?name=../page")
+    assert status == 404
+
+
+def test_claude_judges_through_mcp(lib, tmp_path):
+    from photosearch import evals, mcp_server
+    q = tmp_path / "q.txt"; q.write_text("a beach at sunset\n")
+    evals.run("mcp", "dims=64", n=500, k=3, queries=str(q))
+    image, key = mcp_server.eval_sheet("mcp")
+    assert json.loads(key)["search"] == "a beach at sunset" and image.data[:2] == b"\xff\xd8"
+    assert mcp_server.score_eval_sheet("mcp", 1, [1, 2], [], "x") == "saved; every sheet is judged"
+    assert json.loads(mcp_server.eval_sheet("mcp")[0])["done"]
+    assert json.loads(mcp_server.eval_sheet()[0])[0]["judges"] == {"claude": 1}
