@@ -13,7 +13,7 @@ from .search import SEASONS, best_of, search, similar
 from .checks import CHECK_N, check
 from .smartbox import parse_query
 from .places import near, world
-from .people import people, person
+from .people import people, person, choose as choose_portrait, face
 from .explore import days, galaxy, game_round, on_this_day, overview, photo_math, rediscover, timeline
 from .stories import STORY_ID, edit_review, export_name, load_review, render_review, stories, story_candidates, story_for_editor, story_uuids
 from .albums import album_preview, album_to_photos, album_view, albums, delete_album, save_album
@@ -29,6 +29,7 @@ from .photos_app import Fetcher
 from .lan import LOGIN, LanAccess
 
 VIDEO_FRAME = re.compile(r"[0-9A-F-]{36}/\d{1,6}\.jpg")  # a frame kept by `photosearch videos`
+UUID_ISH = re.compile(r"[0-9A-F-]{36}")
 
 
 def app_icon(px):
@@ -209,7 +210,7 @@ def make_server(a):
             if u.path == "/login":
                 return self.send(LOGIN.encode(), "text/html; charset=utf-8") if (self.headers.get("host") or "").lower() in allowed \
                     else self.send(b"forbidden", "text/plain", 403)
-            if not self.gate(page=not u.path.startswith(("/api/", "/thumb/", "/photo/", "/frame/"))):
+            if not self.gate(page=not u.path.startswith(("/api/", "/thumb/", "/photo/", "/frame/", "/face/"))):
                 return
             if u.path == "/api/open" and (demo or not self.local()):
                 return self.send(json.dumps(dict(error="Open in Photos only works on the Mac")).encode(), "application/json", 403)
@@ -232,6 +233,11 @@ def make_server(a):
                     return self.send(f.read_bytes(), "image/jpeg") if f and f.exists() else self.send(b"", "text/plain", 404)
                 if u.path.startswith("/photo/"):
                     return self.send(photo_jpeg(con, name.removesuffix(".jpg")), "image/jpeg")
+                if u.path.startswith("/face/"):  # /face/UUID.jpg?who=Name: around their face, else the thumbnail
+                    uuid, f = name.removesuffix(".jpg"), THUMBS / name
+                    if not UUID_ISH.fullmatch(uuid) or not f.exists():
+                        return self.send(b"", "text/plain", 404)
+                    return self.send(face(con, uuid, q.get("who", "")) or f.read_bytes(), "image/jpeg")
                 if u.path.startswith("/review/") and STORY_ID.fullmatch(name):
                     r = load_review(con, name, make=True)
                     if "download" in q:  # the file goes to family: wait for full-size copies (~1 s per missing one)
@@ -294,6 +300,7 @@ def make_server(a):
                       # a second judge for an experiment, on any device
                       "/api/eval_score": lambda b: dict(left=evals.record(str(b.get("name", "")), int(b.get("n", 0)), b.get("who"),
                                                                           b.get("x") or [], b.get("y") or [], b.get("first", "same"))),
+                      "/api/portrait": lambda b: choose_portrait(con, str(b.get("name", "")), b.get("uuid") or None),
                       "/api/clutter": lambda b: clutter_choose(con, b), "/api/clutter_send": lambda b: clutter_send(con, str(b.get("kind", ""))),
                       # dates go in this index, not Photos; still only from this Mac, so a guest's guess doesn't stick
                       "/api/undated": lambda b: set_date(con, [str(u) for u in b["uuids"]][:2000], b["year"], b.get("month")),
@@ -301,6 +308,8 @@ def make_server(a):
             if path in writes:
                 if path in ("/api/album_photos", "/api/dupes_send", "/api/clutter_send") and not self.local():
                     return self.send(json.dumps(dict(error="copying into Photos only works on the Mac")).encode(), "application/json", 403)
+                if path == "/api/portrait" and not self.local():
+                    return self.send(json.dumps(dict(error="portraits can only be changed on the Mac")).encode(), "application/json", 403)
                 if path in ("/api/undated", "/api/undated_undo") and not self.local():
                     return self.send(json.dumps(dict(error="dates can only be set on the Mac")).encode(), "application/json", 403)
                 try:

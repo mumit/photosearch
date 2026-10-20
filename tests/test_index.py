@@ -43,7 +43,7 @@ def photos(lib, monkeypatch):
     pdb = SimpleNamespace(library_path=str(config.DATA), photos=lambda intrash=False: ps + [SimpleNamespace(uuid=u) for u in old])
     monkeypatch.setattr(index, "photos_db", lambda library=None: pdb)
     monkeypatch.setattr(index, "meta", lambda p: ("" if not hasattr(p, "date") else p.date.isoformat(), "photo", "", "", "[]",
-                                                  "[]", "[]", None, None, "{}", "[]"))
+                                                  "[]", "[]", None, None, "{}", "[]", "{}"))
     m = Model()
     monkeypatch.setattr(index.embed, "model", lambda audio=False: m)
     return ps, m

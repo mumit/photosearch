@@ -27,8 +27,8 @@ def test_photos_own_screenshot_mark_wins_over_the_shape(con, lib):
 def test_index_keeps_what_photos_marks():
     p = SimpleNamespace(date=datetime(2024, 1, 1), ismovie=False, title="", place=None, persons=[], albums=[], labels=[],
                         location=(None, None), screenshot=True, selfie=False)
-    assert json.loads(index.meta(p)[-1]) == ["screenshot"]
-    assert index.META_COLS.split(", ")[-1] == "flags"
+    cols = index.META_COLS.split(", ")
+    assert json.loads(index.meta(p)[cols.index("flags")]) == ["screenshot"]
 
 
 def test_not_clutter_stops_a_suggestion(con, lib):

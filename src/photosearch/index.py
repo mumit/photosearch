@@ -66,11 +66,21 @@ def meta(p):
     return (p.date.isoformat(), "video" if p.ismovie else "photo", p.title or "",
             (p.place.name if p.place else "") or "",
             json.dumps(list(dict.fromkeys(x for x in p.persons if x != "_UNKNOWN_"))), json.dumps(p.albums),
-            json.dumps(p.labels), lat, lon, geo(p), json.dumps([f for f in FLAGS if getattr(p, f, False)]))
+            json.dumps(p.labels), lat, lon, geo(p), json.dumps([f for f in FLAGS if getattr(p, f, False)]), json.dumps(faces(p)))
 
 
 FLAGS = ("screenshot", "selfie")  # what Photos knows about how a photo was made
-META_COLS = "date, kind, title, place, persons, albums, labels, lat, lon, geo, flags"
+META_COLS = "date, kind, title, place, persons, albums, labels, lat, lon, geo, flags, faces"
+def faces(p):
+    """{name: [x, y, size]} for the people Photos has found in a photo: the face's centre as fractions of the photo's
+    width and height as shown, and its size as a fraction of the photo's longer side. For portraits (people.py)."""
+    out = {}
+    for f in getattr(p, "face_info", None) or []:
+        if f.name and f.name != "_UNKNOWN_" and f.size > 0 and f.size > out.get(f.name, [0, 0, 0])[2]:
+            # Photos counts up from the bottom of the photo as shown, whatever its orientation (checked against
+            # Apple's face detector on 40 photos of each orientation: within 2% of the face)
+            out[f.name] = [round(f.center_x, 4), round(1 - f.center_y, 4), round(f.size, 4)]
+    return out
 N_META = len(META_COLS.split(","))
 
 

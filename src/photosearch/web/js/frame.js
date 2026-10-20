@@ -102,7 +102,7 @@ async function framePick() {
   const fam = await api("/api/picks").then(r => r.results.people).catch(() => []);
   $("fpick").innerHTML = `<div class="kick">Show in the frame</div>
     <div class="fopts"><a href="#frame">✨ The best of everything</a><a href="#frame/?day=today">📅 On this day</a>${fam.length ? `<a href="#frame/?picks=1">♥ Family picks</a>` : ""}${fam.length > 1 ? fam.map(f => `<a href="#frame/?picks=1&who=${encodeURIComponent(f.who)}">♥ ${esc(f.who)}'s</a>`).join("") : ""}</div>
-    <div class="favs">${ppl.slice(0, 10).map(p => `<a href="#frame/?person=${encodeURIComponent(p.name)}"><img src="/thumb/${p.cover}.jpg" alt=""><span>${esc(firstName(p.name))}</span></a>`).join("")}</div>
+    <div class="favs">${ppl.slice(0, 10).map(p => `<a href="#frame/?person=${encodeURIComponent(p.name)}"><img src="${faceSrc(p.cover, p.name)}" alt=""><span>${esc(firstName(p.name))}</span></a>`).join("")}</div>
     <form id="fq"><input id="fqi" placeholder="or anything… e.g. sunsets at the beach"><button>Show</button></form>
     <button class="ibtn" id="fpickx" title="close">✕</button>`;
   $("fpick").hidden = false;

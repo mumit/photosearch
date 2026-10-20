@@ -57,6 +57,10 @@ STEPS = [
     ("filters", "document.getElementById('ftoggle').click()", 1),
     ("person", "closePanel(); location.hash='person/Sam'", 3),
     ("person-scroll", "scrollTo(0, 650)", 1),
+    ("portrait", "scrollTo(0,0); document.querySelector('#pyears .tile').click(); setTimeout(()=>{ document.getElementById('lbportrait').click(); "
+                 "setTimeout(()=>document.querySelector('#lbwho [data-w]')?.click(), 400) }, 800)", 3),
+    ("portrait-set", "if (!document.getElementById('lbportrait').textContent.includes('✓')) throw new Error('not set: ' + "
+                     "document.getElementById('lbportrait').textContent)", 0),
     ("lightbox-day", "scrollTo(0,0); document.querySelector('#pyears .tile').click(); setTimeout(()=>document.querySelector('#lbmode [data-w=day]').click(), 800)", 3),
     ("world", "lbOff(); location.hash='world'", 5),
     ("world-region", "document.querySelector('#wregions [data-k=\"1\"]').click()", 3),

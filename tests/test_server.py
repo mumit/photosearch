@@ -222,3 +222,19 @@ def test_claude_judges_through_mcp(lib, tmp_path):
     assert mcp_server.score_eval_sheet("mcp", 1, [1, 2], [], "x") == "saved; every sheet is judged"
     assert json.loads(mcp_server.eval_sheet("mcp")[0])["done"]
     assert json.loads(mcp_server.eval_sheet()[0])[0]["judges"] == {"claude": 1}
+
+
+def test_portraits_from_the_page(srv, lib, con):
+    import json as j
+    pick = lib["cake0"]
+    assert srv.json("/api/portrait", dict(name="Sam", uuid=pick)) == dict(name="Sam", cover=pick)
+    assert next(p["cover"] for p in srv.json("/api/people") if p["name"] == "Sam") == pick
+    status, _, body = srv.post("/api/portrait", dict(name="Sam", uuid=lib["dog0"]))
+    assert status == 400 and b"isn't tagged" in body
+    status, h, body = srv.get(f"/face/{pick}.jpg?who=Sam")  # no face position yet: the whole thumbnail
+    assert status == 200 and h["content-type"] == "image/jpeg" and body == (config.THUMBS / f"{pick}.jpg").read_bytes()
+    con.execute("update photos set faces=? where uuid=?", (j.dumps({"Sam": [0.5, 0.4, 0.1]}), pick)); con.commit()
+    status, _, crop = srv.get(f"/face/{pick}.jpg?who=Sam")
+    assert status == 200 and crop != body and crop[:2] == b"\xff\xd8"
+    for bad in ("/face/../index.sqlite", "/face/NOPE.jpg?who=Sam"):
+        assert srv.get(bad)[0] == 404

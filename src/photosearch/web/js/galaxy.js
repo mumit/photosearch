@@ -25,7 +25,7 @@ async function openGalaxy() {
   Object.assign($("gyr"), { min: G.y0, max: G.y1, value: G.y1 });
   fitGalaxy();
   if (G.hi) flyTo(G.hi);
-  loadPeople().then(p => { $("gppl").innerHTML = p.slice(0, 8).map(x => `<img src="/thumb/${x.cover}.jpg" alt="" title="${esc(x.name)}" data-name="${esc(x.name)}">`).join(""); }).catch(() => {});
+  loadPeople().then(p => { $("gppl").innerHTML = p.slice(0, 8).map(x => `<img src="${faceSrc(x.cover, x.name)}" alt="" title="${esc(x.name)}" data-name="${esc(x.name)}">`).join(""); }).catch(() => {});
 };
 function resizeGalaxy() {
   const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1;

@@ -8,7 +8,7 @@ const initials = n => n.split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpper
 const fmtN = n => n > 999 ? (n / 1000).toFixed(n > 9999 ? 0 : 1) + "k" : String(n);
 function avatar(p, note) {
   return `<a class="avatar" href="#person/${encodeURIComponent(p.name)}" title="${esc(p.name)}">
-    ${p.cover ? `<img loading="lazy" src="/thumb/${p.cover}.jpg" alt="">` : `<span class="ini">${esc(initials(p.name))}</span>`}
+    ${p.cover ? `<img loading="lazy" src="${faceSrc(p.cover, p.name)}" alt="">` : `<span class="ini">${esc(initials(p.name))}</span>`}
     <b>${esc(p.name)}</b><small>${note ?? p.n.toLocaleString() + " photos"}</small></a>`;
 }
 const PV = { name: null };
@@ -29,7 +29,7 @@ views.person = async arg => {
   const only1 = f => "#" + searchHash("", only(f), new Set());
   $("pv").innerHTML = `
     <div class="phead">
-      ${r.portrait || latest ? `<img class="pportrait" src="/thumb/${r.portrait || latest.uuid}.jpg" alt="">` : ""}
+      ${r.portrait ? `<img class="pportrait" src="${faceSrc(r.portrait, name)}" alt="">` : latest ? `<img class="pportrait" src="/thumb/${latest.uuid}.jpg" alt="">` : ""}
       <div><div class="kick">${r.n.toLocaleString()} photos · ${span}</div><h1>${esc(name)}</h1>
         <div class="pbtns">${years.length >= 3 ? `<button id="pgrow">▶ ${esc(firstName(name))} through the years</button>` : ""}
           <a class="pill" href="#frame/?person=${encodeURIComponent(name)}">🖼 Photo frame</a>

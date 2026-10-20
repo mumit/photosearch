@@ -362,6 +362,15 @@ the numbers above are without them.
   fresh queries with those it got 95/100. It powers the optional ✨ smart search. Choices under 60% confidence are
   ignored.
 
+## Face crops for portraits
+
+Photos keeps each named face's centre and size. osxphotos turns the centre by the photo's orientation, and crops
+made that way missed the face on most rotated photos (a gown, a shirt, grass). Checked against Apple's own face
+detector on thumbnails, 40 photos with one face for each orientation: Photos' centre is already the way the photo is
+shown, counted from the bottom, so only the height is flipped. That lands within 1 to 2% of the detected face for
+every orientation (0, 1, 3, 6 and 8); turning it was 15 to 21% off. The crop is 2.4 times the face, so hair and chin
+fit in a circle.
+
 ## Galaxy
 
 UMAP with `min_dist=0.6`, so near-duplicates spread out instead of piling up, and k-means regions named by the Apple

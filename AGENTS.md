@@ -73,6 +73,7 @@ Update this section when something finishes or starts.
 - **Family picks:** built (♡ Love in the big photo view, `picks.py`). Not tried by the family on phones yet.
 - **Quick first index:** done (`index --quick`, about 4× faster; the next `index` redoes those photos at full quality, newest first).
 - **Jev checks results:** done (`checks.py`, part of ✨ smart search). Judged by Claude alone; worth a second judge.
+- **Use as portrait:** done (👤 Portrait, `people.py`). Face crops need `index` to have run once since (it reads where each face is).
 - **Judge a test:** built (Play → Judge a Test). The `jev` and `hubs` tests in `data/eval/` wait for me as a second judge.
 - **Words in photos:** done (`text.py`, searches in "quotes"). An automatic boost was measured and made search worse (FINDINGS.md).
 - **Vision tokens:** done. 70 tokens is 4.7× faster, changes the first result in more than half of searches, but is only slightly worse when judged by eye (see FINDINGS.md). 280 stays the default.

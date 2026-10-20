@@ -31,7 +31,9 @@ async function sharpen(img, uuid) {
 }
 const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
                 set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
-const once = fn => { let p; return () => p ??= fn().catch(e => { p = null; throw e; }); };
+const once = fn => { let p; const f = () => p ??= fn().catch(e => { p = null; throw e; }); f.reset = () => { p = null; }; return f; };
+// someone's portrait, around their face where Photos knows it (people.py), else the whole thumbnail
+const faceSrc = (uuid, who) => `/face/${uuid}.jpg?who=${encodeURIComponent(who)}`;
 const short = place => (place || "").split(",")[0];
 const longDate = (d, opt = { weekday:"long", month:"long", day:"numeric", year:"numeric" }) => {
   const [y, m, day] = d.split("-").map(Number); return new Date(y, m - 1, day).toLocaleDateString(undefined, opt);
@@ -156,6 +158,8 @@ function lightbox(list, i, keepTrail = false) {
   $("lbtrail").innerHTML = LB.trail.map((t, k) => `<img src="/thumb/${t.uuid}.jpg" data-k="${k}" title="back to here">`).join("");
   const wq = x.kind === "photo" ? whyQuery() : "";
   lovedShow(x);
+  $("lbportrait").hidden = !SERVER.local || SERVER.demo || x.kind !== "photo" || !x.persons?.length;
+  $("lbportrait").textContent = "👤 Portrait";
   $("lbwhy").hidden = !wq;
   if (WHY.on && wq) explainPhoto(x, wq); else whyClear();
   $("lb").classList.add("on"); lbTop();
@@ -229,6 +233,21 @@ async function askWho(then) {
   if (!ppl.length) $("lbwhoi").focus();
 }
 $("lbpick").onclick = lovedToggle;
+
+/* ---------- use as portrait: this photo stands for someone tagged in it, everywhere (on the Mac) ---------- */
+async function portraitSet(x, name) {
+  try { await post("/api/portrait", { name, uuid: x.uuid }); } catch (e) { $("lbportrait").textContent = e.message; return; }
+  loadPeople.reset(); PV.name = null; shelvesDone = false;  // people's covers show it next time they're drawn
+  if (LB.list[LB.at] === x) $("lbportrait").textContent = `✓ ${firstName(name)}'s portrait`;
+}
+$("lbportrait").onclick = () => {
+  const x = LB.list[LB.at], ppl = x.persons || [];
+  if (ppl.length === 1) return portraitSet(x, ppl[0]);
+  const f = $("lbwho"); f.hidden = false; lbTop();
+  f.innerHTML = `<span>Whose portrait?</span>${ppl.map(p => `<button type="button" data-w="${esc(p)}">${esc(firstName(p))}</button>`).join("")}`;
+  f.onclick = e => { const w = e.target.dataset?.w; if (w) { f.hidden = true; lbTop(); portraitSet(x, w); } };
+  f.onsubmit = e => e.preventDefault();
+};
 
 /* ---------- why: which words of the search the photo fits, what the model sees in it, and where it matched ---------- */
 const WHY = { on: false, key: null };

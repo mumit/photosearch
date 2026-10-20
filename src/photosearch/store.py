@@ -21,6 +21,8 @@ def db():
         con.execute("alter table photos add column geo text")
     if "flags" not in cols:  # e.g. ["screenshot"]; null until the next `photosearch index`
         con.execute("alter table photos add column flags text")
+    if "faces" not in cols:  # {name: [x, y, size]}: where each named person's face is (index.faces); null until `index` runs
+        con.execute("alter table photos add column faces text")
     if "quick" not in cols:  # 1 while a photo still has its quick first vector (`index --quick`), until `index` redoes it
         con.execute("alter table photos add column quick integer")
     con.execute("create table if not exists meta(key text primary key, value text)")
@@ -37,6 +39,8 @@ def db():
     con.execute("create table if not exists words(word text primary key, vec blob)")
     # family picks (picks.py): who loved which photo, and when
     con.execute("create table if not exists picks(uuid text, who text, at text, primary key(uuid, who))")
+    # the portrait I chose for someone (people.py), instead of the one picked for them
+    con.execute("create table if not exists portrait(name text primary key, uuid text, at text)")
     # the words in each photo, as Vision reads them (text.py); '' when it found none
     con.execute("create table if not exists texts(uuid text primary key, text text, at text)")
     return con

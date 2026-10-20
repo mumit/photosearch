@@ -13,13 +13,13 @@ views.time = arg => {  // #time/birthday cake, #time/birthday cake?person=Name, 
   const key = q + "|" + person;
   $("tempty").hidden = !!(q || person) || !!T.years.length;
   if ((q || person) && key !== T.key) runTime(q, person);
-  loadPeople().then(p => { $("tpeople").innerHTML = p.slice(0, 10).map(x => `<a href="#${timeHash("", x.name)}" title="${esc(x.name)}"><img src="/thumb/${x.cover}.jpg" alt=""><span>${esc(firstName(x.name))}</span></a>`).join(""); }).catch(() => {});
+  loadPeople().then(p => { $("tpeople").innerHTML = p.slice(0, 10).map(x => `<a href="#${timeHash("", x.name)}" title="${esc(x.name)}"><img src="${faceSrc(x.cover, x.name)}" alt=""><span>${esc(firstName(x.name))}</span></a>`).join(""); }).catch(() => {});
 };
 $("twho").onclick = async () => {
   if (!$("twhop").hidden) { $("twhop").hidden = true; return; }
   const p = await loadPeople().catch(() => []);
   $("twhop").innerHTML = `<a href="#${timeHash(T.q, "")}">👥 Anyone</a>` + p.slice(0, 16).map(x =>
-    `<a href="#${timeHash(T.q, x.name)}"><img src="/thumb/${x.cover}.jpg" alt="">${esc(x.name)}</a>`).join("");
+    `<a href="#${timeHash(T.q, x.name)}"><img src="${faceSrc(x.cover, x.name)}" alt="">${esc(x.name)}</a>`).join("");
   $("twhop").hidden = false;
 };
 $("twhop").onclick = e => { if (e.target.closest("a")) $("twhop").hidden = true; };
