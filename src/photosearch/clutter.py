@@ -9,7 +9,7 @@ around each cut-off:
 - Accidental shots, 0.07 (30): floors, black frames, blurs. Below that come photos of rooms and repairs, which may
   be worth keeping, and blur or darkness alone also finds dim family photos, so neither is used.
 Screenshots come from Photos, which marks them (`flags`); before the index has that, from their phone-screen shape
-(139 of 149 such photos were screenshots).
+(139 of 149 such photos were screenshots). Photos marked 163, and of the 24 not phone-shaped, 22 were screenshots too.
 """
 import json
 

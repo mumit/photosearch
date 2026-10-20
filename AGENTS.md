@@ -68,7 +68,7 @@ Update this section when something finishes or starts.
 - **Then and now:** done (Play → Then and Now, `thennow.py`): same spot and same person.
 - **Recreate this:** built (Play → Recreate This, `recreate.py`, ROADMAP item 1). Waiting on me to take one again, so the match cut-off can be checked.
 - **Video search:** done. All 752 videos are read; `index` reads new local ones, and `videos --icloud` the rest. `SOUND_AT` was set from my marks by ear (`data/sound-marks.json`, README → Videos).
-- **Clutter sweep:** built (Albums → Tidy up → Clutter and private photos). Sending a kind to Photos isn't tried on my library yet, and `photosearch index` needs one run to read Photos' screenshot marks.
+- **Clutter sweep:** built (Albums → Tidy up → Clutter and private photos). Sending a kind to Photos isn't tried on my library yet. Screenshots now come from Photos' own marks (163).
 - **Why did this match:** done (? Why in the big photo view, `photosearch why`, `why.py`). A post is drafted.
 - **Family picks:** built (♡ Love in the big photo view, `picks.py`). Not tried by the family on phones yet.
 - **Quick first index:** done (`index --quick`, about 4× faster; the next `index` redoes those photos at full quality, newest first).
