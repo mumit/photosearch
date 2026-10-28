@@ -447,7 +447,7 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 | `src/photosearch/` | The code (see [Code layout](#code-layout)) |
 | `src/photosearch/web/` | The web page: `index.html`, `app.css`, one script per view in `js/`, and `review.html`, the story player (also used for the one-file export) |
 | `tests/` | The tests and the made-up library they run on (see [Tests](#tests)) |
-| `tools/director/`, `tools/launch/` | Recording and cutting a demo video from a separate demo library (see [Demo videos](#demo-videos)) |
+| `demo/` | The launch video as a [reshoot](https://github.com/mumit/reshoot) project, on a separate demo library (see [Demo videos](#demo-videos)) |
 | `AGENTS.md`, `CLAUDE.md` | Notes for coding agents working on photosearch |
 | `ROADMAP.md` | What to build next, in order |
 | `FINDINGS.md` | What the experiments found, and how each setting was chosen |
@@ -570,8 +570,9 @@ through this Mac's Wi-Fi address, so the server sees a device other than itself;
 To show photosearch without showing your photos, index a separate Photos library of photos you're happy to share into
 its own data folder (`PHOTOSEARCH_DATA=data-demo uv run photosearch index`) and serve it with `serve --demo`
 (presenter mode: no phone pairing, no opening photos in Photos, and it refuses your own `data/`). `photosearch
-demo-check data` checks that nothing from your own library shows. [`tools/launch/README.md`](tools/launch/README.md)
-has the whole reshoot: recording the web app and Claude Code, checking every photo the takes show, and cutting the video.
+demo-check data` checks that nothing from your own library shows. [`demo/README.md`](demo/README.md) has the whole
+reshoot, with [reshoot](https://github.com/mumit/reshoot): recording the web app, Claude Code and the album in Photos,
+checking every frame, and cutting the video.
 
 ### Experiments: `photosearch eval`
 

@@ -1,0 +1,31 @@
+# The photosearch launch video, recorded again on today's photosearch with the original script.
+# Read README.md first: Photos must have the separate demo library open. finish.sh adds the Photos window afterwards.
+schema_version = 1
+inputs = ["BRIEF.md", "README.md", "common.py", "reset.py", "finish.sh"]
+timeout = 3600  # the full scan of every frame alone takes about 20 minutes
+
+[app]
+# photosearch in presenter mode on its separate demo library (data-demo, indexed from "Photosearch Demo")
+run = 'cd .. && PHOTOSEARCH_DATA=data-demo exec uv run photosearch serve --demo --port 18766'
+reset = 'uv run --quiet --project .. python reset.py'
+reset_timeout = 180
+url = "http://127.0.0.1:18766/"
+timeout = 180
+
+[[take]]
+web = "storyboard.toml"
+out = "takes/web.mp4"
+
+[[take]]
+tape = "claude.tape"
+
+[edit]
+script = "edit.py"
+args = ["takes/web.mp4", "takes/claude.mp4"]
+
+[check]
+sources = ["takes/web.assets.json", "takes/photosearch.mp4", "takes/photosearch-readme.gif"]
+review = "review"
+scan = true
+full = true
+ocr = "vision"

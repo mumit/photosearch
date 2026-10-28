@@ -8,7 +8,7 @@ Read this before working on photosearch. [README.md](README.md) covers what the 
 - **Never capture the whole screen.** A full-screen capture once showed my mail and calendar. Record one window (`screencapture -v -l<window id>`) or a headless browser page.
 - **Nothing goes public without my yes.** This includes pushing, posting, publishing and sharing. I post on social media myself.
 - **Keep secrets out of output and git.** My TypeSafe Jev key is `TYPESAFE_API_KEY`, in the environment or a git-ignored `.env`. Don't print it.
-- **Photos shown in public come from the demo library only,** and every one is checked by eye at full size first. See [tools/launch/README.md](tools/launch/README.md).
+- **Photos shown in public come from the demo library only,** and every one is checked by eye at full size first. See [demo/README.md](demo/README.md).
 - **No login items or background services** (launchd) unless I ask.
 - Commit only when I ask, in conventional-commit style (`feat(galaxy): …`, `fix(mcp): …`).
 
@@ -21,8 +21,7 @@ Read this before working on photosearch. [README.md](README.md) covers what the 
 | `src/photosearch/web/` | The page: `index.html`, `app.css`, `js/*.js`. Re-read on every request, so no build step. |
 | `FINDINGS.md` | What experiments found and how each setting was chosen. Add a section for each new one. |
 | `tests/` | pytest, on a made-up library with a fake model. |
-| `tools/director/` | Records the web app in headless Chrome from a storyboard. |
-| `tools/launch/` | Reshoots the launch video. Its README is the step-by-step guide. |
+| `demo/` | The launch video as a [reshoot](https://github.com/mumit/reshoot) project: `reshoot run reshoot.toml`, then `sh finish.sh RUN` for the Photos window. Its README is the step-by-step guide. |
 | `data/` | My index, thumbnails and logs. Git-ignored and personal. |
 | `data-demo/` | The demo library's index and launch takes. Git-ignored. |
 
@@ -63,6 +62,7 @@ What to build next is in [ROADMAP.md](ROADMAP.md). Keep it current: move items t
 Update this section when something finishes or starts.
 
 - **Launch posts:** Highlight important changes so I can post those to X/LinkedIn.
+- **Launch video with reshoot:** `demo/` records the Oct 15 video again, with ? Why and Then and Now added, and replaces `tools/launch` and `tools/director` (removed). A final, a short cut of what's new and a GIF per section wait for me to watch them and look over their scan sheets. Posts for them are drafted in my launch folder (`whats-new.md`).
 - **Demo leftovers:** the demo Photos library, its import folder, `data-demo/` and a separate Claude config folder for the demo takes are still on disk. I haven't decided whether to keep them. Before the demo library is deleted, Photos must be switched back to my library (hold Option while opening Photos).
 - **Date detective:** done. 851 of 1,042 undated photos are dated; the rest are small loose groups.
 - **Then and now:** done (Play → Then and Now, `thennow.py`): same spot and same person.

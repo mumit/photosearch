@@ -1,0 +1,347 @@
+# The web half of the photosearch launch video, on the separate demo library in presenter mode.
+# The first launch video's script (search, look-alikes, Galaxy, Photo Math, the map), with ? Why and Then and Now
+# added for what photosearch can do since. Captions say what the tool does, never more.
+schema_version = 1
+id = "photosearch-launch-web"
+url = "http://127.0.0.1:18766/#home"
+size = "1280x720@1.5"
+theme = "dark"
+seed = 7
+
+[caption]
+position = "bottom"
+min_seconds = 1.5
+
+# The first launch video typed at about this speed; reshoot's default is 13 a second
+[cursor]
+typing = 20
+
+# Before recording: open the map and Galaxy once, so their tiles and layout are loaded when they're shown.
+[[setup]]
+type = "click"
+target = {css = "nav#tabs a[href='#world']"}
+[[setup]]
+type = "wait"
+target = {css = "#wregions .pill[data-k='all']"}
+timeout = 30000
+[[setup]]
+type = "click"
+target = {css = "nav#tabs a[href='#galaxy']"}
+[[setup]]
+type = "wait"
+target = {css = "#gplay"}
+timeout = 30000
+# Ask Why once, so its first answer (about 9 s after a fresh start) isn't on camera. From home: on Galaxy the box
+# lights up the galaxy instead of searching
+[[setup]]
+type = "navigate"
+url = "http://127.0.0.1:18766/#home"
+[[setup]]
+type = "wait"
+target = {css = "#home #hero"}
+[[setup]]
+type = "type"
+target = {css = "#q"}
+text = "a waterfall in the mist"
+[[setup]]
+type = "click"
+target = {css = "#gobtn"}
+[[setup]]
+type = "wait"
+target = {css = "#grid .tile[data-i='1'] img"}
+timeout = 30000
+[[setup]]
+type = "click"
+target = {css = "#grid .tile[data-i='1']"}
+[[setup]]
+type = "click"
+target = {css = "#lbwhy"}
+[[setup]]
+type = "wait"
+target = {css = "#whypanel .wsees span:first-child"}
+timeout = 60000
+# Home by reloading, not by its tab: Galaxy fades out slowly, and the take would open on it
+[[setup]]
+type = "navigate"
+url = "http://127.0.0.1:18766/#home"
+[[setup]]
+type = "wait"
+target = {css = "#home #hero"}
+
+# 1. Home, then the hook: search by what's in the photo
+[[beat]]
+id = "home"
+purpose = "Open on the home page with the promise"
+caption = "Search your photos by what’s in them"
+sub = "on your Mac · nothing leaves it"
+hold = 2.0
+
+[[beat]]
+id = "type"
+purpose = "Describe a scene, not a keyword"
+caption = "Search your photos by what’s in them"
+sub = "on your Mac · nothing leaves it"
+hold = 0.4
+[[beat.action]]
+type = "type"
+target = {css = "#q"}
+text = "a waterfall in the mist"
+[[beat.expect]]
+type = "value"
+target = {css = "#q"}
+value = "a waterfall in the mist"
+
+[[beat]]
+id = "search"
+purpose = "The demo library's waterfalls come back"
+hold = 2.6
+[[beat.action]]
+type = "click"
+target = {css = "#gobtn"}
+[[beat.expect]]
+type = "text"
+target = {css = "#rtitle"}
+contains = "a waterfall in the mist"
+[[beat.expect]]
+type = "text"
+target = {css = "#status"}
+contains = "best matches"
+
+# 2. Wander: every photo leads to its look-alikes
+[[beat]]
+id = "open"
+purpose = "Open a result; its look-alikes line the bottom"
+hold = 1.8
+[[beat.action]]
+type = "click"
+target = {css = "#grid .tile[data-i='1']"}
+[[beat.expect]]
+type = "visible"
+target = {css = "#lbsims img:nth-child(3)"}
+
+[[beat]]
+id = "why"
+purpose = "Why this photo matched: the words that counted, what the model sees, and where"
+caption = "And it shows why each one matched"
+hold = 3.2
+[[beat.action]]
+type = "click"
+target = {css = "#lbwhy"}
+[[beat.expect]]
+type = "visible"
+target = {css = "#whypanel .wsees span:first-child"}
+timeout = 30000
+
+[[beat]]
+id = "wander1"
+purpose = "Follow a look-alike"
+caption = "Every photo leads to its look-alikes"
+hold = 1.5
+[[beat.action]]
+type = "click"
+target = {css = "#lbwhy"}  # put Why away first
+[[beat.action]]
+type = "click"
+target = {css = "#lbsims img:nth-child(3)"}
+[[beat.expect]]
+type = "visible"
+target = {css = "#lbimg"}
+
+[[beat]]
+id = "wander2"
+purpose = "And another"
+caption = "Every photo leads to its look-alikes"
+hold = 1.6
+[[beat.action]]
+type = "click"
+target = {css = "#lbsims img:nth-child(2)"}
+[[beat.expect]]
+type = "visible"
+target = {css = "#lbimg"}
+
+[[beat]]
+id = "close"
+purpose = "Back to the results"
+hold = 0.6
+[[beat.action]]
+type = "click"
+target = {css = "#lbclose"}
+
+# 3. Galaxy: the whole library as a map of look-alikes, growing year by year, then lit up by a search
+# Its own step to change tab, so the caption only changes once Galaxy is on screen
+[[beat]]
+id = "to-galaxy"
+purpose = "Go to Galaxy"
+hold = 0
+[[beat.action]]
+type = "click"
+target = {css = "nav#tabs a[href='#galaxy']"}
+[[beat.expect]]
+type = "visible"
+target = {css = "#gplay"}
+
+[[beat]]
+id = "galaxy"
+purpose = "The whole library laid out by similarity"
+caption = "Your whole library, as a map of look-alikes"
+hold = 2.4
+[[beat.expect]]
+type = "visible"
+target = {css = "#gplay"}
+
+[[beat]]
+id = "grow"
+purpose = "Watch it grow a year at a time (the animation ends by itself on All years)"
+caption = "Your whole library, as a map of look-alikes"
+hold = 6.6
+[[beat.action]]
+type = "click"
+target = {css = "#gplay"}
+[[beat.expect]]
+type = "text"
+target = {css = "#gyl"}
+contains = "up to"
+
+[[beat]]
+id = "light"
+purpose = "A search lights up where its matches sit"
+caption = "Your whole library, as a map of look-alikes"
+hold = 2.8
+[[beat.action]]
+type = "type"
+target = {css = "#q"}
+text = "the ocean"
+[[beat.action]]
+type = "click"
+target = {css = "#gobtn"}
+[[beat.expect]]
+type = "text"
+target = {css = "#glit"}
+contains = "the ocean"
+
+# 4. Photo math
+[[beat]]
+id = "math"
+purpose = "Open Photo Math"
+caption = "Photos you can do math on"
+sub = "a city skyline + night"
+hold = 1.0
+[[beat.action]]
+type = "navigate"
+url = "http://127.0.0.1:18766/#math"
+[[beat.expect]]
+type = "visible"
+target = {css = "#mtext"}
+
+[[beat]]
+id = "math-base"
+purpose = "Start from words"
+caption = "Photos you can do math on"
+sub = "a city skyline + night"
+hold = 0.2
+[[beat.action]]
+type = "type"
+target = {css = "#mtext"}
+text = "a city skyline"
+
+[[beat]]
+id = "math-plus"
+purpose = "Add an idea"
+caption = "Photos you can do math on"
+sub = "a city skyline + night"
+hold = 0.2
+[[beat.action]]
+type = "type"
+target = {css = "#mplus"}
+text = "night"
+
+[[beat]]
+id = "math-go"
+purpose = "Skylines at night come back"
+caption = "Photos you can do math on"
+sub = "a city skyline + night"
+hold = 2.8
+[[beat.action]]
+type = "click"
+target = {css = "#mf button"}
+[[beat.expect]]
+type = "text"
+target = {css = "#mstatus"}
+contains = "results"
+[[beat.expect]]
+type = "visible"
+target = {css = "#mgrid .tile[data-i='0'] img"}
+
+# 5. The map, by the place names Photos knows
+[[beat]]
+id = "to-map"
+purpose = "Go to the map"
+hold = 0
+[[beat.action]]
+type = "click"
+target = {css = "nav#tabs a[href='#world']"}
+[[beat.expect]]
+type = "visible"
+target = {css = "#wregions .pill[data-k='all']"}
+
+[[beat]]
+id = "map"
+purpose = "Every place the library has been"
+caption = "Everywhere you’ve been"
+hold = 2.6
+[[beat.expect]]
+type = "visible"
+target = {css = "#wregions .pill[data-k='all']"}
+
+[[beat]]
+id = "region"
+purpose = "Fly to one region"
+caption = "Everywhere you’ve been"
+hold = 3.0
+[[beat.action]]
+type = "click"
+target = {role = "button", name = "Ottawa & Gatineau 11"}  # the pill reads its photo count too
+
+# 6. Then and Now: the same spot, years apart (the demo library has one pair: an aquarium tank, 2017 and 2022)
+[[beat]]
+id = "to-play"
+purpose = "Open Then and Now from Play"
+hold = 0
+[[beat.action]]
+type = "navigate"  # like Photo Math: a click on the Play tab while the map still flies is lost
+url = "http://127.0.0.1:18766/#play"
+[[beat.action]]
+type = "wait"
+target = {css = "#tncard"}
+[[beat.action]]
+type = "scroll"  # down to the card, so the click doesn't jump there
+dy = 260
+[[beat.action]]
+type = "click"
+target = {css = "#tncard"}
+[[beat.expect]]
+type = "visible"
+target = {css = ".tnpair figure:nth-child(2) img"}
+
+[[beat]]
+id = "thennow"
+purpose = "Two photos from the same spot, years apart"
+caption = "The same spot, years apart"
+hold = 3.4
+[[beat.action]]
+type = "scroll"  # the dates under the photos, above the caption; the title stays under the top bar
+dy = 140
+[[beat.expect]]
+type = "visible"
+target = {css = ".tnpair figure:nth-child(2) img"}
+[[beat.expect]]
+type = "text"
+target = {css = "#playroot h2.ask"}
+contains = "years apart"
+
+# 7. Out (the edit replaces this with its own end card)
+[[beat]]
+id = "end"
+caption = "photosearch"
+sub = "open source · runs on your Mac"
+hold = 2.5
