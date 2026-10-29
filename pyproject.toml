@@ -10,6 +10,7 @@ dependencies = [
     "mcp>=1.0",
     "numpy>=2.5.4",
     "osxphotos>=0.77.2",
+    "packaging>=24",
     "pillow>=12.3.0",
     "pillow-heif>=1.8.1",
     "sentence-transformers>=6.1.0",

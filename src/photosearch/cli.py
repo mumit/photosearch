@@ -13,6 +13,8 @@
   photosearch videos [--icloud] [--limit N]             embed each video's sound and a frame every 3 s
   photosearch why "a red balloon" UUID [--out F.jpg]     why a photo matches: where in it, which words, what it sees
   photosearch text [--limit N]                          read the words in photos (signs, pages), so searches find them
+  photosearch library [--library PATH]                  which Photos library it reads, and how many items it has
+  photosearch update [--check]                          the newest release, for an installed copy
 
 Nothing is downloaded from iCloud: with "Optimize Mac Storage" on we embed the
 local preview Photos keeps (the model only sees ~280 visual tokens anyway).
@@ -22,7 +24,7 @@ import argparse, json, sys
 from pathlib import Path
 
 from . import embed
-from .store import db
+from .store import db, photos_db
 from .index import cmd_index, cmd_thumbs
 from .search import search, similar
 from .places import trips
@@ -36,6 +38,7 @@ from .videos import cmd_download_videos, cmd_videos
 from .dates import cmd_dates
 from .why import cmd_why
 from .text import cmd_text
+from .update import cmd_update, version
 
 
 def cmd_album(a):
@@ -81,6 +84,11 @@ def cmd_review(a):
         print(f"wrote {a.export} ({Path(a.export).stat().st_size / 1e6:.1f} MB): one file, opens in any browser")
 
 
+def cmd_library(a):
+    lib = photos_db(a.library)
+    print(lib.library_path, len(lib.photos()))
+
+
 def cmd_today(a):
     r = on_this_day(db(), a.day)
     if r["window"]:
@@ -94,6 +102,7 @@ def cmd_today(a):
 
 def main():
     ap = argparse.ArgumentParser(prog="photosearch", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", action="version", version=f"photosearch {version()}")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     def filters(p):
@@ -162,6 +171,10 @@ def main():
     p.add_argument("--out", metavar="F.jpg", help="where to write the lit copy (default why-UUID.jpg)"); p.set_defaults(fn=cmd_why)
     p = sub.add_parser("text", help="read the words in photos (signs, pages, receipts) on this Mac, so searches find them")
     p.add_argument("--limit", type=int); p.set_defaults(fn=cmd_text)
+    p = sub.add_parser("library", help="which Photos library it reads (the index's, else the system one), and how many items")
+    p.add_argument("--library"); p.set_defaults(fn=cmd_library)
+    p = sub.add_parser("update", help="install the newest release from PyPI (a git checkout uses git pull)")
+    p.add_argument("--check", action="store_true", help="only say whether there's a newer one"); p.set_defaults(fn=cmd_update)
     p = sub.add_parser("download-videos", help="download videos (by uuid) from iCloud into a folder; used by `videos --icloud`")
     p.add_argument("dir"); p.add_argument("uuids", nargs="+"); p.set_defaults(fn=cmd_download_videos)
     a = ap.parse_args()

@@ -14,9 +14,14 @@ def run(*args):
 
 def test_help_lists_every_command():
     out = run("--help")
-    for cmd in ("index", "search", "serve", "fetch", "add-to-album", "trips", "today", "review", "why"):
+    for cmd in ("index", "search", "serve", "fetch", "add-to-album", "trips", "today", "review", "why", "library", "update"):
         assert cmd in out
     assert out.startswith("usage: photosearch")
+
+
+def test_version():
+    from photosearch.update import version
+    assert run("--version").strip() == f"photosearch {version()}" and version() != "unknown"
 
 
 def test_trips_on_the_made_up_library():

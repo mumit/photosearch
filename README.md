@@ -93,7 +93,7 @@ app Full Disk Access:
 Check that it works. This prints your library path and how many items it has:
 
 ```bash
-uv run python -c "import osxphotos, osxphotos.utils as u; d = osxphotos.PhotosDB(u.get_system_library_path()); print(d.library_path, len(d.photos()))"
+uv run photosearch library
 ```
 
 If you have more than one library, this shows the one Photos currently uses as the **System Photo Library**.
