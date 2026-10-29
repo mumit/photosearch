@@ -88,8 +88,9 @@ def photos_db(library=None):
         return osxphotos.PhotosDB(dbfile=library)
     try:
         return osxphotos.PhotosDB()
-    except FileNotFoundError:  # osxphotos can't always read which library is the system one
-        return osxphotos.PhotosDB(dbfile=str(LIBRARY))
+    except FileNotFoundError:  # newer Photos doesn't record the last library where osxphotos looks
+        from osxphotos.utils import get_system_library_path
+        return osxphotos.PhotosDB(dbfile=get_system_library_path() or str(LIBRARY))
 
 
 _ar = {}
