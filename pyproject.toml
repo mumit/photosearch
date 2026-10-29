@@ -2,10 +2,22 @@
 name = "photosearch"
 version = "0.1.0"
 description = "Search an Apple Photos library by what's in the pictures, and play with it"
-readme = "README.md"
+dynamic = ["readme"]
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
+authors = [{ name = "Mumit Khan" }]
+keywords = ["apple photos", "photo search", "semantic search", "embeddings", "macos", "mcp"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: MacOS X",
+    "Environment :: Web Environment",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics",
+]
 dependencies = [
     "mcp>=1.0",
     "numpy>=2.5.4",
@@ -20,13 +32,38 @@ dependencies = [
     "umap-learn>=0.5.12",
 ]
 
+[project.urls]
+Homepage = "https://github.com/mumit/photosearch"
+Source = "https://github.com/mumit/photosearch"
+Issues = "https://github.com/mumit/photosearch/issues"
+Findings = "https://github.com/mumit/photosearch/blob/main/FINDINGS.md"
+
 [project.scripts]
 photosearch = "photosearch.cli:main"
 photosearch-mcp = "photosearch.mcp_server:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-fancy-pypi-readme"]
 build-backend = "hatchling.build"
+
+# The source archive: the package, its tests and the docs, not demo/ (its takes are many GB) or data folders
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/tests", "/README.md", "/LICENSE", "/FINDINGS.md", "/ROADMAP.md"]
+
+# PyPI shows README.md, where links relative to the repo would break: point them at GitHub
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '\]\((docs/[^)]+)\)'
+replacement = '](https://raw.githubusercontent.com/mumit/photosearch/main/\1)'
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '\]\((?!https?://|#|mailto:)([^)]+)\)'
+replacement = '](https://github.com/mumit/photosearch/blob/main/\1)'
 
 [dependency-groups]
 dev = [

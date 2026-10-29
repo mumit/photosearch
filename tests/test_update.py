@@ -59,4 +59,9 @@ def test_offline(installed, monkeypatch):
 def test_upgrade_command_follows_the_installer():
     assert update.upgrade_command("/Users/me/.local/share/uv/tools/photosearch")[:3] == ["uv", "tool", "upgrade"]
     assert update.upgrade_command("/Users/me/.local/pipx/venvs/photosearch")[:2] == ["pipx", "upgrade"]
-    assert update.upgrade_command("/Users/me/venv")[-3:] == ["install", "--upgrade", "photosearch"]
+    assert update.upgrade_command("/Users/me/venv", has_pip=True)[1:3] == ["-m", "pip"]
+
+
+def test_a_venv_without_pip_upgrades_with_uv(monkeypatch):
+    monkeypatch.setattr(update.shutil, "which", lambda name: "/opt/homebrew/bin/uv")
+    assert update.upgrade_command("/Users/me/venv", has_pip=False)[:3] == ["uv", "pip", "install"]

@@ -1,6 +1,6 @@
 """`photosearch update`: the newest release from PyPI, for an installed copy (uv tool, pipx or pip). A git checkout
 updates with `git pull` instead. Nothing checks for updates by itself: only this command reaches PyPI."""
-import json, subprocess, sys, urllib.error, urllib.request
+import importlib.util, json, shutil, subprocess, sys, urllib.error, urllib.request
 from importlib.metadata import PackageNotFoundError, version as installed_version
 
 from packaging.version import Version
@@ -28,12 +28,17 @@ def latest():
         raise
 
 
-def upgrade_command(prefix=sys.prefix):
-    """How to upgrade, from how it was installed: each installer keeps its tools in a folder of its own."""
+def upgrade_command(prefix=sys.prefix, has_pip=None):
+    """How to upgrade, from how it was installed: each installer keeps its tools in a folder of its own. A venv that
+    uv made has no pip, so uv installs into it instead."""
     if "/uv/tools/" in prefix:
         return ["uv", "tool", "upgrade", "photosearch"]
     if "/pipx/venvs/" in prefix:
         return ["pipx", "upgrade", "photosearch"]
+    if has_pip is None:
+        has_pip = importlib.util.find_spec("pip") is not None
+    if not has_pip and shutil.which("uv"):
+        return ["uv", "pip", "install", "--python", sys.executable, "--upgrade", "photosearch"]
     return [sys.executable, "-m", "pip", "install", "--upgrade", "photosearch"]
 
 
