@@ -22,11 +22,11 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 
 **For people who find the repo:**
 - CI on GitHub Actions (the tests already use a fake model).
-- A one-command install: built (`uv tool install photosearch`, then `photosearch update`), waiting on the first upload to PyPI.
 - `serve` indexes new photos while it runs, instead of a nightly job (no background services).
 
 ## Done
 
+- A one-command install: `uv tool install photosearch`, from PyPI (0.1.0 on Oct 29), and `photosearch update` for new releases. An installed copy keeps its index in `~/Library/Application Support/photosearch/`.
 - Use as portrait: 👤 Portrait in the big photo view (on the Mac) makes a photo someone's portrait everywhere. Every portrait, picked or chosen, is now cropped around that person's face, from where Photos says it is (`index` reads it; `people.py`).
 - Judge a test: Play → Judge a Test shows an experiment's blind sheets on any device, one search at a time, each judge under their own name, with the results once every search is judged and how often two judges agree. Claude judges through MCP (`eval_sheet`, `score_eval_sheet`). `photosearch eval` also compares rules for ranking over the whole library (`search`, `search=nohub`, `search=check`).
 - ✨ smart search checks the first photos: Jev, given each of the first 40 photos described in words (labels, what the model sees, time, people count, brightness and colour; never the photo or a name), nudges their order. Judged blind, the first 10s of 16 weak searches held 136 fitting photos of 160, not 121; 8 of 20 everyday searches got better and 2 worse. About 0.35 s a search (`checks.py`, FINDINGS.md).
