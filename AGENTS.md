@@ -30,7 +30,7 @@ Read this before working on photosearch. [README.md](README.md) covers what the 
 ## Commands
 
 ```bash
-uv run pytest                 # fast tests (about 250)
+uv run pytest                 # fast tests (about 270)
 uv run pytest -m browser      # headless-Chrome tours of the page (slow)
 uv run photosearch serve      # the web app on localhost:8765
 PHOTOSEARCH_DATA=data-demo uv run photosearch serve --demo --port 8766   # presenter mode on the demo index

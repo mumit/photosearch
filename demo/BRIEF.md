@@ -8,7 +8,7 @@
   album through photosearch's MCP server, and that album in Photos.
 - Visible result that proves it worked: the matching photos, and the album Claude made shown in Photos.
 - Destination and length: a landscape MP4 of about 100 s (web, then Claude at a labelled 8x, then an end card),
-  a README GIF of the search and look-alikes, a GIF per section for posts, and a short cut of the two new beats.
+  a README GIF with a moment from each feature, a GIF per section for posts, and a short cut of the two new beats.
 - Next action: github.com/mumit/photosearch.
 - Script source: the first launch video's own tools (a storyboard, a VHS tape and a cut script, since retired).
   Same beats, captions, prompt, album and end card, with the two new beats. Selectors checked against today's UI.

@@ -1,6 +1,6 @@
 """Cuts the photosearch launch video, the same way as the first one: the web take up to its
 "end" beat, then Claude making an album (typing at 1x, working sped up, its answer with the album in Photos beside
-it), then an end card. Also the README GIF (the search and look-alikes), a GIF per section for posts, subtitles for
+it), then an end card. Also the README GIF (a moment from each feature), a GIF per section for posts, subtitles for
 the web part, and a short cut of what's new since the first launch video.
 
     reshoot edit edit.py takes/web.mp4 takes/claude.mp4 [PHOTOS_ALBUM.mov [OUT_DIR]]
@@ -23,7 +23,16 @@ DONE = ("…and it’s in Photos", "{n} hikes, each one looked at first.", "Each
 PROMPT = ('Make an album called "Best hikes" from my photos: trails, forests and views from the top. No people, '
           "nothing blurry, so look at them before you add any.")  # as typed in claude.tape
 SPEED = 8  # Claude's searching and looking, sped up
-GIF = ("type", "to-galaxy", 10, 640)  # the README GIF: from beat, to beat, frames a second, width
+# The README GIF (docs/photosearch.gif): a moment from each feature, sped up, kept under 5 MB so GitHub shows it
+# quickly. Each is (beat, seconds from it, beat, seconds from it, speed); then frames a second and width.
+TOUR = [("search", -1.5, "open", -0.4, 1.6),      # the last words typed, then the results
+        ("why", 0.6, "wander1", -0.8, 1.2),       # ? Why
+        ("grow", 0, "light", 0, 4),               # the galaxy grows year by year
+        ("light", 0.5, "math", -1.0, 1.6),        # a search lights it up
+        ("math-go", 0.3, "to-map", -0.3, 1.5),    # photo math's answer
+        ("map", 0, "to-play", -0.3, 2),           # the map flies to a region
+        ("thennow", 0.3, "end", -0.3, 1)]         # then and now
+GIF = (6, 640)
 # one GIF per section of the web take, for posts: (file, first beat, the beat it ends at, frames a second, width)
 GIFS = [("search", "type", "open", 15, 800), ("why", "open", "wander1", 15, 800),
         ("lookalikes", "wander1", "to-galaxy", 15, 800), ("galaxy", "galaxy", "math", 12, 720),
@@ -101,8 +110,12 @@ def main(web, claude, window=None, out=None):
         cut.gif(claude_part, cut.duration(parts[-4]), cut.duration(claude_part), gifs / "claude.gif", fps=12, width=800)
 
     cut.write_srt(cut.cues(web, 0, end), out / "photosearch.srt")
-    a, z, fps, width = GIF
-    cut.gif(web, b[a], b[z] - 0.1, out / "photosearch-readme.gif", fps=fps, width=width)
+    with tempfile.TemporaryDirectory() as t:
+        t = Path(t)
+        tour = [cut.speed(web, b[a] + da, b[z] + dz, sp, t / f"tour{i}.mp4") if sp != 1 else
+                cut.trim(web, b[a] + da, b[z] + dz, t / f"tour{i}.mp4") for i, (a, da, z, dz, sp) in enumerate(TOUR)]
+        tour = cut.concat(tour, t / "tour.mp4")
+        cut.gif(tour, 0, cut.duration(tour), out / "photosearch-readme.gif", fps=GIF[0], width=GIF[1])
     for f in [out / "photosearch.mp4", out / "photosearch-new.mp4", out / "photosearch-readme.gif",
               *sorted((out / "gifs").glob("*.gif"))]:
         print(f"  {f}  {cut.duration(f):5.1f}s  {f.stat().st_size / 1e6:4.1f} MB")

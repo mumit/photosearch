@@ -67,7 +67,7 @@ anything is shared, and nothing is shared until a person has watched the result.
    and VHS takes only). The finished files are in `takes/final/RUN_ID-TIME/`:
    - `photosearch.mp4`, the whole video, and `photosearch.srt`, its captions;
    - `photosearch-new.mp4`, a short cut of what's new since the first launch video;
-   - `photosearch-readme.gif` for the README, and `gifs/`, one per section for posts;
+   - `photosearch-readme.gif` for the README (copy it to `docs/photosearch.gif`), and `gifs/`, one per section for posts;
    - `review/`, the check sheets.
 5. Watch all of it, read Claude's answer in full (it describes the photos it chose and left out), and look through
    the check sheets at full size. **What fails a photo:**
