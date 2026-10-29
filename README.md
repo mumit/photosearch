@@ -34,7 +34,7 @@ the experiments found.
 |---|---|---|---|
 | [uv](https://docs.astral.sh/uv/) | Python package/environment manager | ~40 MB | `~/.local/bin/uv` |
 | Python 3.12 | Installed automatically by uv if missing | ~60 MB | uv's own folder |
-| Python packages | PyTorch, sentence-transformers, transformers, osxphotos, Pillow, pillow-heif, NumPy | ~1 GB | `.venv/` in this repo (backed by `~/.cache/uv`) |
+| Python packages | PyTorch, sentence-transformers, transformers, osxphotos, Pillow, pillow-heif, NumPy | ~1 GB | uv's tools folder (package) or `.venv/` (clone), backed by `~/.cache/uv` |
 | **Model: `google/embeddinggemma-2`** | Multimodal embedding model (text + images in one vector space). Apache 2.0, not gated, no account or token needed. `index` and search load only the text and vision parts (440M of 740M parameters); `photosearch videos` also loads the audio encoder. | ~1.5 GB | `~/.cache/huggingface/hub/` |
 | [ffmpeg](https://ffmpeg.org) (optional) | Reads videos' sound and frames. Without it, videos are found by their poster frame only. `brew install ffmpeg` | ~100 MB | Homebrew |
 
@@ -43,6 +43,9 @@ No other models are needed. The repo doesn't use any API keys or cloud services.
 ---
 
 ## 2. Install
+
+There are two ways. **Install the package** to use it: one command, and `photosearch update` keeps it current.
+**Clone the repo** to change the code.
 
 ### Step 1: Install uv
 
@@ -56,7 +59,23 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv --version
 ```
 
-### Step 2: Clone the repo
+### Step 2: Install photosearch
+
+**As a package:**
+
+```bash
+uv tool install photosearch
+```
+
+This puts `photosearch` and `photosearch-mcp` in `~/.local/bin`, with Python 3.12 and the packages in a folder of
+uv's own. Your index and settings go in `~/Library/Application Support/photosearch/`. This README writes commands as
+`uv run photosearch ...`, for a clone; with the package, leave out `uv run`. To update later:
+
+```bash
+photosearch update
+```
+
+**Or from a clone:**
 
 ```bash
 git clone https://github.com/mumit/photosearch.git
@@ -64,24 +83,22 @@ git clone https://github.com/mumit/photosearch.git
 ```bash
 cd photosearch
 ```
-
-### Step 3: Install Python and the packages
-
 ```bash
 uv sync
 ```
 
 This creates `.venv/` with the exact versions pinned in `uv.lock`, and installs Python 3.12 first if you don't have it.
+Your index and settings go in `data/` and `.env` at the top of the clone. To update later: `git pull`, then `uv sync`.
 
-### Step 4: Download the model (optional; otherwise it downloads on first run)
+### Step 3: Download the model (optional; otherwise it downloads on first run)
 
 ```bash
-uv run hf download google/embeddinggemma-2
+uvx --from huggingface_hub hf download google/embeddinggemma-2
 ```
 
 You may see a warning about "unauthenticated requests". That's harmless: the model is public.
 
-### Step 5: Let your terminal read the Photos library
+### Step 4: Let your terminal read the Photos library
 
 macOS protects the Photos library. If the next step fails with **"Operation not permitted"**, give your terminal
 app Full Disk Access:
@@ -285,7 +302,13 @@ Why a photo matches (its uuid, or the first few characters): how much each word 
 
 ### Ask Claude about your photos (MCP)
 
-`photosearch-mcp` exposes the index to Claude Code (or any MCP client). Register it once:
+`photosearch-mcp` exposes the index to Claude Code (or any MCP client). Register it once, with the package:
+
+```bash
+claude mcp add --scope user photosearch -- "$(which photosearch-mcp)"
+```
+
+or from the clone's folder:
 
 ```bash
 claude mcp add --scope user photosearch -- uv run --directory "$PWD" photosearch-mcp
@@ -437,13 +460,22 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 checkout, `data/` and `.env` are at its top. Installed as a package, they're in `~/Library/Application
 Support/photosearch/` instead, so an upgrade never touches them. `PHOTOSEARCH_DATA` moves `data/` anywhere.
 
-To remove everything:
+To remove everything, with the package:
+
+```bash
+uv tool uninstall photosearch && rm -rf ~/Library/Application\ Support/photosearch
+```
+
+or in the clone's folder:
 
 ```bash
 rm -rf data .venv
 ```
+
+Then the model, for both:
+
 ```bash
-uv run hf cache rm model/google/embeddinggemma-2
+uvx --from huggingface_hub hf cache rm model/google/embeddinggemma-2
 ```
 
 (or delete `~/.cache/huggingface/hub/models--google--embeddinggemma-2`). `uv cache clean` frees the shared
@@ -455,7 +487,7 @@ package cache, but it affects all uv projects on the Mac.
 
 | Problem | Fix |
 |---|---|
-| `Operation not permitted` / can't open library | Full Disk Access for your terminal (Step 5), then restart the terminal. |
+| `Operation not permitted` / can't open library | Full Disk Access for your terminal (Step 4), then restart the terminal. |
 | `uv: command not found` | Open a new Terminal window after installing uv, or run `source ~/.zshrc`. |
 | Very slow (under 1 photo/s) | Check the Mac is Apple Silicon. Try `--vision-tokens 70`, and close other heavy apps. |
 | Out of memory | Lower the batch size: `index --batch 4`. |
@@ -537,6 +569,16 @@ the model, iCloud or Photos: the libraries that would (osxphotos, torch, sentenc
 during tests, and a stand-in records what would have been added to which album. So the tests pass on a fresh clone,
 before indexing, without Photos access or the model; the first run takes ~30 s longer while UMAP compiles itself. The phone tests connect
 through this Mac's Wi-Fi address, so the server sees a device other than itself; they're skipped when offline.
+
+### Releasing
+
+An installed copy keeps its index across upgrades, so a new version must still open the index an older one made.
+
+1. Set the new `version` in `pyproject.toml`, then `uv lock`.
+2. Commit, and tag it: `git tag v0.2.0`.
+3. `uv build` writes both archives to `dist/`. The source archive holds only `src/`, `tests/` and the docs.
+4. `uv publish` uploads them to PyPI, with a PyPI token in `UV_PUBLISH_TOKEN`.
+5. Push the commit and the tag. `photosearch update` on any installed copy now finds it.
 
 ### Demo videos
 

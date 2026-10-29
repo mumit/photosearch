@@ -22,7 +22,7 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 
 **For people who find the repo:**
 - CI on GitHub Actions (the tests already use a fake model).
-- A one-command install.
+- A one-command install: built (`uv tool install photosearch`, then `photosearch update`), waiting on the first upload to PyPI.
 - `serve` indexes new photos while it runs, instead of a nightly job (no background services).
 
 ## Done

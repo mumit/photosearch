@@ -62,6 +62,7 @@ What to build next is in [ROADMAP.md](ROADMAP.md). Keep it current: move items t
 Update this section when something finishes or starts.
 
 - **Launch posts:** Highlight important changes so I can post those to X/LinkedIn.
+- **PyPI package:** built. `uv tool install photosearch` and `photosearch update` work from a built wheel; an installed copy keeps its index in `~/Library/Application Support/photosearch/`. Waiting on me to upload the first release (README → Releasing).
 - **Launch video with reshoot:** done. `demo/` records the Oct 15 video again, with ? Why and Then and Now added, and replaces `tools/launch` and `tools/director`. I accepted the final on Oct 28. Posts for it and the short cut of what's new are drafted in my launch folder (`whats-new.md`), not posted yet.
 - **Demo leftovers:** the demo Photos library, its import folder, `data-demo/` and a separate Claude config folder for the demo takes are still on disk. I haven't decided whether to keep them. Before the demo library is deleted, Photos must be switched back to my library (hold Option while opening Photos).
 - **Date detective:** done. 851 of 1,042 undated photos are dated; the rest are small loose groups.
