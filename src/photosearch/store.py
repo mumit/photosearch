@@ -7,7 +7,7 @@ from .config import DATA, DB, DIM, LIBRARY, THUMBS
 
 
 def db():
-    DATA.mkdir(exist_ok=True)
+    DATA.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DB, check_same_thread=False)
     con.execute("pragma journal_mode=wal")  # lets `serve` read while `index` writes
     con.execute("""create table if not exists photos(

@@ -27,7 +27,7 @@ JEV_QUESTIONS = {
 
 
 def jev_key():
-    """TYPESAFE_API_KEY from the environment, or from a .env file in the checkout."""
+    """TYPESAFE_API_KEY from the environment, or from a .env file next to data/ (config.ROOT)."""
     if os.environ.get("TYPESAFE_API_KEY"):
         return os.environ["TYPESAFE_API_KEY"]
     f = ROOT / ".env"

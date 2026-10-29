@@ -207,7 +207,7 @@ how bright and colourful it is) and Jev says which look right, which nudges thei
 photo looks ("black and white", "a storm"), adds about a third of a second, and says "✨ checked" by the results (see
 [FINDINGS.md](FINDINGS.md#checking-the-first-results-with-jev)). Jev gets your words, with names replaced by
 "someone", and those descriptions: never a photo, a name, a place or words read from a photo. Untick ✨ in the
-filters to turn both off. Put the key in a `.env` file at the top of the checkout, next to `pyproject.toml` (it's
+filters to turn both off. Put the key in a `.env` file next to `data/` (at the top of the checkout, where it's
 git-ignored). Without a key, search works as before.
 
 ```
@@ -433,7 +433,9 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 | `data/lan.json` | With `serve --lan`: the passcode and the signed-in devices (readable only by you) |
 | `data/galaxy.json` | The Galaxy map layout (rebuilt automatically when the index grows by 10%) |
 
-`data/` holds previews of your photos, so treat it as private. It's in `.gitignore` and never committed.
+`data/` holds previews of your photos, so treat it as private. It's in `.gitignore` and never committed. In a
+checkout, `data/` and `.env` are at its top. Installed as a package, they're in `~/Library/Application
+Support/photosearch/` instead, so an upgrade never touches them. `PHOTOSEARCH_DATA` moves `data/` anywhere.
 
 To remove everything:
 
@@ -494,7 +496,7 @@ thing, and they only import downwards in this list:
 
 | Module | What it does |
 |---|---|
-| `config.py` | Where things live (`data/`, or `PHOTOSEARCH_DATA`), sizes |
+| `config.py` | Where things live (`data/` in a checkout, Application Support once installed, or `PHOTOSEARCH_DATA`), sizes |
 | `store.py` | The index in `data/index.sqlite`: vectors in memory, photo details |
 | `embed.py` | The search model |
 | `images.py` | Reading photos, writing JPEGs, contact sheets |

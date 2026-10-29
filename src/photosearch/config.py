@@ -2,7 +2,11 @@
 import os
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]  # the checkout: src/photosearch/config.py
+CHECKOUT = Path(__file__).resolve().parents[2]  # src/photosearch/config.py
+APP_SUPPORT = Path.home() / "Library" / "Application Support" / "photosearch"
+# Your own data/ and .env: in a git checkout, at its top, as always; installed (pip, uv tool), in Application
+# Support, so an upgrade, which replaces the package's folder, never takes the index with it.
+ROOT = CHECKOUT if (CHECKOUT / "pyproject.toml").exists() else APP_SUPPORT
 WEB = Path(__file__).resolve().parent / "web"  # the page and its scripts, re-read on every request
 DATA = Path(os.environ.get("PHOTOSEARCH_DATA") or ROOT / "data")
 DB = DATA / "index.sqlite"
