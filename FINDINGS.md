@@ -250,7 +250,9 @@ Which kinds of search the model gets wrong, and which photos it gets wrong for e
 0.9 first pages (24 photos) by chance. A few are in 20 to 42, and 62% of the library is in none. The worst, by eye:
 accidental shots (a finger over the lens, a pocket, orange blur, a floor), close textures with no subject (rock
 pools, leaves, dry grass, ground), and small animals far off in dry fields. A model like this puts such photos near
-the middle of the space, close to everything.
+the middle of the space, close to everything. Research calls this hubness: in a space with this many dimensions, a
+few points are near most searches and many are near none. Published fixes, such as CSLS, take off how close a point is
+to everything else, as the penalty below does.
 
 **The fix (`hub_penalty` in `search.py`).** For a search by words, a photo loses up to 0.04 by how many of those
 first pages it's in (up to 40). Judged blind, on photos only, the photos it changes in the first 10:
