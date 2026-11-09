@@ -2,7 +2,7 @@
 // Plain scripts sharing one global scope, loaded in order by index.html; no build step.
 
 /* ---------- smart albums: a search that keeps itself up to date, taught by taking photos out ---------- */
-const AL = { a: null, ranked: [], pinnedExtra: [], n: 0, scored: true, timer: 0, isNew: false, del: false };
+const AL = { a: null, ranked: [], pinnedExtra: [], n: 0, scored: true, timer: 0, isNew: false, del: false };  // timer: a save waiting, else 0
 const albumSummary = a => [a.q ? `“${esc(a.q)}”` : "", ...Object.entries(a.filters || {}).filter(([, v]) => v).map(([k, v]) => esc(CHIP[k] ? CHIP[k](v) : v))].filter(Boolean).join(" · ");
 views.albums = async () => {
   $("albumgrid").innerHTML = skeleton(4, .75);
@@ -27,7 +27,7 @@ views.albums = async () => {
 };
 views.album = async arg => {
   const [id, ps] = (arg || "").split("?");
-  clearTimeout(AL.timer); AL.del = false; $("albdel").textContent = "Delete album";
+  clearTimeout(AL.timer); AL.timer = 0; AL.del = false; $("albdel").textContent = "Delete album";
   if (id === "new") {  // from a search: its words and filters
     const p = new URLSearchParams(ps || ""), q = p.get("q") || "";
     const filters = Object.fromEntries(FIELDS.filter(k => k !== "exclude" && p.get(k)).map(k => [k, p.get(k)]));
@@ -99,7 +99,7 @@ function albumChanged(rerank = false) {
   AL.timer = setTimeout(albumSave, 800);
 }
 async function albumSave() {
-  clearTimeout(AL.timer);
+  clearTimeout(AL.timer); AL.timer = 0;
   const a = AL.a;
   try {
     const r = await post("/api/album", { ...a, name: $("albname").value.trim(), q: $("albq").value.trim(), n: AL.scored ? AL.n : undefined });
@@ -123,7 +123,7 @@ $("albdel").onclick = async () => {  // two taps, no browser dialog
   if (!AL.del) { AL.del = true; $("albdel").textContent = "Tap again to delete (Photos keeps any copy)"; return; }
   try { await post("/api/album_delete", { id: AL.a.id }); go("albums"); } catch (e) { $("albstatus").textContent = e.message; }
 };
-leave.album = () => { if (AL.timer) albumSave(); };
+leave.album = () => { if (AL.timer && !AL.isNew) albumSave(); };  // a new album is saved only by its Save button
 
 /* ---------- tidy up: near-duplicates, the sharpest kept, the rest offered to an album in Photos ---------- */
 const CL = { level: store.get("cllevel", "same"), groups: [], total: 0, extra: 0, offset: 0, sending: false };
@@ -145,7 +145,7 @@ async function cleanupLoad() {
 function cleanupStats(sent) {
   $("clstats").textContent = CL.total ? `${CL.total.toLocaleString()} groups · ${CL.extra.toLocaleString()} extra photos${sent ? ` · ${sent.toLocaleString()} already in “${CL.album}”` : ""}` : "no near-duplicates found";
   $("clsend").hidden = !SERVER.local || !CL.total;
-  $("clsend").textContent = `Send the extras to “${CL.album}” in Photos`;
+  $("clsend").textContent = `Send the extras to “${CL.album}” in Photos`; CL.sending = false;
   $("clphone").hidden = SERVER.local;
 }
 function cleanupGroup(g) {
@@ -156,7 +156,7 @@ function cleanupGroup(g) {
       <button class="ghost tiny" data-a="nope" title="they're different: stop suggesting this group">Not duplicates</button></div>
     <div class="clrow">${g.photos.map((p, i) => `<figure data-i="${i}" class="${p.uuid === g.keep ? "keep" : ""} ${p.sent ? "sent" : ""}" style="--ar:${clampAr(p.ar)}">
       <img loading="lazy" src="/thumb/${p.uuid}.jpg" alt=""><button class="zoom" data-a="zoom" title="see it big">⤢</button>
-      <figcaption>${p.uuid === g.keep ? `✓ keep · ${g.why}` : p.sent ? "in maybe delete" : "tap to keep this one"}</figcaption></figure>`).join("")}</div></div>`;
+      <figcaption>${p.uuid === g.keep ? (p.sent ? "✓ keep · it's in maybe delete: take it out in Photos" : `✓ keep · ${g.why}`) : p.sent ? "in maybe delete" : "tap to keep this one"}</figcaption></figure>`).join("")}</div></div>`;
 }
 $("clgroups").onclick = async e => {
   const card = e.target.closest(".clg"); if (!card) return;
@@ -229,7 +229,8 @@ $("clsend").onclick = async () => {  // two taps, no browser dialog
   if (!CL.sending) { CL.sending = true; $("clsend").textContent = `Tap again: add ${CL.extra.toLocaleString()} extras to “${CL.album}” (nothing gets deleted)`; return; }
   CL.sending = false; $("clsend").disabled = true; $("clstats").textContent = "adding them in Photos… (a minute or two for thousands)";
   try { const r = await post("/api/dupes_send", { level: CL.level });
-        $("clstats").textContent = `Done: ${r.added.toLocaleString()} photos are in “${r.album}”. Look through it in Photos and delete what you don't want there.`; }
+        $("clstats").textContent = `Done: ${r.added.toLocaleString()} photos are in “${r.album}”. Look through it in Photos and delete what you don't want there.`
+          + (r.kept_but_sent ? ` ${r.kept_but_sent.toLocaleString()} groups were left out, so every copy can't end up there: the one you keep is already in “${r.album}”.` : ""); }
   catch (err) { $("clstats").textContent = err.message; }
   $("clsend").disabled = false;
 };

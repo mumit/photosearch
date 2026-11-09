@@ -7,13 +7,14 @@ const GAMES = {
   place: { name: "Guess the Place", glyph: "📍", text: "Drop a pin where you think it was taken.", art: "linear-gradient(180deg, transparent 10%, rgba(14,80,90,.55) 45%, #0b2a30 82%)" },
   first: { name: "Which Came First?", glyph: "⚖️", text: "Two photos. Tap the older one.", art: "linear-gradient(180deg, transparent 10%, rgba(70,40,130,.55) 45%, #1e1236 82%)" },
 };
-const P = { mode: null, round: 0, rounds: 10, players: [], turn: 0, cur: null, guess: null, map: null, layers: [] };
+// game: which one this is (a round that loads after quitting or a new game drops itself); loading: a round on its way
+const P = { mode: null, round: 0, rounds: 10, players: [], turn: 0, cur: null, guess: null, map: null, layers: [], game: 0, loading: false };
 const COLORS = ["#f2b33d", "#5cc8ff", "#ff7aa8", "#7bd88f", "#c79bff", "#ff9f5a"];
 views.play = () => { if (!P.mode) playMenu(); };
 const loadCollage = once(async () => (await api("/api/rediscover", { n: 9 })).results);
 function players() { return store.get("players", []); }
 function playMenu() {
-  P.mode = null;
+  P.mode = null; P.game++; P.loading = false;
   const best = store.get("best", {}), ps = players();
   $("playroot").innerHTML = `
     <div class="kick">Play</div>
@@ -53,10 +54,12 @@ function playMenu() {
 }
 async function startGame(mode) {
   const ps = players();
-  P.mode = mode; P.round = 0; P.turn = -1;
+  P.mode = mode; P.round = 0; P.turn = -1; P.game++; P.loading = false;
   P.players = (ps.length ? ps : ["You"]).map((name, k) => ({ name, score: 0, color: COLORS[k % COLORS.length] }));
   P.rounds = P.players.length > 1 ? 5 * P.players.length : 10;
-  if (mode === "place") await loadLeaflet();
+  if (mode === "place") {
+    try { await loadLeaflet(); } catch { P.mode = null; $("playroot").insertAdjacentHTML("afterbegin", `<p class="status">The map didn't load: are you offline?</p>`); return; }
+  }
   nextRound();
 }
 async function gameRound(mode) {
@@ -68,12 +71,17 @@ async function gameRound(mode) {
   }
 }
 async function nextRound() {
+  if (P.loading) return;  // a double tap
   if (P.round >= P.rounds) return endGame();
   P.round++; P.turn = (P.turn + 1) % P.players.length; P.guess = null; P.revealed = false;
   scrollTo(0, 0);
   const me = P.players[P.turn], solo = P.players.length === 1;
-  try { P.cur = await gameRound(P.mode); }
-  catch (e) { $("playroot").innerHTML = `<p>${esc(e.message)}</p>`; return; }
+  const game = P.game; P.loading = true;
+  let cur;
+  try { cur = await gameRound(P.mode); }
+  catch (e) { if (game === P.game) { P.loading = false; $("playroot").innerHTML = `<p>${esc(e.message)}</p>`; } return; }
+  if (game !== P.game) return;  // quit meanwhile
+  P.cur = cur; P.loading = false;
   const c = P.cur;
   const head = `<div class="ghead">
       <span>Round ${P.round} / ${P.rounds}</span>

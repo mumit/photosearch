@@ -119,6 +119,10 @@ STEPS = [
     ("album-strict", "const r=document.getElementById('albn'); r.value=5; r.dispatchEvent(new Event('input'))", 2),
     ("album-miss", "document.getElementById('albmiss').scrollIntoView()", 1),
     ("album-create", "scrollTo(0,0); document.getElementById('albsave').click()", 3),
+    ("album-edit", "const r=document.getElementById('albn'); r.value=6; r.dispatchEvent(new Event('input'))", 2),
+    ("album-new-again", "location.hash='search/beach'; setTimeout(()=>document.querySelector('#racts a[href^=\"#album/new\"]').click(), 2000)", 4),
+    ("album-new-left", "location.hash='home'", 2),  # a new album is saved only by its button: leaving it once saved it, and bounced back
+    ("album-new-not-saved", "if (location.hash !== '#home' || document.documentElement.dataset.view !== 'home') throw new Error('kept on ' + location.hash)", 0),
     ("albums-list", "location.hash='albums'", 3),
     ("cleanup", "location.hash='cleanup'", 4),
     ("cleanup-keep", "document.querySelector('.clg figure:not(.keep)').click()", 2),

@@ -18,7 +18,7 @@ const post = async (path, body) => {
 // A photo kept only in iCloud has a tiny local preview. Shown big, ask the server to fetch its full-size copy
 // (~1 s, or longer when iCloud is slow) and swap that in, unless the view has moved on to another photo by then.
 async function sharpen(img, uuid) {
-  const still = () => img.isConnected && img.src.includes(uuid);
+  const still = () => img.isConnected && img.src.includes(uuid) && (img.checkVisibility?.() ?? true);  // not once its view is closed
   try {
     let st = (await post("/api/sharp", { uuids: [uuid] }))[uuid];
     if (st !== "fetching") return;
@@ -54,6 +54,7 @@ function route() {
   lbOff(); closeSugg(); closePanel();
   if (tab && tab !== next) leave[tab]?.();
   tab = views[next] ? next : "home";
+  document.documentElement.dataset.view = tab;  // which view is on, for CSS, tests and agents driving the page
   document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.hash === "#" + ({ edit: "stories", math: "play", person: "home", album: "albums", cleanup: "albums", clutter: "albums", judge: "play" }[tab] || tab)));
   document.querySelectorAll("main section").forEach(s => s.classList.toggle("on", s.id === tab));
   $("q").placeholder = PLACEHOLDER[tab] || PLACEHOLDER.home;

@@ -50,8 +50,9 @@ function searchFor(q, extra = {}, keep = false) {
   Object.assign(F, extra); renderChips();
   go(searchHash(q));
 }
+let submits = 0;  // the newest submit: an older one still waiting on ✨ drops its answer
 async function submit(how) {
-  const q = $("q").value.trim(); closeSugg(); closePanel();
+  const q = $("q").value.trim(), seq = ++submits, from = tab; closeSugg(); closePanel(); $("f").classList.remove("busy");
   how ||= { galaxy: "galaxy", time: "time" }[tab] || "search";
   if (how === "galaxy") return go("galaxy/" + encodeURIComponent(q));
   if (how === "time") return q && go("time/" + encodeURIComponent(q));
@@ -61,9 +62,10 @@ async function submit(how) {
     $("status").textContent = "understanding…"; $("f").classList.add("busy");
     try {
       const r = (await api("/api/parse", { q })).results;
+      if (seq !== submits || tab !== from) return;  // searched again, or moved on, meanwhile
       for (const [k, v] of Object.entries(r.filters || {})) if (v && FIELDS.includes(k) && !F[k]) { F[k] = v; AUTO.add(k); }
     } catch {}  // search still works without it
-    $("f").classList.remove("busy");
+    finally { if (seq === submits) $("f").classList.remove("busy"); }
   }
   renderChips(); go(searchHash(q));
 }
@@ -138,12 +140,13 @@ views.search = async arg => {
   const params = R.params = { ...(like ? { like } : { q }), ...Object.fromEntries(FIELDS.filter(k => F[k]).map(k => [k, F[k]])) };
   if (q && !like && SMART.enabled && $("smart").checked) params.check = 1;  // ✨: Jev checks the first photos too
   $("rtitle").innerHTML = title(); $("status").textContent = "searching…"; $("racts").innerHTML = ""; $("grid").innerHTML = ""; $("more").innerHTML = "";
+  $("grid").setAttribute("aria-busy", "true");  // until these results, or an error, are on show
   try {
     const r = await api("/api/search", params);
     if (R.key !== key) return;
     R.results = r.results; R.meta = r;
-  } catch (e) { $("status").textContent = e.message; return; }
-  showResults(); scrollTo(0, 0);
+  } catch (e) { if (R.key === key) { R.key = null; $("status").textContent = e.message; $("grid").removeAttribute("aria-busy"); } return; }  // null: asking again tries again
+  showResults(); scrollTo(0, 0); $("grid").removeAttribute("aria-busy");
 };
 async function moreResults() {
   const key = R.key; R.k += 48;

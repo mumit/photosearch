@@ -13,17 +13,23 @@ async function openFrame({ list = null, title = "", start = 0, ambient = false }
   document.documentElement.requestFullscreen?.().catch(() => {});
   tick(); frameNext(); frameUI();
 }
+const frameOn = () => $("frame").classList.contains("on");
 function closeFrame() {
-  if (!$("frame").classList.contains("on")) return;
+  if (!frameOn()) return;
+  frameOff();
+  if (tab === "frame") location.hash = lastHash;
+}
+function frameOff() {  // every way out of the frame (✕, Escape, back, another view) ends here
+  if (!frameOn()) return;
   $("frame").classList.remove("on"); clearTimeout(FR.timer); clearInterval(FR.clock);
   FR.lock?.release?.().catch(() => {}); FR.lock = null;
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  if (tab === "frame") location.hash = lastHash;
 }
 async function frameNext(step = 1) {
   if (FR.ambient && FR.at + step >= FR.list.length - 2) {  // the frame never runs out: fetch more
     try { FR.list.push(...(await api("/api/rediscover", { n: 30 })).results); } catch {}
   }
+  if (!frameOn()) return;  // closed while that loaded
   const n = FR.list.length; if (!n) return;
   FR.at = FR.ambient ? Math.max(0, FR.at + step) : (FR.at + step + n) % n;
   const x = FR.list[FR.at];
@@ -77,13 +83,12 @@ addEventListener("keydown", e => {
   if (e.key === "ArrowLeft") frameNext(-1);
   frameUI();
 });
-function frameOff() { if ($("frame").classList.contains("on")) { $("frame").classList.remove("on"); clearTimeout(FR.timer); clearInterval(FR.clock); FR.lock?.release?.().catch(() => {}); } }
 
 /* ---------- photo frame: what to show ---------- */
 let lastHash = "#home";
 const shuffled = a => { a = [...a]; for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; };
 views.frame = async arg => {
-  const p = new URLSearchParams((arg || "").replace(/^\?/, ""));
+  const p = new URLSearchParams((arg || "").replace(/^\?/, "")), at = location.hash;
   let list = null, title = "";
   try {
     if (p.get("person")) { title = p.get("person"); list = shuffled((await api("/api/search", { person: title, k: 240 })).results); }
@@ -94,6 +99,7 @@ views.frame = async arg => {
     }
     else if (p.get("day")) { title = "On this day"; list = (await api("/api/today", {})).results.years.flatMap(y => y.photos); }
   } catch {}
+  if (location.hash !== at) return;  // moved on while the photos loaded
   openFrame({ list: list?.length ? list : null, title, ambient: true });
 };
 async function framePick() {
