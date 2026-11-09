@@ -1,4 +1,4 @@
-"""Stories: a year or a trip as a slideshow, made automatically, by Claude, or edited by hand."""
+"""Stories: a year or a trip as a slideshow, made automatically, by an AI agent (MCP), or edited by hand."""
 import json, re, unicodedata
 from collections import Counter
 from datetime import date, datetime, timedelta
@@ -14,6 +14,7 @@ from .places import AWAY_KM, find_trip, homes, km, short_place, trips
 REVIEWS = DATA / "reviews"
 MONTHS = "January February March April May June July August September October November December".split()
 STORY_ID = re.compile(r"\d{4}|trip-\d{4}-\d{2}-\d{2}")  # "2025", or a trip by its first day
+AGENT = ("agent", "claude")  # made_by for a story an AI agent made; "claude" from before any other agent could
 
 
 def day_after(d):
@@ -83,7 +84,7 @@ def cover(con, start, end):
 
 def story_span(con, rid):
     """(first day, last day, fields every review of it carries) for a year or a trip. A trip with a review you or
-    Claude made keeps the days it was made with, even if new photos would now shift where the trip is detected."""
+    an agent made keeps the days it was made with, even if new photos would now shift where the trip is detected."""
     if not STORY_ID.fullmatch(rid):
         raise LookupError(f"not a story id: {rid!r} (a year like 2025, or a trip like trip-2024-05-02)")
     if rid.isdigit():
@@ -105,7 +106,7 @@ def story_highlights(con, rid, n=40):
 
 
 def auto_review(con, rid, n=30):
-    """A review without Claude: highlights grouped by month (a year) or by day (a trip), captioned with who's in them.
+    """A review without an agent: highlights grouped by month (a year) or by day (a trip), captioned with who's in them.
     The place and date show under every photo already, so the caption is just the names."""
     start, end, fields = story_span(con, rid)
     trip = fields["kind"] == "trip"
@@ -135,7 +136,7 @@ def save_review(review):
 
 def saved_review(rid):
     """The review saved for a story, or None. Automatic ones don't count: they're made afresh each time, so they follow
-    the library (new photos, deleted ones, places Photos has named since). Yours and Claude's are kept as made."""
+    the library (new photos, deleted ones, places Photos has named since). Yours and agents' are kept as made."""
     f = REVIEWS / f"{rid}.json"
     r = json.loads(f.read_text()) if f.exists() else None
     return r if r and r.get("made_by") != "auto" else None
@@ -158,7 +159,7 @@ def stories(con):
     def story(rid, start, end, **x):
         r = made.get(rid, {})
         first = next((p["uuid"] for c in r.get("chapters", []) for p in c["photos"]), None)
-        return dict(x, id=rid, start=start, end=end, title=r.get("title", x.get("title")), made_by=r.get("made_by"), edited=r.get("edited"),
+        return dict(x, id=rid, start=start, end=end, title=r.get("title", x.get("title")), made_by=r.get("made_by"), agent=r.get("agent"), edited=r.get("edited"),
                     cover=first or cover(con, start, end))
     found = {t["id"]: t for t in trips(con)}
     for rid, r in made.items():  # a saved trip that new photos have since merged into another, or moved
@@ -205,7 +206,7 @@ def story_candidates(con, rid, q=None, like=None, k=48):
 
 
 def edit_review(con, body):
-    """Save a story edited in the web page. Its author becomes "you" if it was automatic; Claude's stays Claude's,
+    """Save a story edited in the web page. Its author becomes "you" if it was automatic; an agent's stays the agent's,
     marked edited."""
     rid = str(body.get("id", ""))
     _, _, fields = story_span(con, rid)
@@ -220,7 +221,7 @@ def edit_review(con, body):
         raise ValueError(f"not in the index: {sorted(bad)}")
     made_by = "you" if old["made_by"] == "auto" else old["made_by"]
     save_review(dict(fields, title=text(body.get("title"), 120) or old["title"], intro=text(body.get("intro"), 300),
-                     outro=text(body.get("outro"), 300), made_by=made_by, **({"edited": True} if made_by == "claude" else {}),
+                     outro=text(body.get("outro"), 300), made_by=made_by, **({"agent": old.get("agent"), "edited": True} if made_by in AGENT else {}),
                      chapters=chapters))
     return dict(photos=len(uuids), chapters=len(chapters), made_by=made_by)
 

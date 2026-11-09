@@ -14,7 +14,7 @@ order) for a person or an agent to judge. The report then says which variant's p
   photosearch eval report tokens70
 
 Everything is written to eval/<name>/ in the data folder: run.json, sheets/, judgments.json and report.md.
-Sheets can also be judged in the web page (Play → Judge a test) or by Claude (MCP), each judge under their own name.
+Sheets can also be judged in the web page (Play → Judge a test) or by an AI agent (MCP), each judge under their own name.
 """
 import json, random, re, sqlite3, sys, time
 from pathlib import Path

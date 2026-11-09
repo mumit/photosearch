@@ -12,7 +12,7 @@ function dateRange(a, b) {
   return `${s.toLocaleDateString(undefined, md)}–${end}, ${e.getFullYear()}`;
 }
 function poster(x, acts = false) {
-  const by = { claude: "✨ by Claude", you: "✏️ by you" }[x.made_by];
+  const by = { agent: `✨ by ${esc(x.agent || "an AI agent")}`, claude: "✨ by Claude", you: "✏️ by you" }[x.made_by];
   return `<a class="poster ${x.kind === "year" ? "year" : ""}" href="/review/${x.id}" target="_blank" title="${x.made_by ? "play" : "make & play"}">
     ${x.cover ? `<img loading="lazy" src="/thumb/${x.cover}.jpg" alt="">` : ""}
     ${by && x.kind === "trip" ? `<span class="by">${by}${x.edited ? ", edited" : ""}</span>` : ""}

@@ -62,4 +62,4 @@ def cmd_update(a):
     print("running:", " ".join(cmd))
     if subprocess.run(cmd).returncode:
         sys.exit("the upgrade failed (see above)")
-    print("Restart `photosearch serve`, and Claude Code if it uses photosearch, to run the new version.")
+    print("Restart `photosearch serve`, and any AI agent that uses photosearch, to run the new version.")

@@ -1,4 +1,5 @@
-"""photosearch as an MCP server: lets Claude search your Photos library, look at the results, and make albums.
+"""photosearch as an MCP server: lets an AI agent search your Photos library, look at the results, and make albums.
+Any MCP client that starts local (stdio) servers and passes images to its model can use it. With Claude Code:
 
   claude mcp add photosearch -- uv run --directory /path/to/photosearch photosearch-mcp
 
@@ -8,7 +9,7 @@ import json
 from collections import Counter
 from typing import Literal, TypedDict
 
-from mcp.server.mcpserver import Image, MCPServer
+from mcp.server.mcpserver import Context, Image, MCPServer
 from mcp.types import ToolAnnotations
 
 from . import evals, explore, images, photos_app, search, store, stories
@@ -22,6 +23,19 @@ the ones that actually match before answering or making an album. Refer to photo
 con = store.db()
 READ = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
 SHEET_MAX, CELL = 30, 200
+
+
+def agent(ctx):
+    """The agent's name, as its app gave it on connecting (Claude Code says "claude-code"), or None."""
+    params = ctx and ctx.session.client_params
+    return params and (params.client_info.title or params.client_info.name)
+
+
+def judge_name(judge, ctx):
+    """Who's judging: the name given, else the agent's. Claude's apps all judge as "claude", as it did before other
+    agents could, so its verdicts stay one judge's."""
+    name = judge or (agent(ctx) or "agent").lower()
+    return "claude" if name.startswith("claude") else name
 
 
 def tidy(results):
@@ -129,7 +143,7 @@ def on_this_day(day: str | None = None) -> list:
 @mcp.tool(annotations=READ)
 def list_stories() -> list[dict]:
     """The trips (found from where photos were taken) and years that can be made into a slideshow, newest first,
-    with their ids, days, photo counts, and who made the current review (none yet, "auto" or "claude")."""
+    with their ids, days, photo counts, and who made the current review (none yet, "auto", "you" or "agent", with the agent's name)."""
     return [{k: v for k, v in s.items() if k != "cover" and v is not None} for s in stories.stories(con)]
 
 
@@ -149,7 +163,7 @@ def story_highlights(story: str, count: int = 40) -> list:
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True))
-def save_story(story: str, title: str, intro: str, chapters: list[Chapter], outro: str = "") -> str:
+def save_story(story: str, title: str, intro: str, chapters: list[Chapter], outro: str = "", ctx: Context | None = None) -> str:
     """Save a story (a year or a trip) and get the link to its slideshow. Pick ~20-30 photos from story_highlights,
     plus any you found with search_photos (look at them first: skip blurry shots, near-repeats, receipts and too
     many selfies), group them into 4-8 chapters in date order with short titles (for a trip, usually by day or
@@ -160,7 +174,7 @@ def save_story(story: str, title: str, intro: str, chapters: list[Chapter], outr
     bad = [p["uuid"] for c in chapters for p in c.get("photos", []) if p["uuid"] not in known]
     if bad:
         raise ValueError(f"not in the index: {bad}")
-    stories.save_review(dict(fields, title=title, intro=intro, outro=outro, made_by="claude", chapters=chapters))
+    stories.save_review(dict(fields, title=title, intro=intro, outro=outro, made_by="agent", agent=agent(ctx), chapters=chapters))
     # full-size copies from iCloud for photos whose local preview is tiny (~1 s each), so the slideshow is sharp
     photos_app.fetch_in_subprocess(con, [p["uuid"] for c in chapters for p in c.get("photos", [])], wait=False)
     n = sum(len(c.get("photos", [])) for c in chapters)
@@ -170,11 +184,12 @@ def save_story(story: str, title: str, intro: str, chapters: list[Chapter], outr
 
 
 @mcp.tool(annotations=READ)
-def eval_sheet(test: str | None = None, n: int | None = None, judge: str = "claude") -> list:
+def eval_sheet(test: str | None = None, n: int | None = None, judge: str | None = None, ctx: Context | None = None) -> list:
     """Judge an experiment (`photosearch eval`) blind. Without a test: the tests and how far each judge has got.
     With one: sheet n, or this judge's next one: the search and two rows, X and Y, of numbered photos from two
     versions of search, in random order. Judge each photo against the search only, then call score_eval_sheet.
-    Don't try to work out which row is which version."""
+    Don't try to work out which row is which version. judge: whose verdicts these are, the agent's own name if left out."""
+    judge = judge_name(judge, ctx)
     if not test:
         return [json.dumps(evals.runs())]
     sh = evals.sheet(test, n, judge)
@@ -187,10 +202,10 @@ def eval_sheet(test: str | None = None, n: int | None = None, judge: str = "clau
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False))
 def score_eval_sheet(test: str, n: int, x: list[int], y: list[int], first: Literal["x", "y", "same"],
-                     judge: str = "claude") -> str:
+                     judge: str | None = None, ctx: Context | None = None) -> str:
     """Record a verdict on sheet n of a test: the numbers (1..k within each row) of the photos in row X and in row Y
     that fit the search, and whose first photo fits it better. Kept under the judge's name; scoring a sheet again replaces it."""
-    left = evals.record(test, n, judge, x, y, first)
+    left = evals.record(test, n, judge_name(judge, ctx), x, y, first)
     return f"saved; {left} sheets left" if left else "saved; every sheet is judged"
 
 

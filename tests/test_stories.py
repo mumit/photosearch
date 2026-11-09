@@ -88,3 +88,30 @@ def test_stories_you_or_claude_made_are_kept_as_made(con):
     r = stories.load_review(con, "trip-2025-03-10", make=True)
     stories.save_review(dict(r, title="Our week in Lisbon", made_by="claude"))
     assert stories.load_review(con, "trip-2025-03-10")["title"] == "Our week in Lisbon"
+
+
+def connected(name, title=None):
+    """A request from an agent's app, as the MCP server sees it: just the name it gave on connecting."""
+    from types import SimpleNamespace as N
+    return N(session=N(client_params=N(client_info=N(name=name, title=title))))
+
+
+@pytest.mark.parametrize("ctx, by", [(connected("cursor"), "cursor"), (connected("claude-code", "Claude Code"), "Claude Code"),
+                                     (None, None)])
+def test_a_story_an_agent_saves_carries_its_name(con, ctx, by):
+    from photosearch import mcp_server
+    r = stories.auto_review(con, "2024")
+    mcp_server.save_story("2024", "Our year", "", r["chapters"], ctx=ctx)
+    listed = next(s for s in stories.stories(con) if s["id"] == "2024")
+    assert (listed["made_by"], listed["agent"]) == ("agent", by)
+    uuid = r["chapters"][0]["photos"][0]["uuid"]
+    stories.edit_review(con, dict(id="2024", chapters=[dict(title="", photos=[dict(uuid=uuid, caption="")])]))
+    saved = stories.load_review(con, "2024")
+    assert (saved["made_by"], saved["agent"], saved["edited"]) == ("agent", by, True)
+
+
+def test_agents_context_isnt_a_tool_argument():
+    from photosearch import mcp_server
+    tools = {t.name: t for t in mcp_server.mcp._tool_manager.list_tools()}
+    for name in ("save_story", "eval_sheet", "score_eval_sheet"):
+        assert "ctx" not in tools[name].parameters["properties"]

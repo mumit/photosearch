@@ -213,7 +213,7 @@ def test_a_test_is_judged_from_the_page(srv, lib, tmp_path):
     assert status == 404
 
 
-def test_claude_judges_through_mcp(lib, tmp_path):
+def test_an_agent_judges_through_mcp(lib, tmp_path):
     from photosearch import evals, mcp_server
     q = tmp_path / "q.txt"; q.write_text("a beach at sunset\n")
     evals.run("mcp", "dims=64", n=500, k=3, queries=str(q))
@@ -221,7 +221,16 @@ def test_claude_judges_through_mcp(lib, tmp_path):
     assert json.loads(key)["search"] == "a beach at sunset" and image.data[:2] == b"\xff\xd8"
     assert mcp_server.score_eval_sheet("mcp", 1, [1, 2], [], "x") == "saved; every sheet is judged"
     assert json.loads(mcp_server.eval_sheet("mcp")[0])["done"]
-    assert json.loads(mcp_server.eval_sheet()[0])[0]["judges"] == {"claude": 1}
+    assert json.loads(mcp_server.eval_sheet()[0])[0]["judges"] == {"agent": 1}
+
+
+@pytest.mark.parametrize("judge, app, saved_as", [(None, None, "agent"), (None, ("cursor", None), "cursor"),
+                                                  (None, ("claude-code", "Claude Code"), "claude"), ("Sam", ("cursor", None), "Sam")])
+def test_an_agent_judges_under_its_own_name(judge, app, saved_as):
+    from types import SimpleNamespace as N
+    from photosearch import mcp_server
+    ctx = app and N(session=N(client_params=N(client_info=N(name=app[0], title=app[1]))))
+    assert mcp_server.judge_name(judge, ctx) == saved_as
 
 
 def test_portraits_from_the_page(srv, lib, con):

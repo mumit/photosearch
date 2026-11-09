@@ -30,7 +30,7 @@ def photo_jpeg(con, uuid, px=DISPLAY_PX, quality=85):
 
 
 def contact_sheet(con, uuids, cols=6, cell=200):
-    """One JPEG of numbered thumbnails (1..n in the order given), for Claude to look at many photos at once."""
+    """One JPEG of numbered thumbnails (1..n in the order given), for an AI agent to look at many photos at once."""
     from PIL import Image, ImageDraw, ImageFont
     cols = min(cols, len(uuids)) or 1
     sheet = Image.new("RGB", (cols * cell, -(-len(uuids) // cols) * cell), "white")

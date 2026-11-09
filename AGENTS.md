@@ -16,7 +16,7 @@ Read this before working on photosearch. [README.md](README.md) covers what the 
 
 | Path | What it is |
 |---|---|
-| `src/photosearch/` | The package. `cli.py` has the commands, `server.py` the web app, `mcp_server.py` the tools Claude uses, `embed.py` the model. |
+| `src/photosearch/` | The package. `cli.py` has the commands, `server.py` the web app, `mcp_server.py` the tools AI agents use, `embed.py` the model. |
 | `src/photosearch/evals.py` | `photosearch eval`: measures a change to the index (vision tokens, shorter or compressed vectors) or to how search ranks (`search=...`), judged blind (Play → Judge a Test, MCP, or the terminal). Use it for any experiment with the model. |
 | `src/photosearch/web/` | The page: `index.html`, `app.css`, `js/*.js`. Re-read on every request, so no build step. |
 | `FINDINGS.md` | What experiments found and how each setting was chosen. Add a section for each new one. |

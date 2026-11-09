@@ -10,7 +10,8 @@ or find photos that look like one you pick. Everything runs on your Mac using Go
 - **Explore:** look-alikes, a map, a galaxy of the whole library, On this day, stories of every trip and year.
 - **Play:** guessing games, Photo Math, Then and Now, and old photos worth taking again.
 - **Tidy up:** near-duplicates, screenshots, receipts and IDs, sent to albums in Photos for you to look through.
-- **Ask Claude:** it's an MCP server, so Claude Code can search, look at each photo and make albums.
+- **Ask an AI agent:** it's an MCP server, so Claude Code or another agent can search, look at each photo and make
+  albums.
 
 It works with iCloud Photos and **"Optimize Mac Storage"**: it uses the previews Photos already keeps on the Mac, so
 nothing is downloaded to index or search. A learning project, not a product: [FINDINGS.md](FINDINGS.md) has what
@@ -187,7 +188,7 @@ ear, is in [FINDINGS.md](FINDINGS.md#sound-in-videos-sound_base-and-sound_at).
 
 ### Search and play in the browser
 
-This doesn't need Claude. From the `photosearch` folder, in any terminal:
+This doesn't need an AI agent. From the `photosearch` folder, in any terminal:
 
 ```bash
 uv run photosearch serve
@@ -300,9 +301,10 @@ uv run photosearch why "a red balloon in the sky" 1A2B3C4D
 Why a photo matches (its uuid, or the first few characters): how much each word counts, what the model sees, and
 `why-1A2B3C4D.jpg`, a copy with the part that matched lit.
 
-### Ask Claude about your photos (MCP)
+### Ask an AI agent about your photos (MCP)
 
-`photosearch-mcp` exposes the index to Claude Code (or any MCP client). Register it once, with the package:
+`photosearch-mcp` is an MCP server, so an AI agent can use the index. Only Claude Code has been tried so far. With
+Claude Code, register it once, with the package:
 
 ```bash
 claude mcp add --scope user photosearch -- "$(which photosearch-mcp)"
@@ -315,10 +317,32 @@ claude mcp add --scope user photosearch -- uv run --directory "$PWD" photosearch
 ```
 
 Then, in a new Claude Code session, ask things like *"find photos of Sam at the beach, no selfies, and make an
-album"*. Claude searches, **looks at the results** on a numbered contact sheet, drops the wrong ones, and only then
+album"*. The agent searches, **looks at the results** on a numbered contact sheet, drops the wrong ones, and only then
 answers or builds the album. Tools: `search_photos` (with `exclude`, people, place, date and kind filters),
 `similar_photos`, `best_per_year`, `view_photos`, `library_overview`, `on_this_day`, `list_stories`, `story_highlights`, `save_story`,
 `make_album` (adds only, never removes), and `eval_sheet` and `score_eval_sheet` for judging experiments.
+
+**Another agent** can use it if it:
+
+- **starts local servers** (stdio), on this Mac. Agents that only reach servers over the internet can't.
+- **passes images to a model that can see them.** Four tools return contact sheets, and looking at them is how the
+  agent drops wrong matches. Without that, it answers blind.
+- **reads the server's instructions** on how to search. If it doesn't, copy them from the top of `mcp_server.py` into
+  the agent's own rules.
+
+Most agents take an entry like this in their MCP settings, with the full path from `which photosearch-mcp` (apps
+opened from the Dock don't see your terminal's PATH):
+
+```json
+{ "mcpServers": { "photosearch": { "command": "/Users/you/.local/bin/photosearch-mcp" } } }
+```
+
+From a clone, use `"command": "uv"` and `"args": ["run", "--directory", "/path/to/photosearch", "photosearch-mcp"]`.
+To check the images get through, ask it to *"search my photos for a beach, view the results and describe photo 1"*.
+Stories it saves are marked with the name the agent gives, and its verdicts in a test are kept under that name.
+
+An agent with a model in the cloud sends the contact sheets it looks at to that company. A local vision model (in
+LM Studio, for example) keeps them on the Mac.
 
 ### Stories: trips and years
 
@@ -327,7 +351,7 @@ you take photos on the most days). Trips are named from Photos' place data (*Lis
 need 20+ photos. `uv run photosearch trips` lists them.
 
 Every trip and year gets an automatic story the first time you play it: highlights by day for a trip, by month for a
-year, captioned with who's in them. For a nicer one, ask Claude (with the MCP server set up) *"make a story of our
+year, captioned with who's in them. For a nicer one, ask an AI agent (with the MCP server set up) *"make a story of our
 Lisbon trip"* or *"make a year in review for 2025"*. It looks through the highlights and searches for anything
 missing (food, streets), keeps the best ~24 (skipping repeats, blurry shots and too many selfies), and writes
 chapters and captions. Captions stick to what's in the photo and the names tagged in Photos. Trip stories leave out
@@ -356,7 +380,7 @@ uv run photosearch album "Sunsets" "sunset over water" -k 60
 ```
 
 This creates (or adds to) an album called "Sunsets" in Photos with the top 60 matches. Like everything in
-photosearch that writes to Photos (Copy to Photos, Send the extras, Claude's `make_album`), it only adds to albums.
+photosearch that writes to Photos (Copy to Photos, Send the extras, the agent's `make_album`), it only adds to albums.
 Nothing is ever deleted or edited. Try a small album first on a new library.
 
 ---
@@ -425,7 +449,7 @@ the rest about 2048 px). That's plenty for the model and for the grid, but blurr
 
 - **Opening a photo** (search, Time Machine, the games) shows the preview at once, then asks Photos for the full-size
   version and swaps it in (about 1 s; longer if iCloud is slow).
-- **Stories** fetch theirs when you play one, save one, or Claude saves one; **⬇ Download** and `review --export`
+- **Stories** fetch theirs when you play one, save one, or an agent saves one; **⬇ Download** and `review --export`
   wait for any still missing, so the file you send is sharp (1600 px, ~0.5 MB a photo).
 - `uv run photosearch fetch trip-2024-05-02` (or `2025`, or photo uuids) fetches ahead of time, e.g. before
   showing a story offline. `uv run photosearch thumbs` rebuilds thumbnails after changing their size.
@@ -549,7 +573,7 @@ thing, and they only import downwards in this list:
 | `why.py` | Why a photo matches a search: each word, what the model sees, and where in the photo |
 | `checks.py` | ✨ smart search's second step: Jev checks a search's first photos, from descriptions in words |
 | `picks.py` | Family picks: who loved which photo, for Home and the photo frame |
-| `evals.py` | `photosearch eval`: comparing two variants of the index or of search, judged blind in the page, by Claude or in the terminal (searches in `eval_queries.txt`) |
+| `evals.py` | `photosearch eval`: comparing two variants of the index or of search, judged blind in the page, by an AI agent or in the terminal (searches in `eval_queries.txt`) |
 | `lan.py`, `server.py` | Phones on the home Wi-Fi; the web server and its API |
 
 The web page has no build step: plain scripts that share one global scope, loaded in order by `index.html`, and re-read
@@ -618,8 +642,9 @@ uv run photosearch eval report tokens70     # unblinded: which variant's photos 
 The easier way to judge is in the page: **Play → Judge a Test** shows each search with its two rows; tap the photos
 that fit and say whose first photo is better. It works on a phone too (`serve --lan`), so someone else can be a second
 judge. Each judge's answers are kept under their name, the results are shown once they've judged every search, and
-the report says how often two judges called a photo the same way. Claude can judge through MCP (`eval_sheet` and
-`score_eval_sheet`, as `claude`), or from the terminal with `--judge claude`.
+the report says how often two judges called a photo the same way. An AI agent can judge through MCP (`eval_sheet` and
+`score_eval_sheet`, under its own name; any of Claude's apps judges as `claude`), or Claude from the terminal with
+`--judge claude`.
 
 ### Measurements
 

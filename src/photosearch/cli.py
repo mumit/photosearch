@@ -65,7 +65,7 @@ def cmd_trips(a):
     con = db()
     made = {f.stem: json.loads(f.read_text()).get("made_by") for f in REVIEWS.glob("*.json")} if REVIEWS.exists() else {}
     for t in trips(con):
-        tag = {"claude": "  ✨ curated", "auto": "  (automatic review)"}.get(made.get(t["id"]), "")
+        tag = {"agent": "  ✨ curated", "claude": "  ✨ curated", "auto": "  (automatic review)"}.get(made.get(t["id"]), "")
         print(f"{t['id']}  {date_range(t['start'], t['end']):30}  {t['photos']:5} photos  {t['name']}{tag}")
 
 
