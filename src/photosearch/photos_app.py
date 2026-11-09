@@ -7,6 +7,7 @@ from pathlib import Path
 from .config import DISPLAY_PX, LARGE, SHARP_PX, THUMBS, THUMB_PX
 from .store import db, photos_db
 from .images import open_image
+from .shared import held
 from .stories import STORY_ID, load_review, story_uuids
 
 
@@ -22,14 +23,15 @@ def add_now(name, uuids):
     photos = sorted(pdb.photos(uuid=uuids), key=lambda p: order[p.uuid])
     if not photos:
         return 0
-    for i in sorted({0, len(photos) // 2, len(photos) - 1}):  # one index is one library, so a few will tell
-        try:
-            photoscript.Photo(photos[i].uuid)
-        except ValueError:
-            raise LookupError(f"Photos has another library open, or didn't answer. Open {Path(pdb.library_path).stem} in "
-                              "Photos (hold Option while opening it), and check that this app may control Photos (System "
-                              "Settings → Privacy & Security → Automation). Nothing was added.") from None
-    PhotosAlbum(name).extend(photos)
+    with held("photos-app"):  # one process at a time drives Photos: two can stall it
+        for i in sorted({0, len(photos) // 2, len(photos) - 1}):  # one index is one library, so a few will tell
+            try:
+                photoscript.Photo(photos[i].uuid)
+            except ValueError:
+                raise LookupError(f"Photos has another library open, or didn't answer. Open {Path(pdb.library_path).stem} in "
+                                  "Photos (hold Option while opening it), and check that this app may control Photos (System "
+                                  "Settings → Privacy & Security → Automation). Nothing was added.") from None
+        PhotosAlbum(name).extend(photos)
     return len(photos)
 
 
@@ -74,13 +76,13 @@ def needs_fetch(con, uuid):
 def fetch_large(con, uuids, log=None):
     """Download full-size versions of photos that need them (see needs_fetch) from iCloud, through Photos with
     PhotoKit (~1 s each), into data/large/ at DISPLAY_PX, and rebuild their thumbnails from them. One fetch at a
-    time across threads. Returns how many were fetched. Nothing in the Photos library changes."""
+    time across threads and processes. Returns how many were fetched. Nothing in the Photos library changes."""
     global _pdb
     import tempfile
     from osxphotos import ExportOptions, PhotoExporter
     n = 0
     for u in dict.fromkeys(uuids):
-        with _fetch_lock:
+        with _fetch_lock, held("photokit"):  # and across processes: the page's fetches, an agent's, an export's
             if not needs_fetch(con, u):
                 continue
             if _pdb is None or _pdb.get_photo(u) is None:  # opened once; again if the photo is newer than that
@@ -131,15 +133,18 @@ def fetch_in_subprocess(con, uuids, wait=True):
 
 
 class Fetcher:
-    """A background thread working through fetch requests in batches, so pages never wait on iCloud."""
+    """A background thread working through fetch requests in batches, so pages never wait on iCloud. A photo is
+    "sharp" (its full-size copy is here, or its preview is big enough), "fetching" (asked for and not done),
+    "failed" (the last try didn't get it; asking again tries again) or "not asked"."""
     def __init__(self, con):
         import queue
-        self.con, self.q, self.failed = con, queue.Queue(), set()
+        self.con, self.q, self.pending, self.failed = con, queue.Queue(), set(), set()
         threading.Thread(target=self.run, daemon=True).start()
 
     def add(self, uuids):
         for u in uuids:
-            self.q.put(u)
+            if u not in self.pending and needs_fetch(self.con, u):
+                self.pending.add(u); self.failed.discard(u); self.q.put(u)
 
     def run(self):
         import queue
@@ -154,11 +159,12 @@ class Fetcher:
                 left = fetch_in_subprocess(self.con, batch)
             except Exception as ex:
                 print(f"fetch: {ex}", file=sys.stderr); left = batch
-            self.failed.update(left)
+            self.failed.update(left); self.pending.difference_update(batch)
 
     def status(self, u):
-        return "sharp" if (LARGE / f"{u}.jpg").exists() else "failed" if u in self.failed else \
-               "fetching" if needs_fetch(self.con, u) else "sharp"
+        if (LARGE / f"{u}.jpg").exists() or not needs_fetch(self.con, u):
+            return "sharp"
+        return "fetching" if u in self.pending else "failed" if u in self.failed else "not asked"
 
 
 def cmd_fetch(a):

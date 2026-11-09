@@ -9,6 +9,7 @@ from . import photos_app
 from .config import DATA, THUMBS
 from .store import DATED, aspect, photo_info, vectors
 from .search import interest
+from .shared import updating, write_json
 
 CLEANUP = DATA / "cleanup.json"   # choices: groups that aren't duplicates, which photo to keep, what went to Photos
 MAYBE_DELETE = "Photosearch · maybe delete"
@@ -73,7 +74,7 @@ def sharpness(uuids):
                 _sharp[u] = round(float(lap.var()), 1)
             except Exception:
                 _sharp[u] = 0.0
-        f.write_text(json.dumps(_sharp))
+        write_json(f, _sharp)
     return {u: _sharp[u] for u in uuids}
 
 
@@ -166,27 +167,31 @@ def dupes(con, level="same", offset=0, limit=24):
 
 
 def dupes_choose(con, body):
-    st = cleanup_state()
-    key = str(body.get("key") or "")
-    if body.get("action") == "keep":
-        st["keep"][key] = str(body.get("uuid"))[:64]
-    elif body.get("action") == "nope":
-        st["nope"] = sorted(set(st["nope"]) | {key})
-    else:
+    key, action = str(body.get("key") or ""), body.get("action")
+    if action not in ("keep", "nope"):
         raise ValueError("action is keep or nope")
-    CLEANUP.write_text(json.dumps(st))
+    with updating(CLEANUP) as st:
+        if action == "keep":
+            st.setdefault("keep", {})[key] = str(body.get("uuid"))[:64]
+        else:
+            st["nope"] = sorted(set(st.get("nope", [])) | {key})
     return {}
 
 
 def dupes_send(con, level="same"):
-    """Every extra (all but each group's keeper) that isn't in the maybe-delete album yet goes there, in Photos."""
+    """Every extra (all but each group's keeper) that isn't in the maybe-delete album yet goes there, in Photos.
+    A group whose keeper is already there (you picked another after sending) is left out: sending the rest would put
+    every copy in the album. Those are counted in `kept_but_sent`, to take out in Photos."""
     st = cleanup_state(); sent = set(st["sent"])
     nope = set(st["nope"])
-    extras = []
+    extras, kept_but_sent = [], 0
     for g in dupe_groups(con, level):
         if g["key"] not in nope:
             keep = dupe_keeper(con, g, st)[0]  # by the same rule the page shows
+            if keep in sent:
+                kept_but_sent += 1; continue
             extras += [u for u in g["uuids"] if u != keep and u not in sent]
     n = photos_app.add_to_photos_album(MAYBE_DELETE, extras)
-    st = cleanup_state(); st["sent"] = sorted(set(st["sent"]) | set(extras)); CLEANUP.write_text(json.dumps(st))
-    return dict(added=n, album=MAYBE_DELETE)
+    with updating(CLEANUP) as st:
+        st["sent"] = sorted(set(st.get("sent", [])) | set(extras))
+    return dict(added=n, album=MAYBE_DELETE, kept_but_sent=kept_but_sent)

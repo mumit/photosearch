@@ -23,6 +23,7 @@ import numpy as np
 
 from . import embed
 from .config import DATA, THUMBS
+from .shared import held, write_json
 from .store import db
 
 EVALS = DATA / "eval"
@@ -236,8 +237,10 @@ def record(name, n, judge, x, y, first):
     x, y = (sorted({int(i) for i in row}) for row in (x, y))
     if any(not 1 <= i <= k for i in x + y):
         raise ValueError(f"photo numbers go from 1 to {k}")
-    judged.setdefault(judge, {})[str(n)] = dict(x=x, y=y, first=first)
-    (out / "judgments.json").write_text(json.dumps(judged, indent=1))
+    with held("judgments"):  # read again: the page and an agent may be judging at once
+        judged = load(name)[2]
+        judged.setdefault(judge, {})[str(n)] = dict(x=x, y=y, first=first)
+        write_json(out / "judgments.json", judged, indent=1)
     return sum(str(i) not in judged[judge] for i in range(1, len(run_["searches"]) + 1))
 
 

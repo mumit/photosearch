@@ -19,6 +19,7 @@ import numpy as np
 
 from . import embed
 from .config import DATA, DIM, THUMB_PX
+from .shared import held
 
 FRAMES = DATA / "frames"  # FRAMES/<uuid>/<seconds>.jpg, for showing the moment
 FRAME_EVERY = 3  # seconds between frames
@@ -132,8 +133,9 @@ def cmd_download_videos(a):
         try:
             d = Path(a.dir) / u; d.mkdir(parents=True, exist_ok=True)
             # the original, even of an edited video: PhotoKit rendering an edit crashed the process every time
-            r = PhotoExporter(p).export(str(d), options=ExportOptions(download_missing=True, use_photokit=True,
-                                                                      edited=False, timeout=300))
+            with held("photokit"):
+                r = PhotoExporter(p).export(str(d), options=ExportOptions(download_missing=True, use_photokit=True,
+                                                                          edited=False, timeout=300))
             f = [x for x in r.exported if Path(x).suffix.lower() in VIDEO_FILES]
             print(f"{u} ok {f[0]}" if f else f"{u} {r.error or 'nothing exported'} {[Path(x).name for x in r.exported]}", flush=True)
         except Exception as ex:

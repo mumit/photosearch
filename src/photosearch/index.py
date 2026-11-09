@@ -110,8 +110,7 @@ def cmd_index(a):
         keep = done & lib.keys()
         con.executemany(f"update photos set ({META_COLS}) = ({','.join('?' * N_META)}) where uuid=?",
                         [meta(lib[u]) + (u,) for u in keep])
-        con.commit()
-        apply_dates(con)  # Photos still has the placeholder dates; keep mine
+        apply_dates(con)  # Photos still has the placeholder dates; keep mine, in the same commit, so no reader sees them
         print(f"refreshed {len(keep)}, removed {len(gone)} deleted from the library")
         done = keep
     todo = [p for u, p in lib.items() if u not in done]

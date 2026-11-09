@@ -102,6 +102,13 @@ def look_for_people():
     return found
 
 
+def faces_in_library():
+    """[(uuid, faces)] of the demo library's photos that Photos itself found faces or people in."""
+    import osxphotos
+    lib = osxphotos.PhotosDB(dbfile=index_library())
+    return [(p.uuid, len(p.face_info)) for p in lib.photos(intrash=False) if p.face_info or p.persons]
+
+
 def cmd_demo_check(a):
     real = Path(a.real).resolve()
     if real == DATA.resolve():
@@ -134,6 +141,8 @@ def cmd_demo_check(a):
         for m in sorted(found):
             problems.append(f"{path} shows {m!r}" + (" (a name in your library)" if m in names else ""))
     seen = look_for_people()
+    if seen is None:  # a check that couldn't run doesn't pass
+        problems.append("Vision isn't available here, so nobody looked for faces: run this on the Mac")
     ok = json.loads((DATA / "checked-by-eye.json").read_text()) if (DATA / "checked-by-eye.json").exists() else {}
     for u, (f, p) in (seen or {}).items():
         if u in ok:
@@ -141,13 +150,10 @@ def cmd_demo_check(a):
         else:
             problems.append(f"photo {u}: Vision sees {f} face(s), {p} person(s)")
     try:
-        import osxphotos
-        lib = osxphotos.PhotosDB(dbfile=index_library())
-        for p in lib.photos(intrash=False):
-            if p.face_info or p.persons:
-                problems.append(f"photo {p.uuid}: Photos found {len(p.face_info)} face(s) in it")
+        for u, f in faces_in_library():
+            problems.append(f"photo {u}: Photos found {f} face(s) in it")
     except Exception as ex:
-        print(f"(couldn't ask Photos about faces: {ex})")
+        problems.append(f"couldn't ask Photos about faces, so they weren't checked: {ex}")
     n = con.execute("select count(*) from photos").fetchone()[0]
     print(f"checked {n} demo photos and {len(pages)} pages and answers, against {len(names)} names, {len(places)} places "
           f"near home and {len(ids)} photo ids from {real}" + ("" if seen is not None else " (Vision not available)"))

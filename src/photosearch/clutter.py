@@ -18,6 +18,7 @@ import numpy as np
 from . import embed, photos_app
 from .dupes import CLEANUP, cleanup_state
 from .search import INTERESTING
+from .shared import updating
 from .store import aspect, photo_info, vectors
 
 KINDS = {  # in order: a photo that fits two kinds is the first (an ID's screenshot is an ID)
@@ -86,13 +87,12 @@ def clutter(con, kind=None, offset=0, limit=60):
 
 def clutter_choose(con, body):
     """{"action": "not" | "is", "uuid"}: this photo isn't clutter (stop suggesting it), or it is after all."""
-    cs, st = state()
     u = str(body.get("uuid") or "")[:64]
     if body.get("action") not in ("not", "is") or not u:
         raise ValueError("action is not or is, with a uuid")
-    nope = set(cs["clutter_not"])
-    st["clutter_not"] = sorted(nope | {u} if body["action"] == "not" else nope - {u})
-    CLEANUP.write_text(json.dumps(st))
+    with updating(CLEANUP) as st:
+        nope = set(st.get("clutter_not", []))
+        st["clutter_not"] = sorted(nope | {u} if body["action"] == "not" else nope - {u})
     return {}
 
 
@@ -104,7 +104,7 @@ def clutter_send(con, kind):
     nope, sent = set(cs["clutter_not"]), set(cs["clutter_sent"].get(kind, []))
     todo = [u for u in found(con)[kind] if u not in nope and u not in sent]
     n = photos_app.add_to_photos_album(KINDS[kind]["album"], todo)
-    _, st = state()
-    st.setdefault("clutter_sent", {})[kind] = sorted(set(st.get("clutter_sent", {}).get(kind, [])) | set(todo))
-    CLEANUP.write_text(json.dumps(st))
+    with updating(CLEANUP) as st:
+        sent = st.setdefault("clutter_sent", {})
+        sent[kind] = sorted(set(sent.get(kind, [])) | set(todo))
     return dict(added=n, album=KINDS[kind]["album"])

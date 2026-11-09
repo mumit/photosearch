@@ -8,6 +8,7 @@ from . import embed, photos_app
 from .config import DATA, DIM
 from .store import photo_info, vectors
 from .search import EXCLUDE_W, SEASONS, filtered, interest
+from .shared import held, write_json
 from .stories import slug
 
 ALBUMS = DATA / "albums"
@@ -133,8 +134,10 @@ def save_album(con, body):
         if not isinstance(n, int) or n < 1:  # no choice made: the photos close to the best match
             n = min(150, max(10, sum(sc >= ranked[0][1] - 0.07 for _, sc in ranked))) if ranked else 0
         a["threshold"] = ranked[min(n, len(ranked)) - 1][1] if ranked else None
-    ALBUMS.mkdir(parents=True, exist_ok=True)
-    (ALBUMS / f"{aid}.json").write_text(json.dumps(a, indent=1, ensure_ascii=False))
+    with held("albums"):
+        if (ALBUMS / f"{aid}.json").exists() and (synced := load_album(aid).get("photos_album")):
+            a["photos_album"] = synced  # a copy into Photos may have finished since `old` was read
+        write_json(ALBUMS / f"{aid}.json", a, indent=1, ensure_ascii=False)
     return dict(id=aid, n=len(album_members(con, a)))
 
 
@@ -150,6 +153,8 @@ def album_to_photos(con, aid):
     ids = album_members(con, a)
     done = set(a.get("photos_album", {}).get("synced", []))
     n = photos_app.add_to_photos_album(a["name"], [u for u in ids if u not in done])
-    a["photos_album"] = dict(name=a["name"], synced=sorted(done | set(ids)), at=datetime.now().isoformat(timespec="seconds"))
-    (ALBUMS / f"{aid}.json").write_text(json.dumps(a, indent=1, ensure_ascii=False))
+    with held("albums"):  # the album as it is now: it may have been edited while Photos was busy
+        a = load_album(aid)
+        a["photos_album"] = dict(name=a["name"], synced=sorted(done | set(ids)), at=datetime.now().isoformat(timespec="seconds"))
+        write_json(ALBUMS / f"{aid}.json", a, indent=1, ensure_ascii=False)
     return dict(added=n, total=len(ids))

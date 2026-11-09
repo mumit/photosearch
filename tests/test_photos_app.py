@@ -94,3 +94,33 @@ def test_claude_hears_why_photos_refused(lib, monkeypatch):
     monkeypatch.setattr(photos_app, "add_to_photos_album", refused)
     with pytest.raises(LookupError, match="another library"):
         mcp_server.make_album("Dogs", [lib["dog0"]])
+
+
+def test_a_fetch_says_where_it_is(lib, monkeypatch):
+    """not asked → fetching → failed → (asked again) fetching → sharp, as the page sees it while it waits."""
+    import queue, threading
+    from photosearch.config import LARGE
+    u, gate, tries, n = lib["cake0"], threading.Event(), queue.Queue(), []
+    monkeypatch.setattr(photos_app, "needs_fetch", lambda con, x: not (LARGE / f"{x}.jpg").exists())
+
+    def fetch(con, batch):  # the first try fails; the second makes the copy
+        gate.wait(); gate.clear()
+        if n:
+            LARGE.mkdir(parents=True, exist_ok=True); (LARGE / f"{u}.jpg").write_bytes(b"jpeg")
+        n.append(1); tries.put(1)
+        return [x for x in batch if not (LARGE / f"{x}.jpg").exists()]
+    monkeypatch.setattr(photos_app, "fetch_in_subprocess", fetch)
+    f = photos_app.Fetcher(None)
+    assert f.status(u) == "not asked"
+    f.add([u]); f.add([u])  # asked twice: fetched once
+    assert f.status(u) == "fetching"
+    gate.set(); tries.get(timeout=5)
+    for _ in range(100):
+        if f.status(u) != "fetching":
+            break
+        threading.Event().wait(0.01)
+    assert f.status(u) == "failed"
+    f.add([u])
+    assert f.status(u) == "fetching"
+    gate.set(); tries.get(timeout=5)
+    assert f.status(u) == "sharp" and len(n) == 2

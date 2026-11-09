@@ -11,6 +11,7 @@ from .store import DATED, photo_info, vec_of, vectors
 from .search import interest, rank
 from .places import short_place, trips
 from .stories import highlights
+from .shared import write_json
 
 
 def galaxy(con):
@@ -44,7 +45,7 @@ def galaxy(con):
         regions.append(dict(name=" · ".join(top), x=round(float(cx), 4), y=round(float(cy), 4), n=len(idx)))
     g = dict(uuids=uuids, x=np.round(xy[:, 0], 4).tolist(), y=np.round(xy[:, 1], 4).tolist(),
              year=[int(rows[u][0]) for u in uuids], regions=regions)
-    f.write_text(json.dumps(g))
+    write_json(f, g)
     return g
 
 

@@ -115,3 +115,15 @@ def test_agents_context_isnt_a_tool_argument():
     tools = {t.name: t for t in mcp_server.mcp._tool_manager.list_tools()}
     for name in ("save_story", "eval_sheet", "score_eval_sheet"):
         assert "ctx" not in tools[name].parameters["properties"]
+
+
+def test_an_agent_asks_before_replacing_your_story(con):
+    from photosearch import mcp_server
+    r = stories.auto_review(con, "2024")
+    stories.save_review(dict(r, title="Ours", made_by="you"))
+    with pytest.raises(ValueError, match="ask them"):
+        mcp_server.save_story("2024", "The agent's", "", r["chapters"])
+    assert stories.load_review(con, "2024")["title"] == "Ours"
+    mcp_server.save_story("2024", "The agent's", "", r["chapters"], replace=True)
+    assert stories.load_review(con, "2024")["title"] == "The agent's"
+    mcp_server.save_story("2024", "Again", "", r["chapters"])  # its own story: no need to ask

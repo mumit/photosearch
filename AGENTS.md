@@ -30,7 +30,7 @@ Read this before working on photosearch. [README.md](README.md) covers what the 
 ## Commands
 
 ```bash
-uv run pytest                 # fast tests (about 270)
+uv run pytest                 # fast tests (about 300)
 uv run pytest -m browser      # headless-Chrome tours of the page (slow)
 uv run photosearch serve      # the web app on localhost:8765
 PHOTOSEARCH_DATA=data-demo uv run photosearch serve --demo --port 8766   # presenter mode on the demo index
@@ -40,7 +40,10 @@ PHOTOSEARCH_DATA=data-demo uv run photosearch serve --demo --port 8766   # prese
 
 - **Photos and AppleScript hang when called from a worker thread** (the MCP server, the web server). Run them in a subprocess: `make_album` calls `photosearch add-to-album`, and full-size fetches call `photosearch fetch`. A regression once made `make_album` hang for 120 s.
 - **Tests must not start Photos-touching subprocesses.** The subprocess escapes the tests' fakes and reaches the real library.
-- **Two scripts driving Photos at once can stall it** until it's force-quit.
+- **Two scripts driving Photos at once can stall it** until it's force-quit. `add_now` holds the `photos-app` lock and PhotoKit
+  work holds `photokit` (`shared.held`), across processes; anything new that drives Photos should too.
+- **`serve`, `photosearch-mcp` and the commands write the same files.** Change a JSON file in `data/` with
+  `shared.updating` (read, change, write back, under a lock) or `shared.write_json`, never `write_text`.
 - **Torch on MPS crashes the process if two threads encode at once.** `embed_query` holds a lock.
 - **My dates for undated photos live in the `redated` table.** `photosearch index` rewrites `photos.date` from Photos, then `dates.apply` puts mine back. Anything else that rewrites dates must do the same.
 - **`index` also reads new videos on the Mac** (videos.py), which loads the model's audio encoder. `--no-videos` skips that; `--limit` trials skip it too.

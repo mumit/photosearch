@@ -10,6 +10,7 @@ from .store import DATED, photo_info, vectors
 from .images import photo_jpeg
 from .search import MIN_INTEREST, interest, search, similar
 from .places import AWAY_KM, find_trip, homes, km, short_place, trips
+from .shared import write_json
 
 REVIEWS = DATA / "reviews"
 MONTHS = "January February March April May June July August September October November December".split()
@@ -130,8 +131,7 @@ def auto_review(con, rid, n=30):
 
 
 def save_review(review):
-    REVIEWS.mkdir(parents=True, exist_ok=True)
-    (REVIEWS / f"{review['id']}.json").write_text(json.dumps(review, indent=1, ensure_ascii=False))
+    write_json(REVIEWS / f"{review['id']}.json", review, indent=1, ensure_ascii=False)
 
 
 def saved_review(rid):

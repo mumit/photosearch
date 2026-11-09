@@ -88,6 +88,15 @@ def test_send_twice_sends_nothing_new(con, photos_app):
     assert photos_app.added[-1][1] == []
 
 
+def test_picking_a_sent_photo_to_keep_doesnt_send_the_rest(lib, con, photos_app):
+    """Sent, then a different keeper picked: sending again would put every copy in maybe delete."""
+    key = next(g["key"] for g in dupes.dupe_groups(con) if lib["burst0"] in g["uuids"])
+    dupes.dupes_send(con)
+    dupes.dupes_choose(con, dict(key=key, action="keep", uuid=lib["burst2"]))  # burst2 went to the album
+    r = dupes.dupes_send(con)
+    assert r["kept_but_sent"] == 1 and lib["burst0"] not in photos_app.added[-1][1]
+
+
 def test_pages(con):
     a, b = dupes.dupes(con, limit=2), dupes.dupes(con, offset=2, limit=2)
     assert len(a["groups"]) == len(b["groups"]) == 2

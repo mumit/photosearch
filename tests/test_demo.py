@@ -38,8 +38,27 @@ def test_photos_looked_at_by_eye_dont_fail(con, monkeypatch, tmp_path, capsys):
     first = con.execute("select uuid from photos").fetchone()[0]
     (config.DATA / "checked-by-eye.json").write_text('{"%s": "a statue"}' % first)
     monkeypatch.setattr(demo, "look_for_people", lambda: {first: (1, 0)})
+    monkeypatch.setattr(demo, "faces_in_library", lambda: [])
     demo.cmd_demo_check(Namespace(real=str(real)))
     assert "looked at: " + first in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("vision, photos", [(None, []), ({}, "raise")])
+def test_a_face_check_that_couldnt_run_fails(con, monkeypatch, tmp_path, capsys, vision, photos):
+    real = tmp_path / "real"; real.mkdir()
+    con.execute("insert into meta values('library', '/Users/x/Pictures/Photosearch Demo.photoslibrary')"); con.commit()
+    sqlite3.connect(real / "index.sqlite").executescript(
+        "create table photos(uuid text, date text, persons text, place text, lat real, lon real, geo text);")
+    con.execute("update photos set persons='[]', lat=null, lon=null, place=''"); con.commit()
+    monkeypatch.setattr(demo, "look_for_people", lambda: vision)
+    def faces():
+        if photos == "raise":
+            raise OSError("no such library")
+        return photos
+    monkeypatch.setattr(demo, "faces_in_library", faces)
+    with pytest.raises(SystemExit, match="1 problem"):
+        demo.cmd_demo_check(Namespace(real=str(real)))
+    assert "✓" not in capsys.readouterr().out
 
 
 def test_approved_places_are_allowed_but_only_those(con, tmp_path, capsys):

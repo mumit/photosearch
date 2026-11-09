@@ -566,6 +566,7 @@ thing, and they only import downwards in this list:
 | `stories.py` | Stories: making, editing, the slideshow page |
 | `explore.py` | Galaxy, time machine, rediscover, calendar, games, photo math, on this day |
 | `photos_app.py` | Everything that talks to the Photos app or iCloud (in a separate process) |
+| `shared.py` | Files and locks shared by the processes: JSON written whole, read-and-write-back under a lock, one process driving Photos at a time |
 | `albums.py`, `dupes.py`, `clutter.py` | Smart albums; tidying up near-duplicates and clutter |
 | `dates.py` | The date detective: grouping undated photos, their clues, and the dates you give them |
 | `thennow.py` | Then and now: pairs of photos from the same spot or of the same person, years apart |

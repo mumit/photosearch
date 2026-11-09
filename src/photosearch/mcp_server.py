@@ -143,7 +143,8 @@ def on_this_day(day: str | None = None) -> list:
 @mcp.tool(annotations=READ)
 def list_stories() -> list[dict]:
     """The trips (found from where photos were taken) and years that can be made into a slideshow, newest first,
-    with their ids, days, photo counts, and who made the current review (none yet, "auto", "you" or "agent", with the agent's name)."""
+    with their ids, days, photo counts, and who made the saved story: none (an automatic one is made when played),
+    "you" (the user) or "agent" (with its name, and edited=true if the user changed it since)."""
     return [{k: v for k, v in s.items() if k != "cover" and v is not None} for s in stories.stories(con)]
 
 
@@ -163,13 +164,19 @@ def story_highlights(story: str, count: int = 40) -> list:
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True))
-def save_story(story: str, title: str, intro: str, chapters: list[Chapter], outro: str = "", ctx: Context | None = None) -> str:
+def save_story(story: str, title: str, intro: str, chapters: list[Chapter], outro: str = "", replace: bool = False,
+               ctx: Context | None = None) -> str:
     """Save a story (a year or a trip) and get the link to its slideshow. Pick ~20-30 photos from story_highlights,
     plus any you found with search_photos (look at them first: skip blurry shots, near-repeats, receipts and too
     many selfies), group them into 4-8 chapters in date order with short titles (for a trip, usually by day or
     place), and give each photo a one-line caption. Captions should describe what's in the photo, using only names
-    from the photo's tagged people; don't invent events or feelings. Replaces any earlier review of that story."""
+    from the photo's tagged people; don't invent events or feelings. Replaces an earlier automatic or agent's story;
+    one the user made or edited only with replace=True, after asking them."""
     _, _, fields = stories.story_span(con, story)
+    old = stories.saved_review(story)
+    if old and (old.get("made_by") == "you" or old.get("edited")) and not replace:
+        raise ValueError(f"the user {'made' if old.get('made_by') == 'you' else 'edited'} the story {story!r} "
+                         f"(\"{old.get('title')}\"); ask them before replacing it, then call again with replace=true")
     known = store.photo_info(con, [p["uuid"] for c in chapters for p in c.get("photos", [])])
     bad = [p["uuid"] for c in chapters for p in c.get("photos", []) if p["uuid"] not in known]
     if bad:
