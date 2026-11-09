@@ -43,7 +43,32 @@ def db():
     con.execute("create table if not exists portrait(name text primary key, uuid text, at text)")
     # the words in each photo, as Vision reads them (text.py); '' when it found none
     con.execute("create table if not exists texts(uuid text primary key, text text, at text)")
+    # photos in the library that `index` couldn't read (no preview on this Mac, or an unreadable file); tried each run
+    con.execute("create table if not exists skipped(uuid text primary key, reason text, at text)")
     return con
+
+
+def coverage(con):
+    """How much of the library search can find so far, and what each gap needs: what an agent or `photosearch status`
+    can tell the user. Only the gaps are listed under "gaps", each with the command that fills it."""
+    one = lambda sql: con.execute(sql).fetchone()[0]
+    photos, videos = (one(f"select count(*) from photos where kind='{k}'") for k in ("photo", "video"))
+    gaps = []
+    if n := one("select count(*) from skipped"):
+        why = dict(con.execute("select reason, count(*) from skipped group by reason order by 2 desc").fetchall())
+        gaps.append(dict(gap="not indexed", n=n, why=why, fix="`photosearch index` tries them again; one only in "
+                         "iCloud needs Photos to download it (turn off Optimize Mac Storage, or open the photo in Photos)"))
+    if n := one("select count(*) from photos where quick"):
+        gaps.append(dict(gap="quick first vectors, slightly less exact", n=n, fix="`photosearch index` redoes them"))
+    read, failed = (one(f"select count(*) from videos_done join photos using(uuid) where error is {x} null") for x in ("", "not"))
+    if videos - read:
+        gaps.append(dict(gap="videos not searchable by sound or later frames yet", n=videos - read, failed=failed,
+                         fix="`photosearch videos --icloud`; ones on the Mac are read by `photosearch index`"))
+    if n := one("select count(*) from photos where kind='photo' and uuid not in (select uuid from texts)"):
+        gaps.append(dict(gap='words in photos not read yet (searches in "quotes")', n=n, fix="`photosearch text`"))
+    if n := one("select count(*) from photos where faces is null"):
+        gaps.append(dict(gap="face positions not read (portraits crop around faces)", n=n, fix="`photosearch index`"))
+    return dict(photos=photos, videos=videos, gaps=gaps)
 
 
 # Timestamps shared by 50+ photos aren't real dates: scans, or a camera whose clock was reset (here 1,042 photos

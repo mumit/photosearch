@@ -153,6 +153,8 @@ redone ones (see [FINDINGS.md](FINDINGS.md)). Videos' sound and frames wait for 
   photos a second, so a search can ask for words in quotes. The first run on an older index reads every photo once
   (about 15 minutes for 16,000). `photosearch text` does only that step.
 - Expect the Mac to run warm while it works; it's using the GPU.
+- `photosearch status` says what search can't find yet, and the command that fixes each: photos with no preview on
+  the Mac, quick first vectors, videos not read, words not read. An AI agent sees the same in `library_overview`.
 
 **Speed vs. quality:** each image is given to the model as a number of "vision tokens" (default 280).
 `--vision-tokens 70` is about 4× faster, but changes which photos come first (see [FINDINGS.md](FINDINGS.md)):

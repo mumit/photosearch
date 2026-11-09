@@ -1,5 +1,6 @@
 """`photosearch index`: read the Photos library and embed what's new."""
 import json, sys, time
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -99,6 +100,8 @@ def cmd_index(a):
                  "(PHOTOSEARCH_DATA=...)")
     con.execute("insert or ignore into meta values('library', ?)", (str(pdb.library_path),)); con.commit()
     lib = {p.uuid: p for p in pdb.photos(intrash=False)}
+    if lib:
+        con.executemany("delete from skipped where uuid=?", [r for r in con.execute("select uuid from skipped") if r[0] not in lib])
     if lib:  # never prune against an empty read
         gone = done - lib.keys()
         for u in gone:
@@ -143,23 +146,29 @@ def cmd_index(a):
             th.save(THUMBS / f"{p.uuid}.jpg", quality=82)
             con.execute(f"insert or replace into photos (uuid, {META_COLS}, src, vec, quick) values ({','.join('?' * (N_META + 4))})",
                         (p.uuid, *meta(p), src, v.tobytes(), 1 if quick else None))
+            con.execute("delete from skipped where uuid=?", (p.uuid,))
         con.commit()
         n += len(batch); batch.clear()
         rate = n / (time.time() - t0)
         print(f"\r{n}/{len(todo)}  {rate:.1f}/s  eta {(len(todo)-n)/max(rate,1e-9)/60:.0f} min  skipped {skipped}   ",
               end="", flush=True)
 
+    def skip(p, reason):
+        nonlocal skipped
+        skipped += 1
+        con.execute("insert or replace into skipped values(?,?,?)", (p.uuid, reason, datetime.now().isoformat(timespec="seconds")))
+
     for p in todo:
         src = best_local_image(p)
         if not src:
-            skipped += 1; continue
+            skip(p, "no preview on this Mac"); continue
         try:
             batch.append((p, open_image(src), src))
         except Exception as ex:
-            skipped += 1; print(f"\n  skip {p.uuid} ({ex.__class__.__name__}: {ex})"); continue
+            skip(p, "unreadable"); print(f"\n  skip {p.uuid} ({ex.__class__.__name__}: {ex})"); continue
         if len(batch) >= a.batch:
             flush()
-    flush()
+    flush(); con.commit()
     print(f"\ndone: {n} embedded, {skipped} skipped (no local preview / unreadable) in {(time.time()-t0)/60:.1f} min")
     if quick:
         embed.set_vision_tokens(m, embed.VISION_TOKENS)

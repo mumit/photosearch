@@ -75,3 +75,18 @@ def test_quick_then_full(con, photos):
     assert all(q is None for _, q in rows.values()) and np.allclose(rows["NEW-0"][0], Model.vec(im, 280))
     m.calls.clear(); run()
     assert m.calls == []  # nothing left to redo
+
+
+def test_a_photo_it_cant_read_is_kept_track_of(con, photos):
+    from photosearch import store
+    ps, m = photos
+    m.proc.image_seq_length = 280
+    ps[0].path_derivatives = []  # only in iCloud
+    run(limit=3)
+    assert con.execute("select uuid, reason from skipped").fetchall() == [("NEW-0", "no preview on this Mac")]
+    gaps = {g["gap"]: g for g in store.coverage(con)["gaps"]}
+    assert gaps["not indexed"]["n"] == 1 and gaps["not indexed"]["why"] == {"no preview on this Mac": 1}
+    ps[0].path_derivatives = [ps[1].path_derivatives[0]]  # Photos downloaded it since
+    run(limit=3)
+    assert con.execute("select count(*) from skipped").fetchone()[0] == 0
+    assert "not indexed" not in {g["gap"] for g in store.coverage(con)["gaps"]}

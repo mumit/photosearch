@@ -94,13 +94,15 @@ def view_photos(uuids: list[str], size: Literal["sheet", "large"] = "sheet") -> 
 @mcp.tool(annotations=READ)
 def library_overview() -> dict:
     """What's indexed: photo/video counts, date range, the people tagged in Photos and the most common places.
-    Use the exact names from here in search filters."""
+    Use the exact names from here in search filters. "coverage" lists what search can't find yet (photos not
+    indexed, videos not read, words not read), with the command that fixes each: mention it when a search comes up short."""
     rows = con.execute("select kind, substr(date,1,10), persons, place from photos").fetchall()
     people = Counter(p for r in rows for p in json.loads(r[2]))
     places = Counter(r[3] for r in rows if r[3])
     dates = sorted(r[1] for r in rows)
     return dict(indexed=len(rows), kinds=Counter(r[0] for r in rows), first=dates[0] if dates else None,
-                last=dates[-1] if dates else None, people=dict(people.most_common()), places=dict(places.most_common(40)))
+                last=dates[-1] if dates else None, people=dict(people.most_common()), places=dict(places.most_common(40)),
+                coverage=store.coverage(con)["gaps"])
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True))

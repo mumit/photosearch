@@ -24,7 +24,7 @@ import argparse, json, sys
 from pathlib import Path
 
 from . import embed
-from .store import db, photos_db
+from .store import coverage, db, photos_db
 from .index import cmd_index, cmd_thumbs
 from .search import search, similar
 from .places import trips
@@ -82,6 +82,16 @@ def cmd_review(a):
             fetch_large(con, need, log=print)
         Path(a.export).write_text(render_review(con, r, embed=True))
         print(f"wrote {a.export} ({Path(a.export).stat().st_size / 1e6:.1f} MB): one file, opens in any browser")
+
+
+def cmd_status(a):
+    c = coverage(db())
+    print(f"{c['photos']:,} photos and {c['videos']:,} videos indexed")
+    for g in c["gaps"]:
+        extra = ", ".join(f"{n:,} {k}" for k, n in g.get("why", {}).items()) or (f"{g['failed']:,} couldn't be read" if g.get("failed") else "")
+        print(f"- {g['n']:,} {g['gap']}{f' ({extra})' if extra else ''}: {g['fix']}")
+    if not c["gaps"]:
+        print("nothing missing")
 
 
 def cmd_library(a):
@@ -171,6 +181,8 @@ def main():
     p.add_argument("--out", metavar="F.jpg", help="where to write the lit copy (default why-UUID.jpg)"); p.set_defaults(fn=cmd_why)
     p = sub.add_parser("text", help="read the words in photos (signs, pages, receipts) on this Mac, so searches find them")
     p.add_argument("--limit", type=int); p.set_defaults(fn=cmd_text)
+    p = sub.add_parser("status", help="how much of the library search can find so far, and what fills each gap")
+    p.set_defaults(fn=cmd_status)
     p = sub.add_parser("library", help="which Photos library it reads (the index's, else the system one), and how many items")
     p.add_argument("--library"); p.set_defaults(fn=cmd_library)
     p = sub.add_parser("update", help="install the newest release from PyPI (a git checkout uses git pull)")
