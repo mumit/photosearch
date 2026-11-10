@@ -1,6 +1,6 @@
 [project]
 name = "photosearch"
-version = "0.1.0"
+version = "0.2.0"
 description = "Search an Apple Photos library by what's in the pictures, and play with it"
 dynamic = ["readme"]
 license = "MIT"
