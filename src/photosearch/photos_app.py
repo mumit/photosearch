@@ -23,15 +23,14 @@ def add_now(name, uuids):
     photos = sorted(pdb.photos(uuid=uuids), key=lambda p: order[p.uuid])
     if not photos:
         return 0
-    with held("photos-app"):  # one process at a time drives Photos: two can stall it
-        for i in sorted({0, len(photos) // 2, len(photos) - 1}):  # one index is one library, so a few will tell
-            try:
-                photoscript.Photo(photos[i].uuid)
-            except ValueError:
-                raise LookupError(f"Photos has another library open, or didn't answer. Open {Path(pdb.library_path).stem} in "
-                                  "Photos (hold Option while opening it), and check that this app may control Photos (System "
-                                  "Settings → Privacy & Security → Automation). Nothing was added.") from None
-        PhotosAlbum(name).extend(photos)
+    for i in sorted({0, len(photos) // 2, len(photos) - 1}):  # one index is one library, so a few will tell
+        try:
+            photoscript.Photo(photos[i].uuid)
+        except ValueError:
+            raise LookupError(f"Photos has another library open, or didn't answer. Open {Path(pdb.library_path).stem} in "
+                              "Photos (hold Option while opening it), and check that this app may control Photos (System "
+                              "Settings → Privacy & Security → Automation). Nothing was added.") from None
+    PhotosAlbum(name).extend(photos)
     return len(photos)
 
 
@@ -42,8 +41,13 @@ def add_to_photos_album(name, uuids):
     uuids = list(dict.fromkeys(uuids))
     if not uuids:
         return 0
-    r = subprocess.run([sys.executable, "-m", "photosearch", "add-to-album", name, *uuids], capture_output=True, text=True,
-                       timeout=120 + len(uuids))
+    # one process at a time drives Photos (two can stall it); waiting for the turn isn't part of the time limit
+    with held("photos-app"):
+        try:
+            r = subprocess.run([sys.executable, "-m", "photosearch", "add-to-album", name, *uuids], capture_output=True,
+                               text=True, timeout=120 + len(uuids))
+        except subprocess.TimeoutExpired:
+            raise LookupError("Photos didn't answer in time; some may have been added. Try again: it only adds what's missing.") from None
     m = re.search(r"added (\d+)", r.stdout)
     if r.returncode or not m:
         raise LookupError("Photos didn't take them: " + (r.stderr.strip().splitlines() or ["no reply"])[-1][:200])
@@ -142,8 +146,8 @@ class Fetcher:
         threading.Thread(target=self.run, daemon=True).start()
 
     def add(self, uuids):
-        for u in uuids:
-            if u not in self.pending and needs_fetch(self.con, u):
+        for u in uuids:  # the fetch itself skips any that don't need it
+            if u not in self.pending:
                 self.pending.add(u); self.failed.discard(u); self.q.put(u)
 
     def run(self):

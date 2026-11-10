@@ -131,6 +131,25 @@ def test_copy_to_photos_adds_only_whats_new(con, photos_app):
     assert [(name, len(u)) for name, u in photos_app.added] == [("Dog", 4), ("Dog", 2)]
 
 
+def test_a_renamed_album_goes_into_photos_whole(con, photos_app):
+    albums.save_album(con, dict(name="Dog", q="dog", n=4))
+    albums.album_to_photos(con, "dog")
+    albums.save_album(con, dict(id="dog", name="Our dog", q="dog", n=4))
+    assert albums.album_to_photos(con, "dog")["added"] == 4  # a new album in Photos: all of them, not none
+    assert [(name, len(u)) for name, u in photos_app.added] == [("Dog", 4), ("Our dog", 4)]
+    assert albums.load_album("dog")["photos_album"]["name"] == "Our dog"
+
+
+def test_an_album_deleted_while_copying_isnt_an_error(con, monkeypatch):
+    albums.save_album(con, dict(name="Dog", q="dog", n=4))
+    def copy(name, uuids):
+        albums.delete_album("dog")  # tapped while Photos was busy
+        return len(uuids)
+    monkeypatch.setattr(albums.photos_app, "add_to_photos_album", copy)
+    assert albums.album_to_photos(con, "dog") == dict(added=4, total=4)
+    assert albums.albums(con) == []
+
+
 def test_album_vector_is_unit_length(lib, con):
     a = dict(q="beach", pinned=[lib["dog0"]], removed=[lib["beach0"]])
     assert np.linalg.norm(albums.album_vector(con, a)) == pytest.approx(1, abs=1e-5)

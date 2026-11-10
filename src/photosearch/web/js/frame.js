@@ -9,7 +9,10 @@ async function openFrame({ list = null, title = "", start = 0, ambient = false }
   FR.ambient = !list; FR.list = list ? [...list] : []; FR.at = start - 1; FR.paused = false; FR.title = title;
   $("frame").classList.add("on"); $("fslides").innerHTML = "";
   $("ftitle").textContent = title || "Photo frame";
-  try { FR.lock = await navigator.wakeLock?.request("screen"); } catch {}  // keep the screen on
+  let lock = null;
+  try { lock = await navigator.wakeLock?.request("screen"); } catch {}  // keep the screen on
+  if (!frameOn()) { lock?.release?.().catch(() => {}); return; }  // closed while asking
+  FR.lock = lock;
   document.documentElement.requestFullscreen?.().catch(() => {});
   tick(); frameNext(); frameUI();
 }

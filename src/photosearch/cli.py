@@ -24,6 +24,7 @@ import argparse, json, sys
 from pathlib import Path
 
 from . import embed
+from .shared import held
 from .store import coverage, db, photos_db
 from .index import cmd_index, cmd_thumbs
 from .search import search, similar
@@ -42,7 +43,9 @@ from .update import cmd_update, version
 
 
 def cmd_album(a):
-    n = add_now(a.name, [r["uuid"] for r in search(db(), a.query, a.k, **fkw(a))])
+    uuids = [r["uuid"] for r in search(db(), a.query, a.k, **fkw(a))]
+    with held("photos-app"):  # as add_to_photos_album does: one process at a time drives Photos
+        n = add_now(a.name, uuids)
     print(f"added {n} photos to album '{a.name}'")
 
 

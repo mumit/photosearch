@@ -220,12 +220,13 @@ def positions(s, k):
 
 
 JUDGE_MAX = 24  # a first name, as for family picks
+judge_key = lambda judge: " ".join(str(judge or "").split())[:JUDGE_MAX]  # how a judge's name is kept and looked up
 
 
 def record(name, n, judge, x, y, first):
     """Save one judge's verdict on sheet n: the numbers (1..k) of the photos that fit in rows X and Y, and whose
     first photo fits better. Returns how many sheets this judge has left. Raises ValueError for a bad verdict."""
-    judge = " ".join(str(judge or "").split())[:JUDGE_MAX]
+    judge = judge_key(judge)
     if not judge:
         raise ValueError("say who's judging")
     out, run_, judged = load(name)
@@ -275,7 +276,7 @@ def sheet(name, n=None, judge=""):
     """Sheet n (or this judge's next one) for judging: the search and rows X and Y, k photos each, with no sign of
     which variant is which; and this judge's verdict, if any."""
     _, run_, judged = load(name)
-    per, k, mine = run_["searches"], run_["k"], judged.get(judge, {})
+    per, k, mine = run_["searches"], run_["k"], judged.get(judge_key(judge), {})
     if n is None:
         n = next((i for i in range(1, len(per) + 1) if str(i) not in mine), None)
         if n is None:

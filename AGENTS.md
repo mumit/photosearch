@@ -40,7 +40,7 @@ PHOTOSEARCH_DATA=data-demo uv run photosearch serve --demo --port 8766   # prese
 
 - **Photos and AppleScript hang when called from a worker thread** (the MCP server, the web server). Run them in a subprocess: `make_album` calls `photosearch add-to-album`, and full-size fetches call `photosearch fetch`. A regression once made `make_album` hang for 120 s.
 - **Tests must not start Photos-touching subprocesses.** The subprocess escapes the tests' fakes and reaches the real library.
-- **Two scripts driving Photos at once can stall it** until it's force-quit. `add_now` holds the `photos-app` lock and PhotoKit
+- **Two scripts driving Photos at once can stall it** until it's force-quit. `add_to_photos_album` (and `album` from the terminal) hold the `photos-app` lock and PhotoKit
   work holds `photokit` (`shared.held`), across processes; anything new that drives Photos should too.
 - **`serve`, `photosearch-mcp` and the commands write the same files.** Change a JSON file in `data/` with
   `shared.updating` (read, change, write back, under a lock) or `shared.write_json`, never `write_text`.

@@ -225,7 +225,9 @@ def test_an_agent_judges_through_mcp(lib, tmp_path):
 
 
 @pytest.mark.parametrize("judge, app, saved_as", [(None, None, "agent"), (None, ("cursor", None), "cursor"),
-                                                  (None, ("claude-code", "Claude Code"), "claude"), ("Sam", ("cursor", None), "Sam")])
+                                                  (None, ("claude-code", "Claude Code"), "claude"), ("Sam", ("cursor", None), "Sam"),
+                                                  ("claude-second", None, "claude-second"), (" Sam  Lee ", None, "Sam Lee"),
+                                                  (None, ("visual studio code - insiders", None), "visual studio code - ins")])
 def test_an_agent_judges_under_its_own_name(judge, app, saved_as):
     from types import SimpleNamespace as N
     from photosearch import mcp_server

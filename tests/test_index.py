@@ -90,3 +90,13 @@ def test_a_photo_it_cant_read_is_kept_track_of(con, photos):
     run(limit=3)
     assert con.execute("select count(*) from skipped").fetchone()[0] == 0
     assert "not indexed" not in {g["gap"] for g in store.coverage(con)["gaps"]}
+
+
+def test_a_quick_photo_that_loses_its_preview_is_still_indexed(con, photos):
+    from photosearch import store
+    ps, _ = photos
+    run(quick=True)
+    ps[0].path_derivatives = []  # Photos freed the preview before the full redo
+    run(limit=3)
+    assert con.execute("select count(*) from skipped").fetchone()[0] == 0
+    assert "not indexed" not in {g["gap"] for g in store.coverage(con)["gaps"]}

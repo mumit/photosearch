@@ -113,15 +113,10 @@ def save_album(con, body):
     if not q and not any(f.values()):
         raise ValueError("an album needs words or a filter to look for")
     clean = lambda xs: [str(u)[:64] for u in (xs or []) if re.fullmatch(r"[0-9A-Fa-f-]{8,64}", str(u))][:2000]
-    if body.get("id"):  # an update: only of an album that exists (the id names its file)
-        aid = load_album(str(body["id"]))["id"]
-    else:
-        aid = slug(name)[:50].strip("-") or "album"
-    if not body.get("id"):  # a new album: don't overwrite one with the same name
-        base, n = aid, 2
-        while (ALBUMS / f"{aid}.json").exists():
-            aid = f"{base}-{n}"; n += 1
-    old = json.loads((ALBUMS / f"{aid}.json").read_text()) if (ALBUMS / f"{aid}.json").exists() else {}
+    new = not body.get("id")
+    # an update only of an album that exists (the id names its file); a new one's id is picked when it's written
+    old = {} if new else load_album(str(body["id"]))
+    aid = (slug(name)[:50].strip("-") or "album") if new else old["id"]
     a = dict(old, id=aid, name=name, q=q, exclude=[x.strip() for x in str(body.get("exclude") or "").split(",") if x.strip()][:5],
              filters={k: v for k, v in f.items() if v}, pinned=clean(body.get("pinned")), removed=clean(body.get("removed")),
              created=old.get("created", date.today().isoformat()))
@@ -135,26 +130,36 @@ def save_album(con, body):
             n = min(150, max(10, sum(sc >= ranked[0][1] - 0.07 for _, sc in ranked))) if ranked else 0
         a["threshold"] = ranked[min(n, len(ranked)) - 1][1] if ranked else None
     with held("albums"):
-        if (ALBUMS / f"{aid}.json").exists() and (synced := load_album(aid).get("photos_album")):
+        if new:  # don't overwrite one with the same name, even one made a moment ago
+            base, k = aid, 2
+            while (ALBUMS / f"{aid}.json").exists():
+                aid = f"{base}-{k}"; k += 1
+            a["id"] = aid
+        elif synced := load_album(aid).get("photos_album"):
             a["photos_album"] = synced  # a copy into Photos may have finished since `old` was read
         write_json(ALBUMS / f"{aid}.json", a, indent=1, ensure_ascii=False)
     return dict(id=aid, n=len(album_members(con, a)))
 
 
 def delete_album(aid):
-    load_album(aid)
-    (ALBUMS / f"{aid}.json").unlink()
+    with held("albums"):
+        load_album(aid)
+        (ALBUMS / f"{aid}.json").unlink()
     return {}
 
 
 def album_to_photos(con, aid):
-    """Copy the album into the Photos app (an album of the same name). Adds only what isn't there yet."""
+    """Copy the album into the Photos app (an album of the same name). Adds only what isn't there yet; renamed since
+    the last copy, it's a new album in Photos, so every photo goes in."""
     a = load_album(aid)
-    ids = album_members(con, a)
-    done = set(a.get("photos_album", {}).get("synced", []))
-    n = photos_app.add_to_photos_album(a["name"], [u for u in ids if u not in done])
-    with held("albums"):  # the album as it is now: it may have been edited while Photos was busy
-        a = load_album(aid)
-        a["photos_album"] = dict(name=a["name"], synced=sorted(done | set(ids)), at=datetime.now().isoformat(timespec="seconds"))
+    ids, name, was = album_members(con, a), a["name"], a.get("photos_album", {})
+    done = set(was.get("synced", [])) if was.get("name") == name else set()
+    n = photos_app.add_to_photos_album(name, [u for u in ids if u not in done])
+    with held("albums"):  # the album as it is now: it may have been edited, or deleted, while Photos was busy
+        try:
+            a = load_album(aid)
+        except LookupError:
+            return dict(added=n, total=len(ids))
+        a["photos_album"] = dict(name=name, synced=sorted(done | set(ids)), at=datetime.now().isoformat(timespec="seconds"))
         write_json(ALBUMS / f"{aid}.json", a, indent=1, ensure_ascii=False)
     return dict(added=n, total=len(ids))

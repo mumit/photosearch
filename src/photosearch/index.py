@@ -100,8 +100,6 @@ def cmd_index(a):
                  "(PHOTOSEARCH_DATA=...)")
     con.execute("insert or ignore into meta values('library', ?)", (str(pdb.library_path),)); con.commit()
     lib = {p.uuid: p for p in pdb.photos(intrash=False)}
-    if lib:
-        con.executemany("delete from skipped where uuid=?", [r for r in con.execute("select uuid from skipped") if r[0] not in lib])
     if lib:  # never prune against an empty read
         gone = done - lib.keys()
         for u in gone:
@@ -110,6 +108,7 @@ def cmd_index(a):
             (THUMBS / f"{u}.jpg").unlink(missing_ok=True)
             (LARGE / f"{u}.jpg").unlink(missing_ok=True)  # and its full-size copy, if one was fetched
             forget_video(con, u)
+        con.executemany("delete from skipped where uuid=?", [r for r in con.execute("select uuid from skipped") if r[0] not in lib])
         keep = done & lib.keys()
         con.executemany(f"update photos set ({META_COLS}) = ({','.join('?' * N_META)}) where uuid=?",
                         [meta(lib[u]) + (u,) for u in keep])
@@ -153,10 +152,11 @@ def cmd_index(a):
         print(f"\r{n}/{len(todo)}  {rate:.1f}/s  eta {(len(todo)-n)/max(rate,1e-9)/60:.0f} min  skipped {skipped}   ",
               end="", flush=True)
 
-    def skip(p, reason):
+    def skip(p, reason):  # one already indexed (a quick vector to redo) stays searchable, so isn't a gap
         nonlocal skipped
         skipped += 1
-        con.execute("insert or replace into skipped values(?,?,?)", (p.uuid, reason, datetime.now().isoformat(timespec="seconds")))
+        if p.uuid not in done:
+            con.execute("insert or replace into skipped values(?,?,?)", (p.uuid, reason, datetime.now().isoformat(timespec="seconds")))
 
     for p in todo:
         src = best_local_image(p)

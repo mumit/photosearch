@@ -58,7 +58,9 @@ async function startGame(mode) {
   P.players = (ps.length ? ps : ["You"]).map((name, k) => ({ name, score: 0, color: COLORS[k % COLORS.length] }));
   P.rounds = P.players.length > 1 ? 5 * P.players.length : 10;
   if (mode === "place") {
-    try { await loadLeaflet(); } catch { P.mode = null; $("playroot").insertAdjacentHTML("afterbegin", `<p class="status">The map didn't load: are you offline?</p>`); return; }
+    const game = P.game;
+    try { await loadLeaflet(); } catch { if (game === P.game) { P.mode = null; $("playroot").insertAdjacentHTML("afterbegin", `<p class="status">The map didn't load: are you offline?</p>`); } return; }
+    if (game !== P.game) return;  // quit while the map loaded
   }
   nextRound();
 }

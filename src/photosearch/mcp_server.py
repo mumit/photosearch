@@ -32,10 +32,12 @@ def agent(ctx):
 
 
 def judge_name(judge, ctx):
-    """Who's judging: the name given, else the agent's. Claude's apps all judge as "claude", as it did before other
-    agents could, so its verdicts stay one judge's."""
-    name = judge or (agent(ctx) or "agent").lower()
-    return "claude" if name.startswith("claude") else name
+    """Who's judging: the name given, as given, else the agent's. Claude's apps all judge as "claude", as it did before
+    other agents could, so its verdicts stay one judge's."""
+    if not judge:
+        name = (agent(ctx) or "agent").lower()
+        judge = "claude" if name.startswith("claude") else name
+    return evals.judge_key(judge)
 
 
 def tidy(results):
