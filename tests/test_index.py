@@ -100,3 +100,38 @@ def test_a_quick_photo_that_loses_its_preview_is_still_indexed(con, photos):
     run(limit=3)
     assert con.execute("select count(*) from skipped").fetchone()[0] == 0
     assert "not indexed" not in {g["gap"] for g in store.coverage(con)["gaps"]}
+
+
+def test_status_counts_what_index_hasnt_seen(con, photos, monkeypatch):
+    """Photos new in Photos since the last index, and ones deleted there that search still finds, come from the library."""
+    from photosearch import store
+    ps, m = photos
+    m.proc.image_seq_length = 280
+    lib = {p.uuid for p in index.photos_db().photos()}
+    monkeypatch.setattr(store, "library_uuids", lambda: set(lib))
+    gaps = lambda: {g["gap"]: g["n"] for g in store.coverage(con)["gaps"]}
+    assert gaps()["new in Photos since the last index"] == 3
+    ps[0].path_derivatives = []  # only in iCloud: tried, and listed as not indexed instead
+    run()
+    assert "new in Photos since the last index" not in gaps() and gaps()["not indexed"] == 1
+    lib.discard("NEW-1")  # deleted in Photos
+    assert gaps()["deleted from Photos, still found by search"] == 1
+
+
+def test_the_library_is_read_again_only_when_photos_changes_it(lib, tmp_path, monkeypatch):
+    import os
+    from photosearch import store
+    (tmp_path / "database").mkdir(); f = tmp_path / "database" / "Photos.sqlite"; f.write_text("")
+    reads = []
+
+    def photos_db(library):
+        reads.append(library)
+        return SimpleNamespace(photos=lambda intrash=False: [SimpleNamespace(uuid=f"P{len(reads)}")])
+    monkeypatch.setattr(store, "index_library", lambda: str(tmp_path))
+    monkeypatch.setattr(store, "photos_db", photos_db)
+    assert store.library_uuids() == {"P1"} and store.library_uuids() == {"P1"} and len(reads) == 1
+    os.utime(f, ns=(1, 1))  # Photos wrote to it
+    assert store.library_uuids() == {"P2"}
+    monkeypatch.setattr(store, "photos_db", lambda library: 1 / 0)  # no access to Photos: no gap, not an error
+    os.utime(f, ns=(2, 2))
+    assert store.library_uuids() is None and "photos" in store.coverage(store.db())

@@ -1,5 +1,6 @@
 """The index: photos with their vectors and what Photos knows about them, in data/index.sqlite."""
 import json, sqlite3, threading
+from pathlib import Path
 
 import numpy as np
 
@@ -53,7 +54,13 @@ def coverage(con):
     can tell the user. Only the gaps are listed under "gaps", each with the command that fills it."""
     one = lambda sql: con.execute(sql).fetchone()[0]
     photos, videos = (one(f"select count(*) from photos where kind='{k}'") for k in ("photo", "video"))
-    gaps = []
+    gaps, lib = [], library_uuids()
+    if lib is not None:  # what's in Photos that `index` hasn't seen yet, and what's left of photos deleted there
+        have, tried = ({u for (u,) in con.execute(f"select uuid from {t}")} for t in ("photos", "skipped"))
+        if n := len(lib - have - tried):
+            gaps.append(dict(gap="new in Photos since the last index", n=n, fix="`photosearch index`"))
+        if n := len(have - lib):
+            gaps.append(dict(gap="deleted from Photos, still found by search", n=n, fix="`photosearch index` removes them"))
     if n := one("select count(*) from skipped"):
         why = dict(con.execute("select reason, count(*) from skipped group by reason order by 2 desc").fetchall())
         gaps.append(dict(gap="not indexed", n=n, why=why, fix="`photosearch index` tries them again; one only in "
@@ -96,6 +103,27 @@ def vectors(con):
         uuids, M = load_matrix(con)
         _vecs = (stamp, uuids, M, {u: i for i, u in enumerate(uuids)})
     return _vecs[1:]
+
+
+_lib = (None, None)  # (when Photos' database last changed, the uuids in it)
+
+
+def library_uuids():
+    """The uuids of the photos and videos in this index's library (not in the trash), or None if it can't be read
+    (no index yet, or no access to Photos). Reading the library takes ~2 s, so it's remembered until Photos'
+    database changes."""
+    global _lib
+    lib = index_library()
+    if not lib:
+        return None
+    try:
+        stamp = tuple(f.stat().st_mtime_ns for f in sorted((Path(lib) / "database").glob("Photos.sqlite*"))
+                      if not f.name.endswith("-shm"))
+        if _lib[0] != stamp:
+            _lib = (stamp, {p.uuid for p in photos_db(lib).photos(intrash=False)} or None)  # never empty: a bad read
+        return _lib[1]
+    except Exception:
+        return None
 
 
 def index_library():
