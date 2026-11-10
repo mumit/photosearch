@@ -77,16 +77,19 @@ def needs_fetch(con, uuid):
         return True
 
 
-def fetch_large(con, uuids, log=None):
+def fetch_large(con, uuids, log=None, locked=False):
     """Download full-size versions of photos that need them (see needs_fetch) from iCloud, through Photos with
     PhotoKit (~1 s each), into data/large/ at DISPLAY_PX, and rebuild their thumbnails from them. One fetch at a
-    time across threads and processes. Returns how many were fetched. Nothing in the Photos library changes."""
+    time across threads and processes (locked: the process that started this one holds the photokit lock).
+    Returns how many were fetched. Nothing in the Photos library changes."""
     global _pdb
     import tempfile
+    from contextlib import nullcontext
     from osxphotos import ExportOptions, PhotoExporter
     n = 0
     for u in dict.fromkeys(uuids):
-        with _fetch_lock, held("photokit"):  # and across processes: the page's fetches, an agent's, an export's
+        # and across processes: the page's fetches, an agent's, an export's
+        with _fetch_lock, nullcontext() if locked else held("photokit"):
             if not needs_fetch(con, u):
                 continue
             if _pdb is None or _pdb.get_photo(u) is None:  # opened once; again if the photo is newer than that
@@ -120,7 +123,9 @@ def fetch_large(con, uuids, log=None):
 def fetch_in_subprocess(con, uuids, wait=True):
     """fetch_large in a `photosearch fetch` process. PhotoKit hangs on its second request when its first came from a
     worker thread (seen with the web server's), so fetches run on a process's main thread, which can also be
-    killed if iCloud stalls. Returns the uuids still needing a fetch afterwards (all of them if not waiting)."""
+    killed if iCloud stalls. When waiting, this process holds the photokit lock, so the time limit starts once it has
+    it, not while a video download has it. Returns the uuids still needing a fetch afterwards (all of them if not
+    waiting)."""
     import subprocess
     todo = [u for u in dict.fromkeys(uuids) if needs_fetch(con, u)]
     if not todo:
@@ -130,7 +135,8 @@ def fetch_in_subprocess(con, uuids, wait=True):
         subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return todo
     try:
-        subprocess.run(cmd, timeout=30 + 10 * len(todo), capture_output=True)
+        with held("photokit"):
+            subprocess.run([*cmd, "--locked"], timeout=30 + 10 * len(todo), capture_output=True)
     except subprocess.TimeoutExpired:
         pass
     return [u for u in todo if needs_fetch(con, u)]
@@ -177,4 +183,4 @@ def cmd_fetch(a):
     uuids = [u for x in a.what for u in (story_uuids(load_review(con, x, make=True)) if STORY_ID.fullmatch(x) else [x])]
     need = [u for u in dict.fromkeys(uuids) if needs_fetch(con, u)]
     print(f"{len(uuids)} photos, {len(need)} need a full-size copy")
-    print(f"fetched {fetch_large(con, need, log=print)}")
+    print(f"fetched {fetch_large(con, need, log=print, locked=a.locked)}")

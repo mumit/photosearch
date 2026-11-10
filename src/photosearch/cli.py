@@ -145,7 +145,9 @@ def main():
     p = sub.add_parser("demo-check", help="before showing a demo (PHOTOSEARCH_DATA): nothing in it from your own library")
     p.add_argument("real", help="your own library's data folder, e.g. data"); p.set_defaults(fn=cmd_demo_check)
     p = sub.add_parser("fetch", help="full-size copies from iCloud for photos whose local preview is small")
-    p.add_argument("what", nargs="+", help="story ids (2025, trip-2024-05-02) or photo uuids"); p.set_defaults(fn=cmd_fetch)
+    p.add_argument("what", nargs="+", help="story ids (2025, trip-2024-05-02) or photo uuids")
+    p.add_argument("--locked", action="store_true", help=argparse.SUPPRESS)  # its parent holds the photokit lock
+    p.set_defaults(fn=cmd_fetch)
     p = sub.add_parser("thumbs", help="rebuild thumbnails at the current size, where the source allows")
     p.set_defaults(fn=cmd_thumbs)
     p = sub.add_parser("today", help="photos from this day in earlier years")

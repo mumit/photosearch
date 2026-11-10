@@ -26,6 +26,7 @@ from photosearch import clutter, config, dupes, embed, people, recreate, search,
 from photosearch import photos_app as photos  # noqa: E402  (the fixture below is called photos_app)
 import library  # noqa: E402
 
+REAL_FETCH = photos.fetch_in_subprocess  # replaced for every test below; the lock test checks the real one
 TEMPLATE = WORK / "template"
 NAMED = library.build(TEMPLATE)
 
@@ -86,6 +87,12 @@ def lib(monkeypatch):
 @pytest.fixture
 def photos_app():
     return photos.add_to_photos_album
+
+
+@pytest.fixture
+def fetch_in_subprocess():
+    """The real one, for a test that also replaces subprocess.run: it would otherwise start `photosearch fetch`."""
+    return REAL_FETCH
 
 
 @pytest.fixture

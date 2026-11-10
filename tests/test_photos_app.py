@@ -124,3 +124,31 @@ def test_a_fetch_says_where_it_is(lib, monkeypatch):
     assert f.status(u) == "fetching"
     gate.set(); tries.get(timeout=5)
     assert f.status(u) == "sharp" and len(n) == 2
+
+
+def test_a_fetch_waits_for_photokit_before_its_time_limit_starts(lib, monkeypatch, fetch_in_subprocess):
+    """A video download holding PhotoKit doesn't use up a fetch's time: the parent waits for the lock, then starts
+    the fetch with --locked so the child doesn't wait on its own parent."""
+    import fcntl, subprocess, threading, time
+    from photosearch import config
+    from photosearch.shared import held
+    monkeypatch.setattr(photos_app, "needs_fetch", lambda con, u: True)
+    runs, released = [], []
+
+    def run(cmd, timeout=None, **kw):
+        with open(config.DATA / ".photokit.lock", "a") as f:  # someone else can't have it while the fetch runs
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        runs.append((cmd, time.monotonic()))
+    monkeypatch.setattr(subprocess, "run", run)
+
+    def video_download():
+        with held("photokit"):
+            started.set(); time.sleep(0.3)
+            released.append(time.monotonic())
+    started = threading.Event()
+    t = threading.Thread(target=video_download); t.start(); started.wait()
+    fetch_in_subprocess(None, [lib["cake0"]])
+    t.join()
+    (cmd, at), = runs
+    assert cmd[-1] == "--locked" and lib["cake0"] in cmd and at >= released[0]
