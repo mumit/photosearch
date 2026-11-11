@@ -38,7 +38,7 @@ from .evals import cmd_eval
 from .videos import cmd_download_videos, cmd_videos
 from .dates import cmd_dates
 from .why import cmd_why
-from .text import cmd_text
+from .text import cmd_read_text, cmd_text
 from .update import cmd_update, version
 
 
@@ -194,6 +194,8 @@ def main():
     p.add_argument("--check", action="store_true", help="only say whether there's a newer one"); p.set_defaults(fn=cmd_update)
     p = sub.add_parser("download-videos", help="download videos (by uuid) from iCloud into a folder; used by `videos --icloud`")
     p.add_argument("dir"); p.add_argument("uuids", nargs="+"); p.set_defaults(fn=cmd_download_videos)
+    p = sub.add_parser("read-text", help="the words in image files, as JSON lines; used by `text`")
+    p.add_argument("files", nargs="+"); p.set_defaults(fn=cmd_read_text)
     a = ap.parse_args()
     if a.fn is cmd_dates and ((a.do == "set" and not a.when) or (a.do != "list" and not a.group)):
         ap.error("dates set GROUP WHEN, or dates undo GROUP|all")

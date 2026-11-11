@@ -27,6 +27,7 @@ from photosearch import photos_app as photos  # noqa: E402  (the fixture below i
 import library  # noqa: E402
 
 REAL_FETCH = photos.fetch_in_subprocess  # replaced for every test below; the lock test checks the real one
+REAL_READINGS = text.readings  # likewise: the reader test gives it a stand-in for Vision
 TEMPLATE = WORK / "template"
 NAMED = library.build(TEMPLATE)
 
@@ -72,6 +73,7 @@ def offline():
         mp.setattr(photos, "fetch_in_subprocess", lambda con, uuids, wait=True: [])
         mp.setattr(smartbox, "jev_key", lambda: None)
         mp.setattr(text, "read", lambda path: [])  # Apple's Vision: tests say what's written instead
+        mp.setattr(text, "readings", lambda jobs: ((u, text.read(f)) for u, f in jobs))  # in this process
         yield
 
 
@@ -88,6 +90,12 @@ def lib(monkeypatch):
 @pytest.fixture
 def photos_app():
     return photos.add_to_photos_album
+
+
+@pytest.fixture
+def readings():
+    """The real one, for a test that also replaces the reading process: it would otherwise start Vision."""
+    return REAL_READINGS
 
 
 @pytest.fixture

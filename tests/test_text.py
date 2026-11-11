@@ -1,4 +1,6 @@
 """The words in photos (text.py): read once per photo, and searched with "quotes"."""
+import pytest
+
 from photosearch import search, text
 
 
@@ -34,3 +36,34 @@ def test_each_photo_is_read_once(lib, con, monkeypatch):
     seen.clear(); text.read_all(con)
     assert seen == []
     assert text.written_in(con, ["exit"]) == {lib["snow1"]}
+
+
+def test_a_stuck_reader_costs_one_photo(monkeypatch, readings, tmp_path):
+    """Vision once stopped answering mid-run: a photo that takes too long is left for next time, and a new reader goes
+    on with the rest. Three stuck in a row: Vision isn't answering anyone, so stop for this run."""
+    import sys
+    fake = tmp_path / "reader.py"  # a stand-in for `photosearch read-text`
+    fake.write_text("import json, sys, time\n"
+                    "for f in sys.argv[1:]:\n"
+                    "    if 'stuck' in f: time.sleep(60)\n"
+                    "    print(json.dumps(None if 'bad' in f else [f.upper()]), flush=True)\n")
+    monkeypatch.setattr(text, "READER", [sys.executable, str(fake)])
+    monkeypatch.setattr(text, "WAIT", 1); monkeypatch.setattr(text, "BATCH", 3)
+    jobs = [(x, x) for x in ("a", "stuck", "b", "bad", "c", "d", "e")]
+    assert list(readings(jobs)) == [("a", ["A"]), ("stuck", None), ("b", ["B"]), ("bad", None), ("c", ["C"]),
+                                    ("d", ["D"]), ("e", ["E"])]
+    out = []
+    with pytest.raises(TimeoutError):
+        for r in readings([("a", "a")] + [(f"stuck{i}", f"stuck{i}") for i in range(4)]):
+            out.append(r)
+    assert out == [("a", ["A"]), ("stuck0", None), ("stuck1", None), ("stuck2", None)]
+
+
+def test_index_goes_on_when_vision_stops_answering(lib, con, monkeypatch, capsys):
+    def stuck(jobs):
+        yield jobs[0][0], ["EXIT"]
+        raise TimeoutError
+    monkeypatch.setattr(text, "readings", stuck)
+    text.read_all(con)
+    assert con.execute("select count(*) from texts").fetchone()[0] == 1
+    assert "stopped answering" in capsys.readouterr().out
