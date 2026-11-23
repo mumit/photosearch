@@ -135,3 +135,29 @@ def test_the_library_is_read_again_only_when_photos_changes_it(lib, tmp_path, mo
     monkeypatch.setattr(store, "photos_db", lambda library: 1 / 0)  # no access to Photos: no gap, not an error
     os.utime(f, ns=(2, 2))
     assert store.library_uuids() is None and "photos" in store.coverage(store.db())
+
+
+def test_another_index_of_the_library_is_used_not_started_again(con, photos, tmp_path, monkeypatch, capsys):
+    """An installed copy beside a checkout: a first `index` says where the other index is instead of starting over."""
+    import json
+    from photosearch import config, store
+    ps, m = photos
+    m.proc.image_seq_length = 280
+    other = tmp_path / "other"; other.mkdir(); (other / "index.sqlite").write_text("")
+    config.REGISTRY.write_text(json.dumps({str(other): dict(library=str(config.DATA), items=17002, at="2026-11-11")}))
+    con.execute("delete from photos"); con.commit()  # this one is empty, of a library of just the three new photos
+    monkeypatch.setattr(index, "photos_db", lambda library=None: SimpleNamespace(library_path=str(config.DATA),
+                                                                                photos=lambda intrash=False: ps))
+    with pytest.raises(SystemExit, match="already an index of this library.*17,002 items"):
+        run()
+    run(here=True)  # asked to start one here anyway
+    assert con.execute("select count(*) from photos").fetchone()[0] > 0
+    assert str(config.DATA.resolve()) in json.loads(config.REGISTRY.read_text())  # and it's on the list now
+    assert store.other_indexes(str(config.DATA)) == [(str(other), 17002)]
+
+
+def test_one_index_at_a_time(con, photos):
+    from photosearch.shared import held
+    with held("index"):
+        with pytest.raises(SystemExit, match="another `photosearch index` is running"):
+            run()

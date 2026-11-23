@@ -24,8 +24,9 @@ import argparse, json, sys
 from pathlib import Path
 
 from . import embed
+from .config import DATA
 from .shared import held
-from .store import coverage, db, photos_db
+from .store import coverage, db, index_library, other_indexes, photos_db, register
 from .index import cmd_index, cmd_thumbs
 from .search import search, similar
 from .places import trips
@@ -88,8 +89,12 @@ def cmd_review(a):
 
 
 def cmd_status(a):
-    c = coverage(db())
-    print(f"{c['photos']:,} photos and {c['videos']:,} videos indexed")
+    con = db()
+    c = coverage(con)
+    register(con)  # so another copy on this Mac can find this index
+    print(f"{c['photos']:,} photos and {c['videos']:,} videos indexed, in {DATA}")
+    for folder, n in other_indexes(index_library()) if index_library() else []:
+        print(f"- another index of this library, of {n:,} items, is in {folder} (PHOTOSEARCH_DATA picks one)")
     for g in c["gaps"]:
         extra = ", ".join(f"{n:,} {k}" for k, n in g.get("why", {}).items()) or (f"{g['failed']:,} couldn't be read" if g.get("failed") else "")
         print(f"- {g['n']:,} {g['gap']}{f' ({extra})' if extra else ''}: {g['fix']}")
@@ -124,6 +129,8 @@ def main():
         p.add_argument("--kind", choices=["photo", "video"])
 
     p = sub.add_parser("index"); p.add_argument("--limit", type=int); p.add_argument("--library")
+    p.add_argument("--here", action="store_true", help="start an index in this data folder even if this Mac has another "
+                   "of the same library")
     p.add_argument("--batch", type=int, default=16)
     p.add_argument("--quick", action="store_true", help="a first index about 5x faster, at slightly lower quality; "
                    "a plain `index` later redoes it at full quality, newest first (stop it any time)")

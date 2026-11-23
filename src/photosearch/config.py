@@ -10,6 +10,9 @@ ROOT = CHECKOUT if (CHECKOUT / "pyproject.toml").exists() else APP_SUPPORT
 WEB = Path(__file__).resolve().parent / "web"  # the page and its scripts, re-read on every request
 DATA = Path(os.environ.get("PHOTOSEARCH_DATA") or ROOT / "data")
 DB = DATA / "index.sqlite"
+# Every photosearch on this Mac (a checkout, an installed copy) notes its data folder here, so one can say where
+# another already has an index of the same library. PHOTOSEARCH_REGISTRY moves it (the tests use it).
+REGISTRY = Path(os.environ.get("PHOTOSEARCH_REGISTRY") or APP_SUPPORT / "indexes.json")
 THUMBS = DATA / "thumbs"
 MODEL = "google/embeddinggemma-2"
 DIM = 768

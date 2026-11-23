@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
+from . import config
 from .config import DATA, DB, DIM, LIBRARY, THUMBS
 
 
@@ -124,6 +125,27 @@ def library_uuids():
         return _lib[1]
     except Exception:
         return None
+
+
+def register(con):
+    """Note this index in config.REGISTRY: its data folder, library and size. Every copy on this Mac reads it."""
+    from datetime import date
+    from .shared import updating
+    lib, n = index_library(), con.execute("select count(*) from photos").fetchone()[0]
+    if lib and n:
+        with updating(config.REGISTRY) as known:
+            known[str(DATA.resolve())] = dict(library=lib, items=n, at=date.today().isoformat())
+
+
+def other_indexes(library):
+    """[(data folder, items)] of this Mac's other indexes of `library` that are still there, biggest first."""
+    try:
+        known = json.loads(config.REGISTRY.read_text())
+    except (OSError, ValueError):
+        return []
+    same = lambda a, b: Path(a).resolve() == Path(b).resolve()
+    return sorted(((d, e["items"]) for d, e in known.items() if not same(d, DATA) and same(e.get("library", ""), library)
+                   and (Path(d) / "index.sqlite").exists()), key=lambda x: -x[1])
 
 
 def index_library():

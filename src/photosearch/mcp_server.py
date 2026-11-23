@@ -12,7 +12,7 @@ from typing import Literal, TypedDict
 from mcp.server.mcpserver import Context, Image, MCPServer
 from mcp.types import ToolAnnotations
 
-from . import evals, explore, images, photos_app, search, store, stories
+from . import config, evals, explore, images, photos_app, search, store, stories
 
 mcp = MCPServer("photosearch", instructions="""\
 Search the user's Apple Photos library by what's in the pictures.
@@ -104,7 +104,7 @@ def library_overview() -> dict:
     dates = sorted(r[1] for r in rows)
     return dict(indexed=len(rows), kinds=Counter(r[0] for r in rows), first=dates[0] if dates else None,
                 last=dates[-1] if dates else None, people=dict(people.most_common()), places=dict(places.most_common(40)),
-                coverage=store.coverage(con)["gaps"])
+                coverage=store.coverage(con)["gaps"], data_folder=str(config.DATA))
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True))

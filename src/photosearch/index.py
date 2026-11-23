@@ -8,7 +8,8 @@ import numpy as np
 from . import embed
 from .config import LARGE, MODEL, THUMBS, THUMB_PX
 from .dates import apply as apply_dates
-from .store import db, photos_db
+from .shared import held
+from .store import db, other_indexes, photos_db, register
 from .images import open_image
 from .text import read_all as read_text
 from .videos import embed_videos, forget as forget_video
@@ -86,6 +87,14 @@ N_META = len(META_COLS.split(","))
 
 
 def cmd_index(a):
+    try:
+        with held("index", wait=False):  # two at once would write the same rows
+            index(a)
+    except BlockingIOError:
+        sys.exit("another `photosearch index` is running on this data folder (perhaps `serve`'s); try again when it's done")
+
+
+def index(a):
     con = db()
     check_settings(con)
     THUMBS.mkdir(parents=True, exist_ok=True)
@@ -98,6 +107,11 @@ def cmd_index(a):
     if have and Path(have[0]).resolve() != Path(pdb.library_path).resolve():
         sys.exit(f"this index is of {have[0]}, not {pdb.library_path}; for another library, use another data folder "
                  "(PHOTOSEARCH_DATA=...)")
+    if not done and not getattr(a, "here", False) and (others := other_indexes(pdb.library_path)):
+        folder, n = others[0]
+        sys.exit(f"there's already an index of this library on this Mac, of {n:,} items, in {folder}.\n"
+                 f"To use it: export PHOTOSEARCH_DATA=\"{folder}\" (in your shell's profile, so every photosearch "
+                 f"command uses it).\nTo start another one here anyway: photosearch index --here")
     con.execute("insert or ignore into meta values('library', ?)", (str(pdb.library_path),)); con.commit()
     lib = {p.uuid: p for p in pdb.photos(intrash=False)}
     if lib:  # never prune against an empty read
@@ -127,6 +141,10 @@ def cmd_index(a):
         todo = todo[: a.limit]
     print(f"{len(done)} already indexed, {len(todo) - len(redo)} to go" + (f", {len(redo)} quick ones to redo" if redo else "") +
           f" (vision tokens: {QUICK_TOKENS if quick else embed.VISION_TOKENS})")
+    if not done and not quick and len(todo) > 1000:  # a first index: say what it takes, and the quicker way
+        print(f"a first index at full quality takes about {len(todo) / 2.1 / 3600:.1f} h on an M3 Pro; "
+              f"`photosearch index --quick` makes them searchable in about a quarter of that (stop this with ^C), "
+              f"and a later plain `index` redoes them at full quality, newest first", flush=True)
     m = embed.model()
     if quick:
         embed.set_vision_tokens(m, QUICK_TOKENS); shift = quick_shift()
@@ -169,6 +187,7 @@ def cmd_index(a):
         if len(batch) >= a.batch:
             flush()
     flush(); con.commit()
+    register(con)
     print(f"\ndone: {n} embedded, {skipped} skipped (no local preview / unreadable) in {(time.time()-t0)/60:.1f} min")
     if quick:
         embed.set_vision_tokens(m, embed.VISION_TOKENS)

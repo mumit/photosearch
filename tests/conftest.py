@@ -8,6 +8,7 @@ import pytest
 
 WORK = Path(tempfile.mkdtemp(prefix="photosearch-test-"))
 os.environ["PHOTOSEARCH_DATA"] = str(WORK / "data")  # before photosearch is imported: all its paths hang off this
+os.environ["PHOTOSEARCH_REGISTRY"] = str(WORK / "indexes.json")  # not the real list of indexes on this Mac
 
 
 class NoPhotosOrModel:

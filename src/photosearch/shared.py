@@ -10,11 +10,12 @@ from . import config
 
 
 @contextmanager
-def held(name):
-    """A lock on `name` across every photosearch process (and thread) using this data folder; waits for it."""
+def held(name, wait=True):
+    """A lock on `name` across every photosearch process (and thread) using this data folder; waits for it, or with
+    wait=False raises BlockingIOError if someone has it."""
     config.DATA.mkdir(parents=True, exist_ok=True)
     with open(config.DATA / f".{name}.lock", "a") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
+        fcntl.flock(f, fcntl.LOCK_EX if wait else fcntl.LOCK_EX | fcntl.LOCK_NB)
         try:
             yield
         finally:

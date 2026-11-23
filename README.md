@@ -491,6 +491,10 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 `data/` holds previews of your photos, so treat it as private. It's in `.gitignore` and never committed. In a
 checkout, `data/` and `.env` are at its top. Installed as a package, they're in `~/Library/Application
 Support/photosearch/` instead, so an upgrade never touches them. `PHOTOSEARCH_DATA` moves `data/` anywhere.
+`photosearch status` says which data folder it's using. Each copy on this Mac notes its index in
+`~/Library/Application Support/photosearch/indexes.json`, so if you have a checkout and an installed copy, a first
+`index` in one says where the other's index of the same library already is, instead of spending hours starting
+over (`--here` starts over anyway).
 
 To remove everything, with the package:
 
