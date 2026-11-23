@@ -348,6 +348,52 @@ the numbers above are without them.
 
 **Measure again** with a new Jev model, or before using it for more than the first 40.
 
+## Smart search without Jev (keyword rules and Laya)
+
+✨ smart search uses Jev in two ways, and only works with a TypeSafe key, so anyone installing from PyPI goes without:
+
+1. **Reading the search box** (`smartbox.py`): five questions about the words typed, each with a few fixed answers.
+   Photo, video or either; which season; which time period; does it want no people; does it want no selfies. Names
+   are found locally and replaced with "someone" first, and years are found with a pattern.
+2. **Checking the first results** (`checks.py`): the first 40 photos, described in words, are asked "is this
+   likely a good result?" all in one call, and the answer nudges their order (see Checking the first results with
+   Jev, above).
+
+**This stage is about the first only.** The second has too few labels to train anything on (640 photos, one judge),
+its gain is small, and a stand-in would have the same limit Jev has: it reads descriptions, not photos. Jev's
+answers are never used to train another model: TypeSafe's terms forbid it.
+
+**Measured** on 60 searches written and labelled for this, with names as "someone": 30 to pick each model's cut-offs
+and its confidence floor for choices, then 30 fresh ones, scored only. Five answers each, so 150 per half. Where two
+answers are fair ("last summer" in November is this year or last), either counts. The keyword rules were written
+before the searches. A year in the search counts as "a named year" for every method, as smart search does.
+
+| On the 30 fresh searches | Right of 150 | Kind | Season | When | No people | No selfies | A search |
+|---|---|---|---|---|---|---|---|
+| Keyword rules | **146** | 29 | 30 | 28 | 29 | 30 | under 1 ms |
+| Jev as shipped (0.6 / 0.7 / 0.85) | **146** | 29 | 30 | 30 | 28 | 29 | 106 ms, over the network |
+| Laya 0.5, classic encoder (ModernBERT-large), tuned | 141 | 30 | 26 | 28 | 28 | 29 | 122 ms on the GPU |
+| Laya 0.5, default engine (Qwen3.5-0.8B reader), tuned | 126 | 25 | 30 | 23 | 21 | 27 | 267 ms, 2.5 min to load |
+| Rules for the choices, classic Laya for yes/no | 144 | 29 | 30 | 28 | 28 | 29 | |
+
+- **The rules miss phrasings they have no pattern for:** "not a soul around", "pics from last christmas", "last
+  summer's camping trip", "photos only of…". **Jev's misses are scattered:** "recordings of someone singing" wasn't
+  a video, and "photos only of the northern lights" came back as no people and no selfies.
+- **Classic Laya missed seasons that were spelled out** ("winter hikes", "mountain lake, no people, autumn"). Laya's
+  makers call it a base to specialise, not a zero-shot engine, and that's what it measured as here. Its yes/no answers
+  added nothing to the rules'.
+
+**Caveat, and a big one:** the same author (Claude) wrote the rules, the searches and the labels. Rules written first
+still share the author's way of phrasing things, so 146 is likely the best they'll do. Real searches typed by someone
+else are the fair test, and haven't been tried.
+
+**Not tried yet:** `laya.Learner`, which learns from answers a person confirms, on the Mac and without fine-tuning.
+It's the way to improve Laya without Jev's answers, and needs a few hundred labelled searches.
+
+**Measure again** (`experiments/smart-search/`): `run_jev.py` and `run_laya.py classic|vega` save each model's
+answers to `data/eval/smart-search/` (git-ignored), and `score.py` scores them. Laya isn't a photosearch dependency:
+`run_laya.py` runs from its own environment with `pip install laya`.
+
 ## Search, negation and the search box
 
 - **Photos that match everything.** A CSLS-style penalty on every photo, using Apple's labels as a query bank, was
