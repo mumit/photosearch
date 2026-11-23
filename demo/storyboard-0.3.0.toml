@@ -1,0 +1,124 @@
+# What's new in 0.3.0, the web part: ✨ smart search reading filters out of the words, with no key, on the demo
+# library in presenter mode. Runs the released 0.3.0 from PyPI (whats-new-0.3.0.toml), which has no TypeSafe key, so
+# the keyword rules read the box, as they do for anyone who installs it. Captions say what the tool does, never more.
+schema_version = 1
+id = "photosearch-0.3.0-web"
+url = "http://127.0.0.1:18767/#home"
+size = "1280x720@1.5"
+theme = "dark"
+seed = 7
+
+[caption]
+position = "bottom"
+min_seconds = 1.5
+
+[cursor]
+typing = 20
+
+# Search once before recording, so the model's first answer (slow after a fresh start) isn't on camera
+[[setup]]
+type = "wait"
+target = {css = "#home #hero"}
+timeout = 60000
+[[setup]]
+type = "type"
+target = {css = "#q"}
+text = "a lake"
+[[setup]]
+type = "click"
+target = {css = "#gobtn"}
+[[setup]]
+type = "wait"
+target = {css = "#grid .tile[data-i='1'] img"}
+timeout = 60000
+[[setup]]
+type = "navigate"
+url = "http://127.0.0.1:18767/#home"
+[[setup]]
+type = "wait"
+target = {css = "#home #hero"}
+
+# 1. Smart search, now without a key
+[[beat]]
+id = "home"
+purpose = "Open on the home page with what's new"
+caption = "Smart search reads filters from your words"
+sub = "now for everyone · on your Mac, no key needed"
+hold = 2.0
+
+[[beat]]
+id = "type1"
+purpose = "A search with a season, a time and something to leave out"
+caption = "Smart search reads filters from your words"
+sub = "now for everyone · on your Mac, no key needed"
+hold = 0.4
+[[beat.action]]
+type = "type"
+target = {css = "#q"}
+text = "a foggy harbour this winter, no people"
+[[beat.expect]]
+type = "value"
+target = {css = "#q"}
+value = "a foggy harbour this winter, no people"
+
+[[beat]]
+id = "chips1"
+purpose = "The filters it read appear as amber chips, and the results follow them"
+caption = "It fills in the filters, shown in amber"
+sub = "winter · this year · without people"
+hold = 3.4
+[[beat.action]]
+type = "click"
+target = {css = "#gobtn"}
+[[beat.expect]]
+type = "text"
+target = {css = "#fchips"}
+contains = "winter"
+timeout = 30000
+[[beat.expect]]
+type = "text"
+target = {css = "#fchips"}
+contains = "people"
+[[beat.expect]]
+type = "visible"
+target = {css = "#grid .tile[data-i='1'] img"}
+timeout = 30000
+
+[[beat]]
+id = "type2"
+purpose = "A second search: last summer"
+caption = "“Last summer” means either of the last two"
+sub = "so a November search finds both"
+hold = 0.4
+[[beat.action]]
+type = "type"
+target = {css = "#q"}
+text = "tide pools last summer"
+[[beat.expect]]
+type = "value"
+target = {css = "#q"}
+value = "tide pools last summer"
+
+[[beat]]
+id = "chips2"
+purpose = "Summer, from June last year to August this year: tide pools from both summers"
+caption = "“Last summer” means either of the last two"
+sub = "so a November search finds both"
+hold = 3.4
+[[beat.action]]
+type = "click"
+target = {css = "#gobtn"}
+[[beat.expect]]
+type = "text"
+target = {css = "#fchips"}
+contains = "summer"
+timeout = 30000
+[[beat.expect]]
+type = "visible"
+target = {css = "#grid .tile[data-i='1'] img"}
+timeout = 30000
+
+[[beat]]
+id = "end"
+purpose = "Hold on the results before the cut"
+hold = 0.6

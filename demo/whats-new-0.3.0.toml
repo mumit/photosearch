@@ -1,0 +1,28 @@
+# What's new in photosearch 0.3.0: ✨ smart search without a key (a web take), and a 📖 photo book of a demo trip
+# (made by edit-0.3.0.py, from the same released version). Read README.md first: the demo library only. Unlike the
+# launch video, nothing here drives Photos, so it can run with any library open.
+schema_version = 1
+inputs = ["README.md", "edit-0.3.0.py"]
+timeout = 2400
+
+[app]
+# the released 0.3.0 from PyPI, in presenter mode on the demo index. Installed copies keep their .env in Application
+# Support, where there's none, so no Jev key: the keyword rules read the box, as for anyone who installs it.
+run = 'cd .. && PHOTOSEARCH_DATA=data-demo exec uvx --from photosearch==0.3.0 photosearch serve --demo --port 18767'
+url = "http://127.0.0.1:18767/"
+timeout = 300
+
+[[take]]
+web = "storyboard-0.3.0.toml"
+out = "takes/web-0.3.0.mp4"
+
+[edit]
+script = "edit-0.3.0.py"
+args = ["takes/web-0.3.0.mp4"]
+
+[check]
+sources = ["takes/web-0.3.0.assets.json", "takes/whats-new-0.3.0.mp4", "takes/smart-search.gif", "takes/photo-book.gif"]
+review = "review"
+scan = true
+full = true
+ocr = "vision"
