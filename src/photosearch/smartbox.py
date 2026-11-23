@@ -49,12 +49,15 @@ def ask_jev(text):
         return json.load(r)["answers"]
 
 
-# The keyword rules, as measured (experiments/smart-search/rules.py): change them only with a new set of fresh
-# searches to check them on, since the ones they were measured on have been seen.
+# The keyword rules (experiments/smart-search/ has the first version, as measured). Change them only with a new set of
+# fresh searches to check them on: the ones they were measured on have been seen.
+NOT = r"\b(no|not|without|minus|skip|but not|except)( the| any)? "
+
+
 def _kind(q):
-    if re.search(r"\b(only|just) (the )?(photos?|pictures?|pics?|stills?)\b|\bno (videos?|clips?)\b", q, re.I):
+    if re.search(r"\b(only|just) (the )?(photos?|pictures?|pics?|stills?)\b|\bphotos? only\b|" + NOT + r"(videos?|clips?|movies?)\b", q, re.I):
         return "photo"
-    if re.search(r"\b(only|just) (the )?(videos?|clips?)\b|\bno (photos?|pictures?|pics?)\b", q, re.I):
+    if re.search(r"\b(only|just) (the )?(videos?|clips?)\b|\bvideos? only\b|" + NOT + r"(photos?|pictures?|pics?)\b", q, re.I):
         return "video"
     q = re.sub(r"\bvideo ?games?\b|\bmovie (night|theat(er|re)|poster|tickets?)\b|\bat the movies\b", "", q, flags=re.I)
     if re.search(r"\b(videos?|vids?|clips?|footage|movies?|filmed|filming|recordings?|recorded)\b", q, re.I):
@@ -70,16 +73,20 @@ def _season(q):
     return "none"
 
 
-def _when(q):
-    if re.search(r"\bthis year\b", q, re.I):
+def _when(q, today):
+    if re.search(r"\bthis (year|spring|summer|fall|autumn|winter)\b", q, re.I):
         return "this year"
-    if re.search(r"\blast year\b|\ba year ago\b", q, re.I):
+    if re.search(r"\blast (year|yr)\b|\ba year ago\b", q, re.I):
         return "last year"
+    if m := re.search(r"\blast (spring|summer|fall|autumn|winter)\b", q, re.I):  # the latest one that's over
+        months = SEASONS["autumn" if m.group(1).lower() == "fall" else m.group(1).lower()]
+        return "this year" if today.month not in months and today.month > months[-1] else "last year"
     if re.search(r"\b(recent(ly)?|lately|latest|newest|this (month|week)|(last|past) (few |couple( of)? )?(days|weeks?|months?))\b",
                  q, re.I):
         return "recent"
     if re.search(r"\b(years ago|long ago|ages ago|back in the day|old (photos?|pictures?|pics?|videos?)|"
-                 r"when (the )?(kids|someone|we|i|they) (were|was) (little|young|small|tiny|babies|a baby|kids))\b", q, re.I):
+                 r"when (the )?(kids|someone|we|i|they|he|she) (were|was) (a )?(little|young|small|tiny|bab(y|ies)|toddlers?|kids?))\b",
+                 q, re.I):
         return "long ago"
     return "any"
 
@@ -95,10 +102,10 @@ def _no_selfies(q):
                           r"(the |any |my )?(selfies?|self[- ]portraits?)\b", q, re.I))
 
 
-def read_words(text):
+def read_words(text, today=None):
     """JEV_QUESTIONS answered by the keyword rules, in Jev's shape (choices are sure, yes/no is 1 or 0)."""
     choice = lambda c: dict(choice=c, confidence=1.0)
-    return dict(kind=choice(_kind(text)), season=choice(_season(text)), when=choice(_when(text)),
+    return dict(kind=choice(_kind(text)), season=choice(_season(text)), when=choice(_when(text, today or date.today())),
                 no_people=dict(noul=float(_no_people(text))), no_selfies=dict(noul=float(_no_selfies(text))))
 
 
@@ -127,7 +134,7 @@ def parse_query(con, text, today=None):
             a, by = ask_jev(masked), "jev"
         except Exception:  # offline, a bad key, a rate limit: the rules still read it
             pass
-    a = a or read_words(masked)
+    a = a or read_words(masked, today)
     pick = lambda k: a[k]["choice"] if a[k].get("confidence", 1) >= CHOICE_P else None
     f = dict(person=", ".join(found), kind="", after="", before="", season="", exclude="")
     if pick("kind") in ("photo", "video"):

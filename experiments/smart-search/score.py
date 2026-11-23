@@ -4,7 +4,9 @@ from pathlib import Path
 HERE = Path(__file__).parent
 D = HERE.parent.parent / "data" / "eval" / "smart-search"
 sys.path.insert(0, str(HERE))
-from queries import FRESH, TUNE, TEST
+from datetime import date
+from queries import FRESH, FRESH2, TUNE, TEST
+from photosearch.smartbox import read_words
 import rules
 DEFAULT = dict(kind="either", season="none", when="any")
 CH = ("kind", "season", "when")
@@ -16,6 +18,9 @@ def conf(m, a):
 def answers(m, q, gate, tnp, tns, abstain=False):
     if m == "rules":
         r = rules.answer(q)
+    elif m == "rules2":  # as fixed after FRESH, in smartbox.py; the searches were labelled on 2026-11-22
+        a = read_words(q, date(2026, 11, 22))
+        r = {k: a[k]["choice"] for k in CH} | {k: a[k]["noul"] > .5 for k in ("no_people", "no_selfies")}
     else:
         a = raw[m][q]["answers"]
         r = {k: (a[k]["choice"] if (not abstain or not a[k].get("abstain")) and conf(m, a[k]) >= gate else DEFAULT[k]) for k in CH}
@@ -47,8 +52,9 @@ for m in raw:
              for g in grid for a in grid[1:] for b in grid[1:] for ab in ((False, True) if m == "laya-vega" else (False,))]
     best[m] = max(cands, key=lambda c: (c[0], -abs(c[2] - .5) - abs(c[3] - .5)))
 rows = []
-add = lambda name, f: rows.append((name, score(TUNE, f), score(TEST, f), score(FRESH, f)))
+add = lambda name, f: rows.append((name, score(TUNE, f), score(TEST, f), score(FRESH, f), score(FRESH2, f)))
 add("keyword rules", lambda q: answers("rules", q, 0, 0, 0))
+add("keyword rules, fixed after FRESH (smartbox.py)", lambda q: answers("rules2", q, 0, 0, 0))
 add("Jev as shipped (0.6 / 0.7 / 0.85)", lambda q: answers("jev", q, .6, .7, .85))
 for m in raw:
     _, g, a, b, ab = best[m]
@@ -57,10 +63,10 @@ for m in raw:
 for m in ("laya-classic", "laya-vega"):
     _, g, a, b, ab = best[m]
     add(f"rules for choices + {m} yes/no", mix(lambda q: answers("rules", q, 0, 0, 0), lambda q, m=m, g=g, a=a, b=b, ab=ab: answers(m, q, g, a, b, ab)))
-print(f"{'':58} {'tune':>5} {'test':>5} {'FRESH':>6}   fresh: kind season when no-people no-selfies (each /40)")
-for name, t, s_, fr in rows:
-    print(f"{name:58} {total(t):>5} {total(s_):>5} {total(fr):>6}   {fr['kind']:>4} {fr['season']:>6} {fr['when']:>4} {fr['no_people']:>9} {fr['no_selfies']:>10}")
-print("(tune and test are out of 150, FRESH out of 200)")
+print(f"{'':58} {'tune':>5} {'test':>5} {'fresh':>6} {'FRESH2':>7}   fresh2: kind season when no-people no-selfies (each /37)")
+for name, t, s_, fr, f2 in rows:
+    print(f"{name:58} {total(t):>5} {total(s_):>5} {total(fr):>6} {total(f2):>7}   {f2['kind']:>4} {f2['season']:>6} {f2['when']:>4} {f2['no_people']:>9} {f2['no_selfies']:>10}")
+print("(tune and test are out of 150, fresh out of 200, FRESH2 out of 185)")
 
 def misses(f, rows_):
     out = []
@@ -71,7 +77,5 @@ def misses(f, rows_):
                 want = dict(zip(("kind", "season", "when", "no_people", "no_selfies"), row[1:]))[k]
                 out.append(f"{row[0]!r}: {k} = {r[k]} (wanted {want})")
     return out
-_, g, a, b, ab = best["laya-classic"]
-for name, f in (("rules", lambda q: answers("rules", q, 0, 0, 0)), ("jev", lambda q: answers("jev", q, .6, .7, .85)),
-                ("laya-classic", lambda q: answers("laya-classic", q, g, a, b, ab))):
-    print(f"\n{name} misses, FRESH:"); print("\n".join("  " + m for m in misses(f, FRESH)))
+for name, f in (("rules, fixed", lambda q: answers("rules2", q, 0, 0, 0)), ("jev", lambda q: answers("jev", q, .6, .7, .85))):
+    print(f"\n{name} misses, FRESH2:"); print("\n".join("  " + m for m in misses(f, FRESH2)))

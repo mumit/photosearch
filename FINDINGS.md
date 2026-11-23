@@ -407,11 +407,32 @@ The rules weren't changed after seeing them, and cut-offs stayed as picked on th
 - **Laya** missed seasons and "not the videos" too, and on one search turned every answer around.
 - Jev answered a few of the first 60 differently from the earlier run, so its tuned cut-offs moved slightly.
 
-**What's used** (`smartbox.py`): these rules, as measured, read the box without a key, or when Jev can't answer;
-with a key, Jev does. The checking of the first results stays with Jev.
+**The rules, fixed, on another 37** (`FRESH2`). The four misses were fixed ("last summer" is the latest summer
+that's over, "last yr", "when someone was a toddler", "not the videos"), with nothing else changed. Then new agents
+wrote and labelled 37 more searches the same way, asked this time for less obvious phrasings, and nobody saw them
+until they were scored (3 exact repeats of earlier searches were left out).
 
-**So:** reading the search box needs no model. Keyword rules come within 2 of 200 of Jev on searches their author
-never saw, in under a millisecond, with nothing leaving the Mac. Laya, untrained, is behind both.
+| On the 37 searches after the fix | Right of 185 | Kind | Season | When | No people | No selfies |
+|---|---|---|---|---|---|---|
+| Keyword rules, first version | 171 | 37 | 35 | 27 | 35 | 37 |
+| Keyword rules, fixed | 174 | 37 | 35 | 30 | 35 | 37 |
+| Jev as shipped | **175** | 35 | 36 | 35 | 36 | 33 |
+| Laya, classic encoder | 163 | 33 | 31 | 28 | 34 | 37 |
+
+- **The fix helped on searches it never saw** (171 to 174: "last winter", "last fall", "this summer").
+- **The rules miss mostly time:** "this yr", "summer before last", "a couple years back", "way back when we first moved
+  in", "the old minivan we used to have", "as a teenager", "spring break 22". Also "w/o ppl", "scenery only not us",
+  the typo "autum", and "the fall someone took off his bike" read as autumn (Jev did that too).
+- **Jev's misses are mostly yes/no it wasn't asked for:** no selfies on "no faces", "w/o ppl", "nobody in the shot"
+  and "scenery only", and no people on "mountains, no selfies". Those take photos away from a search, where the
+  rules' misses leave a filter out.
+
+**What's used** (`smartbox.py`): the fixed rules read the box without a key, or when Jev can't answer; with a key,
+Jev does. The checking of the first results stays with Jev.
+
+**So:** reading the search box needs no model. Keyword rules come within 1 or 2 of Jev on searches their author never
+saw (174 to 175 of 185, 196 to 198 of 200), in under a millisecond, with nothing leaving the Mac. Laya, untrained,
+is behind both. Fix the rules' misses only with another fresh set to check the fix on.
 
 **Not tried yet:** `laya.Learner`, which learns from answers a person confirms, on the Mac and without fine-tuning.
 It's the way to improve Laya without Jev's answers, and needs a few hundred labelled searches.
