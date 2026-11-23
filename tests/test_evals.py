@@ -112,6 +112,20 @@ def test_jevs_check_can_be_a_variant(tmp_path, monkeypatch):
     assert len(r["searches"]) == 2 and all(len(p["B"]) == evals.TOP for p in r["searches"])
 
 
+def test_smart_search_reading_the_box_can_be_a_variant(tmp_path):
+    f = tmp_path / "q.txt"; f.write_text("only photos of the beach\nsnow in winter 2021\nsnow in winter 2030\n")
+    r = run("box", "search=rules", a="search", queries=str(f))
+    beach, snow, none = r["searches"]
+    assert beach["filtersB"] == dict(kind="photo") and "filtersA" not in beach  # plain search reads nothing
+    assert snow["filtersB"] == dict(after="2021-01-01", before="2022-01-01", season="winter")
+    dates = dict(evals.db().execute("select uuid, date from photos"))
+    assert snow["B"] and all(dates[u][:4] == "2021" and dates[u][5:7] in ("12", "01", "02") for u in snow["B"])
+    assert none["B"] == [] and not none["first_same"]  # filters can match nothing
+    assert r["captions"] and evals.sheet("box", 1, judge="Sam")["captions"]  # judges see when, and what kind
+    with pytest.raises(SystemExit, match="needs Jev"):  # no key in the tests
+        run("boxjev", "search=jev", a="search=rules", queries=str(f))
+
+
 def test_a_sheet_is_blind_and_comes_in_order(tmp_path):
     run("blind", "dims=64", queries=two_searches(tmp_path))
     s = evals.sheet("blind", judge="Sam")

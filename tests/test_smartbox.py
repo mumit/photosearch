@@ -27,7 +27,7 @@ def test_without_a_key_the_rules_read_it(con, monkeypatch):
     ("christmas morning when someone was a toddler", "", "", dict(before="2021-11-22"), ""),
     ("winter skiing pics 2023 not the videos", "photo", "winter", dict(after="2023-01-01", before="2024-01-01"), ""),
     ("thanksgiving dinner last yr", "", "", dict(after="2025-01-01", before="2026-01-01"), ""),
-    ("videos of the kids at the beach last summer", "video", "summer", dict(after="2026-01-01"), ""),  # this year's
+    ("videos of the kids at the beach last summer", "video", "summer", dict(after="2025-06-01", before="2026-09-01"), ""),
 ])
 def test_what_the_rules_read(con, words, kind, season, when, exclude):
     f, _ = smartbox.parse_query(con, words, today=TODAY)
@@ -38,6 +38,18 @@ def test_last_summer_is_the_latest_one_thats_over():
     when = lambda words, day: smartbox.read_words(words, day)["when"]["choice"]
     assert when("last summer", date(2026, 11, 22)) == "this year" and when("last summer", date(2027, 4, 1)) == "last year"
     assert when("last winter", date(2026, 11, 22)) == "this year" and when("last winter", date(2027, 1, 15)) == "last year"
+
+
+def test_last_summer_means_either_of_the_last_two(con, monkeypatch):
+    """In November, "last summer" is this year's to some and last year's to others (and to Jev): both are searched."""
+    assert smartbox.last_two("summer", date(2026, 11, 22)) == ("2025-06-01", "2026-09-01")
+    assert smartbox.last_two("summer", date(2027, 7, 1)) == ("2025-06-01", "2026-09-01")  # this one isn't over
+    assert smartbox.last_two("winter", date(2026, 11, 22)) == ("2024-12-01", "2026-03-01")
+    assert smartbox.last_two("fall", date(2027, 3, 1)) == ("2025-09-01", "2026-12-01")
+    monkeypatch.setattr(smartbox, "jev_key", lambda: "test-key")
+    monkeypatch.setattr(smartbox, "ask_jev", lambda text: jev_answers(when="last year"))  # Jev's reading
+    f, by = smartbox.parse_query(con, "the snowy backyard last winter", today=TODAY)
+    assert by == "jev" and (f["after"], f["before"], f["season"]) == ("2024-12-01", "2026-03-01", "winter")
 
 
 def jev_answers(kind="either", season="none", when="any", no_people=0.0, no_selfies=0.0):

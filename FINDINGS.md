@@ -427,6 +427,33 @@ until they were scored (3 exact repeats of earlier searches were left out).
   and "scenery only", and no people on "mountains, no selfies". Those take photos away from a search, where the
   rules' misses leave a filter out.
 
+**What search then returns.** Getting the filters right is only worth it if the photos get better, so the 48 fresh
+searches that ask for something plain search ignores (a kind, a season, a time, no people, no selfies) were run over
+the whole library three ways: plain search, smart search with the fixed rules, and smart search with Jev (no check
+of the results, so only the reading of the box differs). Two `photosearch eval` runs, `box` (search against
+search=rules) and `box-jev` (search=rules against search=jev), with each photo's month and "video" on the sheets so a
+judge can see them, judged blind by a fresh agent each.
+
+| 48 searches | Top 5 that fit, of 240 (judged blind) | First 10 that meet what was asked, of 400 (from dates and kinds) |
+|---|---|---|
+| Plain search | 52 | 149 (37%) |
+| Smart search, rules | 81 (82 by the second judge) | 343 (86%) |
+| Smart search, Jev | 93 | 358 (90%) |
+
+- **Smart search is the big win:** half again as many fitting photos, and a better first photo on 6 searches, worse on
+  none. Plain search mostly showed the right things from the wrong year, or photos for "videos of…".
+- **Jev against the rules is close.** 10 of Jev's 11 extra fitting photos came from two searches: "last summer" and
+  "last winter", which Jev read as 2025 and the rules as the latest one that's over (2026). The labels allowed both;
+  that judge read them as 2025, and the other judge read "last winter" as the one just over. On the other 46, Jev
+  was 1 photo ahead.
+- The rest of Jev's lead in the second column is time phrases the rules don't know ("this yr", "a couple years back",
+  "way back when we first moved in"). Both found nothing for "camping trip in the summer of 2015, videos only" and
+  "christmas morning 2014": the filters were right, and the library has no such photos.
+- `experiments/smart-search/constraints.py` scores the second column; `eval_searches.txt` holds the 48.
+- **So "last summer" now means either** (`smartbox.last_two`): the latest summer that's over and the one before it,
+  whoever reads the box. On those two searches, the photos the judge found fitting in Jev's results are 3 of 5 and
+  5 of 5 of the new first five.
+
 **What's used** (`smartbox.py`): the fixed rules read the box without a key, or when Jev can't answer; with a key,
 Jev does. The checking of the first results stays with Jev.
 

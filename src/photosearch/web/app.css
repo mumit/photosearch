@@ -673,6 +673,7 @@ nav#tabs { view-transition-name:dock; }
                   color:#fff; font-size:12px; line-height:22px; text-align:center; white-space:nowrap; }
 #judge .jrow figure.fit .n { background:var(--good); color:#06130a; }
 #judge .jrow figure.fit .n::after { content:" ✓"; }
+#judge .jrow figure .cap { position:absolute; left:5px; bottom:5px; padding:1px 6px; border-radius:8px; background:rgba(0,0,0,.6); color:#fff; font-size:12px; }
 #judge .jrow .zoom { position:absolute; top:5px; right:5px; width:26px; height:26px; padding:0; border-radius:50%; border:0; background:rgba(0,0,0,.55); color:#fff; font-size:13px; }
 .jfirst { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:18px 0; }
 .jnav { display:flex; align-items:center; gap:10px; margin-top:8px; }

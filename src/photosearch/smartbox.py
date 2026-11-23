@@ -122,14 +122,26 @@ def mask(con, text):
     return found, masked
 
 
-def parse_query(con, text, today=None):
+def last_two(season, today):
+    """(after, before) for "last summer": in November that's this year's summer to some and last year's to others,
+    so both, the latest one that's over and the one before it. A winter runs from December into the next year."""
+    months = SEASONS["autumn" if season == "fall" else season]
+    y = today.year if today.month not in months and today.month > months[-1] else today.year - 1  # the latest ends in y
+    after = date(y - 2, 12, 1) if months[0] == 12 else date(y - 1, months[0], 1)
+    return after.isoformat(), date(y, months[-1] + 1, 1).isoformat()
+
+
+def parse_query(con, text, today=None, reader="auto"):
     """Turn "Sam at the beach last summer, no selfies" into search filters, and who read them ("jev" or "rules").
     Names and years are found locally; the rest is asked of Jev if there's a key, which only ever sees the text with
-    tagged names replaced by "someone", else of the keyword rules."""
+    tagged names replaced by "someone", else of the keyword rules. reader="rules" or "jev" picks one (for evals):
+    "jev" raises if Jev can't answer."""
     today = today or date.today()
     found, masked = mask(con, text)
     a, by = None, "rules"
-    if jev_key():
+    if reader == "jev":
+        a, by = ask_jev(masked), "jev"
+    elif reader == "auto" and jev_key():
         try:
             a, by = ask_jev(masked), "jev"
         except Exception:  # offline, a bad key, a rate limit: the rules still read it
@@ -142,9 +154,13 @@ def parse_query(con, text, today=None):
     if pick("season") in SEASONS:
         f["season"] = pick("season")
     year = re.search(r"\b(19[5-9]\d|20\d\d)\b", text)
+    last = re.search(r"\blast (spring|summer|fall|autumn|winter)\b", text, re.I)
     when = "a named year" if year else pick("when")
     y = int(year.group(1)) if year else {"this year": today.year, "last year": today.year - 1}.get(when)
-    if y:
+    if last and not year:  # either of the two readings, whoever read the words
+        f["after"], f["before"] = last_two(last.group(1).lower(), today)
+        f["season"] = f["season"] or ("autumn" if last.group(1).lower() == "fall" else last.group(1).lower())
+    elif y:
         f["after"], f["before"] = f"{y}-01-01", f"{y + 1}-01-01"
         if when == "this year":
             f["before"] = ""

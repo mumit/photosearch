@@ -10,6 +10,7 @@ order) for a person or an agent to judge. The report then says which variant's p
   photosearch eval run other index=data-other    another index of the same library
   photosearch eval run jev search=check --a search   how search ranks the whole library: with Jev's check (✨)...
   photosearch eval run hubs search --a search=nohub  ...or without the penalty for photos that match everything
+  photosearch eval run box search=rules --a search   ✨ smart search reading the box (keyword rules, or search=jev)
   photosearch eval score tokens70 7 --x 1,2,4 --y 1,3 --first x
   photosearch eval report tokens70
 
@@ -24,6 +25,7 @@ import numpy as np
 from . import embed
 from .config import DATA, THUMBS
 from .shared import held, write_json
+from .search import SEASONS as SEARCH_SEASONS
 from .store import db
 
 EVALS = DATA / "eval"
@@ -101,21 +103,34 @@ def variant(spec, rows, con, speed):
     sys.exit(f"don't know the variant {spec!r}: use index, index=PATH, tokens=N, dims=N, bits=1 or bits=8")
 
 
-SEARCH_RULES = ("", "nohub", "check")
+SEARCH_RULES = ("", "nohub", "check", "rules", "jev")
+SMART = ("search=rules", "search=jev")  # runs whose sheets show each photo's month and whether it's a video
 
 
 def searcher(spec, con):
     """For a search=... variant: query -> its first TOP uuids over the whole library, ranked as the app ranks them.
-    search: as it is; search=nohub: no penalty for photos that match everything; search=check: with Jev's check (✨)."""
+    search: as it is; search=nohub: no penalty for photos that match everything; search=check: with Jev's check (✨);
+    search=rules or search=jev: with the filters ✨ smart search reads out of the words (smartbox.py), by the keyword
+    rules or by Jev, and no check. The filters each search got are kept in top.filters."""
     from . import search as s
     from .checks import CHECK_N, check
+    from .smartbox import parse_query
     rule = spec.partition("=")[2]
     if rule not in SEARCH_RULES:
-        sys.exit(f"search variants: search, search=nohub, search=check")
+        sys.exit(f"search variants: search, search=nohub, search=check, search=rules, search=jev")
 
     def top(q):
         if rule == "nohub":
             res = s.rank(con, embed.embed_query(q), TOP, sounds=True)
+        elif rule in ("rules", "jev"):  # as the page searches once the box is read: the words, and the filters
+            try:
+                f, _ = parse_query(con, q, reader=rule)
+            except Exception as ex:
+                sys.exit(f"search=jev needs Jev: a TYPESAFE_API_KEY, and the network ({ex.__class__.__name__})")
+            top.filters[q] = {k: v for k, v in f.items() if v}
+            split = lambda v: [x.strip() for x in v.split(",") if x.strip()] or None
+            res = s.search(con, q, TOP, split(f["exclude"]), person=split(f["person"]), after=f["after"] or None,
+                           before=f["before"] or None, kind=f["kind"] or None, months=SEARCH_SEASONS.get(f["season"]))
         else:
             res = s.search(con, q, max(TOP, CHECK_N))
             if rule == "check":
@@ -123,12 +138,13 @@ def searcher(spec, con):
                 if not done:
                     sys.exit("search=check needs Jev: a TYPESAFE_API_KEY, and the network")
         return [r["uuid"] for r in res[:TOP]]
+    top.filters = {}
     return top
 
 
 def agreement_top(a, b):
-    """agreement() for two first pages, when only those are known."""
-    return dict(first_same=a[0] == b[0], a_first_rank_in_b=b.index(a[0]) + 1 if a[0] in b else TOP + 1,
+    """agreement() for two first pages, when only those are known. A page can be empty: filters can match nothing."""
+    return dict(first_same=a[:1] == b[:1], a_first_rank_in_b=b.index(a[0]) + 1 if a and a[0] in b else TOP + 1,
                 overlap10=len(set(a[:10]) & set(b[:10])), overlap24=len(set(a) & set(b)))
 
 
@@ -154,7 +170,8 @@ def run(name, b, a="index", n=2000, seed=7, k=5, queries=None, speed=0):
         sa, sb = searcher(a, con), searcher(b, con)
         for q in qs:
             ta, tb = sa(q), sb(q)
-            per.append(dict(q=q, A=ta, B=tb, x=rng.choice("AB"), **agreement_top(ta, tb)))
+            fs = {side: f[q] for side, f in (("filtersA", sa.filters), ("filtersB", sb.filters)) if q in f}
+            per.append(dict(q=q, A=ta, B=tb, x=rng.choice("AB"), **fs, **agreement_top(ta, tb)))
     else:
         rows = sample(con, n, seed)
         if not rows:
@@ -175,23 +192,33 @@ def run(name, b, a="index", n=2000, seed=7, k=5, queries=None, speed=0):
                               min=round(float(cos.min()), 4))
     out.mkdir(parents=True, exist_ok=True)
     meta = dict(con.execute("select key, value from meta"))
+    captions = a in SMART or b in SMART  # the filters are about when and what kind: judges need to see both
     (out / "run.json").write_text(json.dumps(dict(a=a, b=b, photos=len(rows), whole=all(whole), seed=seed, k=k, index=meta, notes={a: na, b: nb},
-                                                  summary=summary, searches=per), indent=1))
-    sheets(out, per, k)
+                                                  captions=captions, summary=summary, searches=per), indent=1))
+    sheets(out, per, k, con if captions else None)
     print(report(name))
 
 
-def sheets(out, per, k, cell=220):
-    """One JPEG per search: row X and row Y, each that variant's top k numbered 1..k. Which is which is in run.json."""
+def caption(info):
+    """Under a photo on a smart search sheet: its month, and whether it's a video."""
+    return (info["date"][:7] if info.get("date") else "no date") + (" · video" if info.get("kind") == "video" else "")
+
+
+def sheets(out, per, k, con=None, cell=220):
+    """One JPEG per search: row X and row Y, each that variant's top k numbered 1..k. Which is which is in run.json.
+    With con, each photo has its month and whether it's a video under it."""
     from PIL import Image, ImageDraw, ImageFont
+    from .store import photo_info
     d = out / "sheets"; d.mkdir(exist_ok=True)
     font, small = ImageFont.load_default(size=24), ImageFont.load_default(size=18)
+    below = 26 if con else 0
     for i, p in enumerate(per, 1):
-        sheet = Image.new("RGB", (50 + k * (cell + 6), 44 + 2 * (cell + 6)), "white")
+        info = photo_info(con, p["A"][:k] + p["B"][:k]) if con else {}
+        sheet = Image.new("RGB", (50 + k * (cell + 6), 44 + 2 * (cell + 6 + below)), "white")
         draw = ImageDraw.Draw(sheet)
         draw.text((8, 8), f"{i}. {p['q']}", fill="black", font=font)
         for r, row in enumerate("XY"):
-            y = 44 + r * (cell + 6)
+            y = 44 + r * (cell + 6 + below)
             draw.text((14, y + cell // 2 - 12), row, fill="black", font=font)
             side = p["x"] if row == "X" else "AB".replace(p["x"], "")
             for c, u in enumerate(p[side][:k]):
@@ -200,6 +227,8 @@ def sheets(out, per, k, cell=220):
                 sheet.paste(im, (x + (cell - im.width) // 2, y + (cell - im.height) // 2))
                 draw.rectangle((x, y, x + 26, y + 24), fill="black")
                 draw.text((x + 7, y + 2), str(c + 1), fill="white", font=small)
+                if con:
+                    draw.text((x + 4, y + cell + 4), caption(info.get(u, {})), fill="black", font=small)
         sheet.save(d / f"{i:02d}.jpg", quality=80)
 
 
@@ -284,7 +313,7 @@ def sheet(name, n=None, judge=""):
     if not 1 <= n <= len(per):
         raise LookupError(f"sheets go from 1 to {len(per)}")
     p, r = per[n - 1], rows(per[n - 1], k)
-    return dict(name=name, n=n, total=len(per), k=k, q=p["q"], x=r["x"], y=r["y"],
+    return dict(name=name, n=n, total=len(per), k=k, q=p["q"], x=r["x"], y=r["y"], captions=run_.get("captions", False),
                 verdict=mine.get(str(n)), left=sum(str(i) not in mine for i in range(1, len(per) + 1)))
 
 

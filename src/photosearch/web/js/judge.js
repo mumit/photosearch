@@ -45,7 +45,8 @@ async function judgeSheet(name, n) {
   JG.sheet = s; JG.x = new Set(s.verdict?.x || []); JG.y = new Set(s.verdict?.y || []); JG.first = s.verdict?.first || "same";
   const row = (r, ps) => `<div class="jrow" style="--k:${s.k}" data-r="${r}"><b>${r.toUpperCase()}</b>${ps.map((p, i) =>
     `<figure data-i="${i + 1}" class="${JG[r].has(i + 1) ? "fit" : ""}">${p.gone ? "" : `<img src="/thumb/${p.uuid}.jpg" alt="">`}
-      <span class="n">${i + 1}</span>${p.gone ? "" : `<button class="zoom" data-a="zoom" title="see it big">⤢</button>`}</figure>`).join("")}</div>`;
+      <span class="n">${i + 1}</span>${p.gone ? "" : `<button class="zoom" data-a="zoom" title="see it big">⤢</button>`}${s.captions && !p.gone
+      ? `<span class="cap">${p.date ? p.date.slice(0, 7) : "no date"}${p.kind === "video" ? " · 🎞" : ""}</span>` : ""}</figure>`).join("")}</div>`;
   $("jroot").innerHTML = judgeHead(name) + `<p class="status">Search ${s.n} of ${s.total} · ${s.left} left to judge</p>
     <div class="jq">“${esc(s.q)}”</div>
     <p class="status">Tap every photo that fits the search.</p>
