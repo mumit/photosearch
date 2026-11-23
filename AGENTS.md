@@ -20,7 +20,7 @@ Read this before working on photosearch. [README.md](README.md) covers what the 
 | `src/photosearch/evals.py` | `photosearch eval`: measures a change to the index (vision tokens, shorter or compressed vectors) or to how search ranks (`search=...`), judged blind (Play → Judge a Test, MCP, or the terminal). Use it for any experiment with the model. |
 | `src/photosearch/web/` | The page: `index.html`, `app.css`, `js/*.js`. Re-read on every request, so no build step. |
 | `FINDINGS.md` | What experiments found and how each setting was chosen. Add a section for each new one. |
-| `tests/` | pytest, on a made-up library with a fake model. |
+| `tests/` | pytest, on a made-up library with a fake model. GitHub runs the fast ones on every push to main and every pull request (`.github/workflows/tests.yml`). |
 | `demo/` | The launch video as a [reshoot](https://github.com/mumit/reshoot) project: `reshoot run reshoot.toml`, then `sh finish.sh RUN` for the Photos window. Its README is the step-by-step guide. |
 | `data/` | My index, thumbnails and logs. Git-ignored and personal. |
 | `data-demo/` | The demo library's index and launch takes. Git-ignored. |

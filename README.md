@@ -1,5 +1,7 @@
 # photosearch
 
+[![tests](https://github.com/mumit/photosearch/actions/workflows/tests.yml/badge.svg)](https://github.com/mumit/photosearch/actions/workflows/tests.yml)
+
 Search your Apple Photos library by describing what's in a picture ("kids on a red slide at sunset"),
 or find photos that look like one you pick. Everything runs on your Mac using Google's open
 [EmbeddingGemma 2](https://huggingface.co/google/embeddinggemma-2) model. No photos leave the machine.

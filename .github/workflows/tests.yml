@@ -1,0 +1,18 @@
+# The fast tests on every push to main and every pull request. They use a made-up library and a fake model, so
+# nothing here reads a Photos library or downloads the real model. The headless-Chrome tours (-m browser) stay local.
+name: tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  tests:
+    runs-on: macos-15  # pyobjc and Apple's frameworks: the app only runs on a Mac
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run --frozen pytest -q
