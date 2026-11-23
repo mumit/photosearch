@@ -129,6 +129,8 @@ def main():
         p.add_argument("--kind", choices=["photo", "video"])
 
     p = sub.add_parser("index"); p.add_argument("--limit", type=int); p.add_argument("--library")
+    p.add_argument("--only-new", action="store_true", help="only photos new to the index, not quick ones to redo "
+                   "(what `serve` runs)")
     p.add_argument("--here", action="store_true", help="start an index in this data folder even if this Mac has another "
                    "of the same library")
     p.add_argument("--batch", type=int, default=16)
@@ -148,6 +150,7 @@ def main():
     p.add_argument("--new-passcode", action="store_true", help="with --lan: a new passcode, and every device signs in again")
     p.add_argument("--demo", action="store_true", help="presenter mode, for recording: only a demo's index (PHOTOSEARCH_DATA), "
                    "nothing about this Mac or how phones get in")
+    p.add_argument("--no-index", action="store_true", help="don't index new photos from Photos while serving")
     p.set_defaults(fn=cmd_serve)
     p = sub.add_parser("demo-check", help="before showing a demo (PHOTOSEARCH_DATA): nothing in it from your own library")
     p.add_argument("real", help="your own library's data folder, e.g. data"); p.set_defaults(fn=cmd_demo_check)

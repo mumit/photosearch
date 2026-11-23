@@ -149,7 +149,7 @@ like any other run. Search keeps working throughout: photos still waiting are ad
 redone ones (see [FINDINGS.md](FINDINGS.md)). Videos' sound and frames wait for the plain run.
 
 - Indexing is **incremental**: you can stop it (Ctrl-C) and re-run it later, and it continues where it left off.
-  Run it again any time to add new photos.
+  Run it again any time to add new photos, or leave `serve` running: it adds them by itself (see below).
 - Newest photos are indexed first. Each run also refreshes people, albums and places, and drops photos you've deleted.
 - Each run also reads the words in new photos (signs, receipts, documents) with the Mac's own text reader, about 20
   photos a second, so a search can ask for words in quotes. The first run on an older index reads every photo once
@@ -200,6 +200,11 @@ uv run photosearch serve
 ```
 
 Open **http://localhost:8765**. It works while `index` is still running, and picks up new photos as they're added.
+While it runs, it also looks for photos new in Photos (a minute after it starts, then every 15 minutes) and indexes
+them in the background, at low priority, so they're in searches without running `index`; it prints a line when it
+does, and the details go to `data/index.log`. New videos' sound and frames, and redoing a `--quick` index at full
+quality, still wait for a plain `photosearch index`. `serve --no-index` turns this off. It stops when `serve` does:
+nothing runs in the background otherwise.
 Stop the server with Ctrl-C; it runs only while that terminal window is open.
 
 One search box at the top works everywhere (press **/** or **⌘K** to jump to it). As you type, it suggests the
@@ -571,6 +576,7 @@ thing, and they only import downwards in this list:
 | `embed.py` | The search model |
 | `images.py` | Reading photos, writing JPEGs, contact sheets |
 | `index.py` | `photosearch index` (and its `--quick` first pass) and `thumbs` |
+| `watch.py` | While `serve` runs, new photos in Photos are indexed by themselves |
 | `videos.py` | `photosearch videos`: each video's sound and frames, and its best moment for a search |
 | `text.py` | `photosearch text`: the words in photos, read by Apple's Vision, for searches in "quotes" |
 | `search.py` | Search, look-alikes, filters, how interesting a photo looks |

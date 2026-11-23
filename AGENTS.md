@@ -39,7 +39,7 @@ PHOTOSEARCH_DATA=data-demo uv run photosearch serve --demo --port 8766   # prese
 ## Pitfalls
 
 - **Photos and AppleScript hang when called from a worker thread** (the MCP server, the web server). Run them in a subprocess: `make_album` calls `photosearch add-to-album`, and full-size fetches call `photosearch fetch`. A regression once made `make_album` hang for 120 s.
-- **Tests must not start Photos-touching subprocesses.** The subprocess escapes the tests' fakes and reaches the real library.
+- **Tests must not start Photos-touching subprocesses.** The subprocess escapes the tests' fakes and reaches the real library. `serve` starts `photosearch index` for new photos (`watch.py`): the tests replace `watch.start`, and start servers with `make_server`, not `cmd_serve`.
 - **Two scripts driving Photos at once can stall it** until it's force-quit. `add_to_photos_album` (and `album` from the terminal) hold the `photos-app` lock and PhotoKit
   work holds `photokit` (`shared.held`), across processes; anything new that drives Photos should too. Take a lock
   before starting a time limit, in the parent, as `fetch_in_subprocess` does: waiting for it isn't the child's time.

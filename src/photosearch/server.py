@@ -91,7 +91,11 @@ class Checked(list):
 
 
 def cmd_serve(a):
-    make_server(a).serve_forever()
+    httpd = make_server(a)
+    if not a.demo and not getattr(a, "no_index", False):  # new photos join searches by themselves (watch.py)
+        from . import watch
+        watch.start(lambda m: print(f"new photos: {m}", flush=True))
+    httpd.serve_forever()
 
 
 def make_server(a):

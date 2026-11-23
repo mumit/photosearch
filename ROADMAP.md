@@ -20,12 +20,12 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 **Fun:**
 - **Photo book:** a story exported as a print-ready PDF.
 
-**For people who find the repo:**
-- CI on GitHub Actions (the tests already use a fake model).
-- `serve` indexes new photos while it runs, instead of a nightly job (no background services).
-
 ## Done
 
+- ✨ smart search without a key: keyword rules read the search box on the Mac when there's no Jev key, close to Jev on searches they never saw (FINDINGS.md); `photosearch eval` compares them (`search=rules`, `search=jev`).
+- `serve` indexes new photos while it runs (`watch.py`): it looks a minute after starting and every 15 minutes, and indexes what's new in its own low-priority process, so new photos are in searches without running `index`.
+- CI on GitHub Actions: the fast tests on every push to main and pull request (`.github/workflows/tests.yml`).
+- First run: `status` says which data folder is used, and copies on one Mac note their indexes (`indexes.json`), so a first `index` points to an existing index of the same library instead of starting over. A first full index says how long it takes and suggests `--quick`.
 - A one-command install: `uv tool install photosearch`, from PyPI (0.1.0 on Oct 29), and `photosearch update` for new releases. An installed copy keeps its index in `~/Library/Application Support/photosearch/`.
 - Use as portrait: 👤 Portrait in the big photo view (on the Mac) makes a photo someone's portrait everywhere. Every portrait, picked or chosen, is now cropped around that person's face, from where Photos says it is (`index` reads it; `people.py`).
 - Judge a test: Play → Judge a Test shows an experiment's blind sheets on any device, one search at a time, each judge under their own name, with the results once every search is judged and how often two judges agree. Claude judges through MCP (`eval_sheet`, `score_eval_sheet`). `photosearch eval` also compares rules for ranking over the whole library (`search`, `search=nohub`, `search=check`).

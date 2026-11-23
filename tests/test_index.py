@@ -161,3 +161,12 @@ def test_one_index_at_a_time(con, photos):
     with held("index"):
         with pytest.raises(SystemExit, match="another `photosearch index` is running"):
             run()
+
+
+def test_only_new_leaves_quick_photos_for_a_plain_index(con, photos):
+    ps, m = photos
+    run(quick=True)
+    ps.append(SimpleNamespace(**dict(vars(ps[0]), uuid="NEW-3")))  # a photo taken since
+    run(only_new=True)
+    quick = dict(con.execute("select uuid, quick from photos where uuid like 'NEW-%'"))
+    assert quick["NEW-3"] is None and all(quick[f"NEW-{i}"] for i in range(3))  # the quick ones wait

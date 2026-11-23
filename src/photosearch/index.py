@@ -134,7 +134,7 @@ def index(a):
     quick = getattr(a, "quick", False)
     if quick and embed.VISION_TOKENS != 280:
         sys.exit("--quick is for an index at the default 280 vision tokens")
-    redo = [] if quick or embed.VISION_TOKENS != 280 else \
+    redo = [] if quick or getattr(a, "only_new", False) or embed.VISION_TOKENS != 280 else \
         sorted((lib[u] for (u,) in con.execute("select uuid from photos where quick") if u in lib), key=lambda p: p.date, reverse=True)
     todo += redo
     if a.limit:

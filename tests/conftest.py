@@ -23,7 +23,7 @@ class NoPhotosOrModel:
 
 sys.meta_path.insert(0, NoPhotosOrModel())
 
-from photosearch import clutter, config, dupes, embed, people, recreate, search, smartbox, store, text, thennow, videos  # noqa: E402
+from photosearch import clutter, config, dupes, embed, people, recreate, search, smartbox, store, text, thennow, videos, watch  # noqa: E402
 from photosearch import photos_app as photos  # noqa: E402  (the fixture below is called photos_app)
 import library  # noqa: E402
 
@@ -74,6 +74,7 @@ def offline():
         mp.setattr(photos, "fetch_in_subprocess", lambda con, uuids, wait=True: [])
         mp.setattr(smartbox, "jev_key", lambda: None)
         mp.setattr(text, "read", lambda path: [])  # Apple's Vision: tests say what's written instead
+        mp.setattr(watch, "start", lambda log=print: None)  # it would start `photosearch index` on the real library
         mp.setattr(text, "readings", lambda jobs: ((u, text.read(f)) for u, f in jobs))  # in this process
         yield
 
