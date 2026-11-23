@@ -383,9 +383,31 @@ before the searches. A year in the search counts as "a named year" for every met
   makers call it a base to specialise, not a zero-shot engine, and that's what it measured as here. Its yes/no answers
   added nothing to the rules'.
 
-**Caveat, and a big one:** the same author (Claude) wrote the rules, the searches and the labels. Rules written first
-still share the author's way of phrasing things, so 146 is likely the best they'll do. Real searches typed by someone
-else are the fair test, and haven't been tried.
+**Caveat:** the same author (Claude) wrote the rules, the searches and the labels above. Rules written first still
+share the author's way of phrasing things.
+
+**So 40 more searches** (`FRESH`) were written by a separate agent that never saw the rules, the other searches or
+this work, told only to write what people really type for a family library (a third with nothing to read, the
+rest phrased every which way, with tricky cases). Another agent labelled them from the question definitions alone.
+The rules weren't changed after seeing them, and cut-offs stayed as picked on the first 30.
+
+| On the 40 fresh searches | Right of 200 | Kind | Season | When | No people | No selfies |
+|---|---|---|---|---|---|---|
+| Keyword rules | 196 | 39 | 40 | 37 | 40 | 40 |
+| Jev as shipped | **198** | 39 | 39 | 40 | 40 | 40 |
+| Laya, classic encoder | 186 | 37 | 37 | 36 | 37 | 39 |
+| Laya, default engine | 169 | 33 | 38 | 31 | 29 | 38 |
+
+- **The rules' four misses:** "last summer" and "last yr" (no time read), "when someone was a toddler" (not read as
+  long ago), and "winter skiing pics 2023 **not the videos**", read as wanting videos. They'd be easy to add, but
+  only with another set of fresh searches to check them on.
+- **Jev's two:** "snowy mountains no people" as winter, which the labeller called no season (a fair call either way),
+  and "selfies with someone at the concert" as photos only.
+- **Laya** missed seasons and "not the videos" too, and on one search turned every answer around.
+- Jev answered a few of the first 60 differently from the earlier run, so its tuned cut-offs moved slightly.
+
+**So:** reading the search box needs no model. Keyword rules come within 2 of 200 of Jev on searches their author
+never saw, in under a millisecond, with nothing leaving the Mac. Laya, untrained, is behind both.
 
 **Not tried yet:** `laya.Learner`, which learns from answers a person confirms, on the Mac and without fine-tuning.
 It's the way to improve Laya without Jev's answers, and needs a few hundred labelled searches.

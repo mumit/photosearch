@@ -4,7 +4,7 @@ from pathlib import Path
 HERE = Path(__file__).parent
 D = HERE.parent.parent / "data" / "eval" / "smart-search"
 sys.path.insert(0, str(HERE))
-from queries import TUNE, TEST
+from queries import FRESH, TUNE, TEST
 import rules
 DEFAULT = dict(kind="either", season="none", when="any")
 CH = ("kind", "season", "when")
@@ -47,7 +47,7 @@ for m in raw:
              for g in grid for a in grid[1:] for b in grid[1:] for ab in ((False, True) if m == "laya-vega" else (False,))]
     best[m] = max(cands, key=lambda c: (c[0], -abs(c[2] - .5) - abs(c[3] - .5)))
 rows = []
-add = lambda name, f: rows.append((name, score(TUNE, f), score(TEST, f)))
+add = lambda name, f: rows.append((name, score(TUNE, f), score(TEST, f), score(FRESH, f)))
 add("keyword rules", lambda q: answers("rules", q, 0, 0, 0))
 add("Jev as shipped (0.6 / 0.7 / 0.85)", lambda q: answers("jev", q, .6, .7, .85))
 for m in raw:
@@ -57,9 +57,10 @@ for m in raw:
 for m in ("laya-classic", "laya-vega"):
     _, g, a, b, ab = best[m]
     add(f"rules for choices + {m} yes/no", mix(lambda q: answers("rules", q, 0, 0, 0), lambda q, m=m, g=g, a=a, b=b, ab=ab: answers(m, q, g, a, b, ab)))
-print(f"{'':58} {'tune /150':>9} {'TEST /150':>9}   test: kind season when no-people no-selfies (each /30)")
-for name, t, s in rows:
-    print(f"{name:58} {total(t):>9} {total(s):>9}   {s['kind']:>4} {s['season']:>6} {s['when']:>4} {s['no_people']:>9} {s['no_selfies']:>10}")
+print(f"{'':58} {'tune':>5} {'test':>5} {'FRESH':>6}   fresh: kind season when no-people no-selfies (each /40)")
+for name, t, s_, fr in rows:
+    print(f"{name:58} {total(t):>5} {total(s_):>5} {total(fr):>6}   {fr['kind']:>4} {fr['season']:>6} {fr['when']:>4} {fr['no_people']:>9} {fr['no_selfies']:>10}")
+print("(tune and test are out of 150, FRESH out of 200)")
 
 def misses(f, rows_):
     out = []
@@ -73,5 +74,4 @@ def misses(f, rows_):
 _, g, a, b, ab = best["laya-classic"]
 for name, f in (("rules", lambda q: answers("rules", q, 0, 0, 0)), ("jev", lambda q: answers("jev", q, .6, .7, .85)),
                 ("laya-classic", lambda q: answers("laya-classic", q, g, a, b, ab))):
-    print(f"\n{name} misses, TEST:"); print("\n".join("  " + m for m in misses(f, TEST)))
-print("\nrules misses, TUNE:"); print("\n".join("  " + m for m in misses(lambda q: answers("rules", q, 0, 0, 0), TUNE)))
+    print(f"\n{name} misses, FRESH:"); print("\n".join("  " + m for m in misses(f, FRESH)))

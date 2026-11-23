@@ -1,6 +1,8 @@
 """Labelled searches for the smart search box, as typed (tagged names already replaced by "someone").
 (search, kind, season, when, no people?, no selfies?); "a|b" means either answer is right. Today is 2026-11-22.
-TUNE picks each model's yes/no cut-offs; TEST is only scored."""
+TUNE picks each model's yes/no cut-offs; TEST is only scored. FRESH was written by a separate agent that never saw
+the rules or the other searches, and labelled by another from the question definitions alone (the rules stayed as
+they were)."""
 TUNE = [
     ("someone at the beach last summer, no selfies", "either", "summer", "last year|this year|recent", 0, 1),
     ("videos of the dog playing in the snow", "video", "none|winter", "any", 0, 0),
@@ -64,4 +66,46 @@ TEST = [
     ("the kitchen renovation in the past couple of months", "either", "none", "recent", 0, 0),
     ("a rainy day", "either", "none", "any", 0, 0),
     ("someone's graduation in 2015", "either", "none", "a named year", 0, 0),
+]
+FRESH = [
+    ('dog asleep on the couch', 'either', 'none', 'any', 0, 0),
+    ('someone blowing out birthday candles', 'either', 'none', 'any', 0, 0),
+    ('sunset over the lake', 'either', 'none', 'any', 0, 0),
+    ('the red canoe', 'either', 'none', 'any', 0, 0),
+    ("grandma's kitchen", 'either', 'none', 'any', 0, 0),
+    ('kids building a sandcastle', 'either', 'none', 'any', 0, 0),
+    ('fireworks', 'either', 'none', 'any', 0, 0),
+    ('someone and someone hugging at the airport', 'either', 'none', 'any', 0, 0),
+    ('pancakes shaped like mickey mouse', 'either', 'none', 'any', 0, 0),
+    ('waterfall hike', 'either', 'none', 'any', 0, 0),
+    ('our old blue minivan', 'either', 'none', 'any|long ago', 0, 0),
+    ('christmas tree with presents underneath', 'either', 'none|winter', 'any', 0, 0),
+    ('cat in a cardboard box', 'either', 'none', 'any', 0, 0),
+    ('videos of the kids at the beach last summer', 'video', 'summer', 'this year|last year', 0, 0),
+    ('snowy mountains no people', 'either', 'none', 'any', 1, 0),
+    ('show me photos of fall leaves from 2019', 'either|photo', 'autumn', 'a named year', 0, 0),
+    ('fall colours on the trail, just scenery, nobody in it', 'either', 'autumn', 'any', 1, 0),
+    ('that video where someone fell off the trampoline', 'video', 'none', 'any', 0, 0),
+    ("someone's first steps vid", 'video', 'none', 'any|long ago', 0, 0),
+    ('find that one where the dog is chasing the waves, i think it was spring 2021', 'either', 'spring', 'a named year', 0, 0),
+    ('recent pics of the garden', 'either|photo', 'none', 'recent', 0, 0),
+    ('pictures from a long time ago when the kids were babies', 'either|photo', 'none', 'long ago', 0, 0),
+    ('halloween costumes this year', 'either', 'none|autumn', 'this year', 0, 0),
+    ('thanksgiving dinner last yr', 'either', 'none|autumn', 'last year', 0, 0),
+    ('selfies with someone at the concert', 'either', 'none', 'any', 0, 0),
+    ('group photo at the wedding but not selfies please', 'either|photo', 'none', 'any', 0, 1),
+    ('beach sunset, no selfies, no people, just the view', 'either', 'none', 'any', 1, 1),
+    ('movie night with popcorn', 'either', 'none', 'any', 0, 0),
+    ("someone's spring recital", 'either', 'spring', 'any', 0, 0),
+    ("old photos of someone's house before the renovation", 'either|photo', 'none', 'long ago', 0, 0),
+    ('the shot of the eiffel tower at night', 'either|photo', 'none', 'any', 0, 0),
+    ('camping trip in the summer of 2015, videos only', 'video', 'summer', 'a named year', 0, 0),
+    ('someone in a high chair covered in spaghetti', 'either', 'none', 'any', 0, 0),
+    ('first day of kindergarten', 'either', 'none', 'any', 0, 0),
+    ('empty beaches from our hawaii trip', 'either', 'none', 'any', 1, 0),
+    ('clips of someone playing guitar from the past few months', 'video', 'none', 'recent', 0, 0),
+    ('winter skiing pics 2023 not the videos', 'photo', 'winter', 'a named year', 0, 0),
+    ('show me some recent movies of the puppy', 'video', 'none', 'recent', 0, 0),
+    ('christmas morning when someone was a toddler', 'either', 'none|winter', 'long ago', 0, 0),
+    ('landscape photos from iceland without anybody in them, taken ages ago, and skip the selfies', 'either|photo', 'none', 'long ago', 1, 1),
 ]
