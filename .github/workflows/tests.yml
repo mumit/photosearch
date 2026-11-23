@@ -14,5 +14,6 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
+          python-version: "3.12"  # as developed on; torch has no build for the runner's own 3.15 yet
       - run: uv sync --frozen
       - run: uv run --frozen pytest -q
