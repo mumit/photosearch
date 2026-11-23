@@ -17,11 +17,9 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 **Experiments with the model** (measure each with `photosearch eval`):
 - **Learn from ✕ and ☆:** train a small adjustment applied to every search from smart-album feedback.
 
-**Fun:**
-- **Photo book:** a story exported as a print-ready PDF.
-
 ## Done
 
+- Photo book: 📖 on a story, or `photosearch book`, makes a print-ready PDF (`book.py`): 300 dpi, A4 or Letter landscape, a cover, chapters opening on their first photo and the rest two to a page, photos fitted not cropped, soft photos listed, an optional bleed.
 - ✨ smart search without a key: keyword rules read the search box on the Mac when there's no Jev key, close to Jev on searches they never saw (FINDINGS.md); `photosearch eval` compares them (`search=rules`, `search=jev`).
 - `serve` indexes new photos while it runs (`watch.py`): it looks a minute after starting and every 15 minutes, and indexes what's new in its own low-priority process, so new photos are in searches without running `index`.
 - CI on GitHub Actions: the fast tests on every push to main and pull request (`.github/workflows/tests.yml`).

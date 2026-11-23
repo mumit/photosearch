@@ -255,3 +255,9 @@ def test_portraits_from_the_page(srv, lib, con):
     assert status == 200 and crop != body and crop[:2] == b"\xff\xd8"
     for bad in ("/face/../index.sqlite", "/face/NOPE.jpg?who=Sam"):
         assert srv.get(bad)[0] == 404
+
+
+def test_a_story_as_a_photo_book(srv):
+    status, h, body = srv.get("/book/2025.pdf")
+    assert status == 200 and h["content-type"] == "application/pdf" and body.startswith(b"%PDF")
+    assert 'filename="photo-book-2025.pdf"' in h["content-disposition"]

@@ -16,7 +16,7 @@ function poster(x, acts = false) {
   return `<a class="poster ${x.kind === "year" ? "year" : ""}" href="/review/${x.id}" target="_blank" title="${x.made_by ? "play" : "make & play"}">
     ${x.cover ? `<img loading="lazy" src="/thumb/${x.cover}.jpg" alt="">` : ""}
     ${by && x.kind === "trip" ? `<span class="by">${by}${x.edited ? ", edited" : ""}</span>` : ""}
-    ${acts ? `<span class="pacts">${x.made_by ? `<span data-go="/review/${x.id}?download=1" title="download, to send to family">⤓</span>` : ""}<span data-go="#edit/${x.id}" title="edit">✎</span></span>` : ""}
+    ${acts ? `<span class="pacts">${x.made_by ? `<span data-go="/review/${x.id}?download=1" title="download, to send to family">⤓</span><span data-go="/book/${x.id}.pdf" title="a photo book to print (PDF)">📖</span>` : ""}<span data-go="#edit/${x.id}" title="edit">✎</span></span>` : ""}
     <div class="pt"><h3>${esc(x.title)}</h3><small>${x.kind === "trip" ? dateRange(x.start, x.end) + " · " : ""}${x.photos.toLocaleString()} photos${by && x.kind === "year" ? " · " + by : ""}</small></div>
   </a>`;
 }

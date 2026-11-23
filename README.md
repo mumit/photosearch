@@ -225,7 +225,13 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 | **Tidy up** | Under Albums: near-duplicates, as groups of bursts and copies of the same picture. Each group has a suggested keeper (the sharpest, judged from the detail in its thumbnail); tap another to keep that instead, or **Not duplicates** to stop suggesting the group. **Send the extras** adds every non-keeper to an album in Photos called *Photosearch · maybe delete*, so you can look through it and delete there. Nothing is ever deleted by Photosearch. *Near-identical* is the default; *Also similar shots* includes shots of the same moment that differ a little more. Receipts, ID cards and screenshots only count when they're practically the same pixels, so two different receipts are never paired. |
 | **Clutter** | Also under Tidy up: photos that are probably not memories, in four kinds: *IDs and cards*, *Screenshots*, *Receipts and papers* and *Accidental shots* (floors, black frames). Tap ✕ on any that don't belong. **Send** adds a kind to its own album in Photos (*Photosearch · screenshots* and so on) to look through there. IDs are worth moving to Photos' locked Hidden album. Nothing is deleted. Screenshots are the ones Photos marks as screenshots; run `photosearch index` once to read those marks (until then, they're found by their phone-screen shape). The other kinds come from the search model, with cut-offs set by eye on a 17,000-photo library (`clutter.py` says how). |
 | **Photo frame** | `#frame`, or from Home: a slow, endless full-screen slideshow of your best photos with the time and date, for a spare iPad or TV. It keeps the screen awake. **⚙ What to show** picks everything, on this day, one person, or any search (`#frame/?person=…`, `#frame/?q=…`). **▶ Slideshow** on any search, place or open photo plays just those. |
-| **Stories** | Every trip (found automatically from where photos were taken) and every year as a slideshow of its best, most varied moments, with chapters and captions. **⤓** saves one as a single HTML file (photos included) you can send to family; **✎** edits it. |
+| **Stories** | Every trip (found automatically from where photos were taken) and every year as a slideshow of its best, most varied moments, with chapters and captions. **⤓** saves one as a single HTML file (photos included) you can send to family; **📖** makes it a photo book to print (a PDF, or `photosearch book 2025`; see below); **✎** edits it. |
+
+**📖 Photo books.** Any story becomes a PDF to print: landscape A4 (or `--size letter`), 300 dpi, a cover from its
+first photos, then each chapter opening on its title and words, and the rest two to a page with their captions, dates
+and places. Photos are fitted, never cropped, except on the cover; videos are left out. Full-size copies are fetched
+from iCloud first, and any photo that would still print soft (under 150 dpi) is listed, so you can swap it in the
+editor. `photosearch book trip-2024-05-02 --bleed` adds the 3 mm margin a print shop trims off.
 
 **✨ Smart search.** The search box fills in the filters from your description: *"videos of Sam in the snow last
 year, no people"* becomes person Sam, videos only, last year, without people. The chips it adds are amber, so you
@@ -577,6 +583,7 @@ thing, and they only import downwards in this list:
 | `images.py` | Reading photos, writing JPEGs, contact sheets |
 | `index.py` | `photosearch index` (and its `--quick` first pass) and `thumbs` |
 | `watch.py` | While `serve` runs, new photos in Photos are indexed by themselves |
+| `book.py` | A story as a print-ready photo book (PDF) |
 | `videos.py` | `photosearch videos`: each video's sound and frames, and its best moment for a search |
 | `text.py` | `photosearch text`: the words in photos, read by Apple's Vision, for searches in "quotes" |
 | `search.py` | Search, look-alikes, filters, how interesting a photo looks |

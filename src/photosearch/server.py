@@ -238,6 +238,15 @@ def make_server(a):
                     if not UUID_ISH.fullmatch(uuid) or not f.exists():
                         return self.send(b"", "text/plain", 404)
                     return self.send(face(con, uuid, q.get("who", "")) or f.read_bytes(), "image/jpeg")
+                if u.path.startswith("/book/") and STORY_ID.fullmatch(name.removesuffix(".pdf")):  # 📖 (book.py)
+                    from .book import SIZES, book, book_name
+                    r = load_review(con, name.removesuffix(".pdf"), make=True)
+                    photos_app.fetch_in_subprocess(con, story_uuids(r))  # print wants full size: ~1 s a missing one
+                    pdf, _ = book(con, r, q.get("size") if q.get("size") in SIZES else "a4", "bleed" in q)
+                    self.send_response(200); self.send_header("content-type", "application/pdf")
+                    self.send_header("content-disposition", f'attachment; filename="{book_name(r)}"')
+                    self.send_header("content-length", str(len(pdf))); self.end_headers()
+                    return self.wfile.write(pdf)
                 if u.path.startswith("/review/") and STORY_ID.fullmatch(name):
                     r = load_review(con, name, make=True)
                     if "download" in q:  # the file goes to family: wait for full-size copies (~1 s per missing one)
