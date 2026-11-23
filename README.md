@@ -220,16 +220,21 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 | **Photo frame** | `#frame`, or from Home: a slow, endless full-screen slideshow of your best photos with the time and date, for a spare iPad or TV. It keeps the screen awake. **⚙ What to show** picks everything, on this day, one person, or any search (`#frame/?person=…`, `#frame/?q=…`). **▶ Slideshow** on any search, place or open photo plays just those. |
 | **Stories** | Every trip (found automatically from where photos were taken) and every year as a slideshow of its best, most varied moments, with chapters and captions. **⤓** saves one as a single HTML file (photos included) you can send to family; **✎** edits it. |
 
-**✨ Smart search (optional).** With a [TypeSafe](https://typesafe.ai) API key, the search box fills in the
-filters from your description: *"Sam at the beach last summer, no selfies"* becomes person Sam, summer 2025,
-without selfies. The chips it adds are amber, so you can see and remove what it understood. It also checks the first
-40 photos: each is described in words (when it was taken, Photos' labels, what the model sees, how many named people,
+**✨ Smart search.** The search box fills in the filters from your description: *"videos of Sam in the snow last
+year, no people"* becomes person Sam, videos only, last year, without people. The chips it adds are amber, so you
+can see and remove what it understood. It reads photos or videos, a season, a time (this year, last year, a year,
+recently, long ago), no people and no selfies, with keyword rules on the Mac.
+
+With a [TypeSafe](https://typesafe.ai) API key, Jev reads the box instead, which catches a few more ways of saying
+things (on 40 searches, 198 of 200 answers right against the rules' 196; see
+[FINDINGS.md](FINDINGS.md#smart-search-without-jev-keyword-rules-and-laya)). With a key it also checks the first 40
+photos: each is described in words (when it was taken, Photos' labels, what the model sees, how many named people,
 how bright and colourful it is) and Jev says which look right, which nudges their order. That helps most with how a
 photo looks ("black and white", "a storm"), adds about a third of a second, and says "✨ checked" by the results (see
 [FINDINGS.md](FINDINGS.md#checking-the-first-results-with-jev)). Jev gets your words, with names replaced by
-"someone", and those descriptions: never a photo, a name, a place or words read from a photo. Untick ✨ in the
-filters to turn both off. Put the key in a `.env` file next to `data/` (at the top of the checkout, where it's
-git-ignored). Without a key, search works as before.
+"someone", and those descriptions: never a photo, a name, a place or words read from a photo. If Jev can't answer,
+the rules read the box. Untick ✨ in the filters to turn it all off. Put the key in a `.env` file next to `data/` (at
+the top of the checkout, where it's git-ignored).
 
 ```
 TYPESAFE_API_KEY=...
@@ -473,7 +478,7 @@ Settings → iCloud → Download Originals to this Mac** (this needs disk space 
 | `ROADMAP.md` | What to build next, in order |
 | `FINDINGS.md` | What the experiments found, and how each setting was chosen |
 | `data/reviews/` | Saved story picks and captions, one JSON file per year (`2025.json`) or trip (`trip-2024-05-02.json`) |
-| `.env` | Optional `TYPESAFE_API_KEY` for ✨ smart search (git-ignored) |
+| `.env` | Optional `TYPESAFE_API_KEY`, so Jev reads ✨ smart search and checks the first results (git-ignored) |
 | `data/index.sqlite` | One row per photo: date, place, GPS, people, albums, Apple's labels, and its 768-number vector. Also the dates you gave photos without a real one (table `redated`, with the date Photos has), and a vector for each video's frames and pieces of sound (table `clips`) |
 | `data/thumbs/` | Small JPEG previews for the web page (512 px) |
 | `data/frames/` | A frame every 3 s of each video (512 px), for showing the moment a search found |
@@ -563,7 +568,7 @@ thing, and they only import downwards in this list:
 | `videos.py` | `photosearch videos`: each video's sound and frames, and its best moment for a search |
 | `text.py` | `photosearch text`: the words in photos, read by Apple's Vision, for searches in "quotes" |
 | `search.py` | Search, look-alikes, filters, how interesting a photo looks |
-| `smartbox.py` | The optional ✨ smart search box (Jev) |
+| `smartbox.py` | The ✨ smart search box: keyword rules, or Jev with a key |
 | `places.py` | Home, trips, the map |
 | `people.py` | People and their portraits: the one picked, the one you chose, and the crop around their face |
 | `stories.py` | Stories: making, editing, the slideshow page |

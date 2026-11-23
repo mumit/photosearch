@@ -1,4 +1,6 @@
-"""The optional smart search box: TypeSafe Jev reads filters (season, dates, no selfies) out of plain words."""
+"""The smart search box: filters (photo or video, season, dates, no people, no selfies) read out of plain words. With a
+TypeSafe key Jev reads them; without one, or when Jev can't answer, keyword rules do, on this Mac. On 40 searches
+their author never saw, the rules got 196 of 200 answers right and Jev 198 (FINDINGS.md, Smart search without Jev)."""
 import functools, json, os, re
 from collections import Counter
 from datetime import date, timedelta
@@ -47,6 +49,59 @@ def ask_jev(text):
         return json.load(r)["answers"]
 
 
+# The keyword rules, as measured (experiments/smart-search/rules.py): change them only with a new set of fresh
+# searches to check them on, since the ones they were measured on have been seen.
+def _kind(q):
+    if re.search(r"\b(only|just) (the )?(photos?|pictures?|pics?|stills?)\b|\bno (videos?|clips?)\b", q, re.I):
+        return "photo"
+    if re.search(r"\b(only|just) (the )?(videos?|clips?)\b|\bno (photos?|pictures?|pics?)\b", q, re.I):
+        return "video"
+    q = re.sub(r"\bvideo ?games?\b|\bmovie (night|theat(er|re)|poster|tickets?)\b|\bat the movies\b", "", q, flags=re.I)
+    if re.search(r"\b(videos?|vids?|clips?|footage|movies?|filmed|filming|recordings?|recorded)\b", q, re.I):
+        return "video"
+    return "either"
+
+
+def _season(q):
+    for s, pat in (("spring", r"\bspring(time)?\b(?! (roll|water|onion))"), ("summer", r"\bsummer(time|s)?\b"),
+                   ("autumn", r"\bautumn\b|\bfall\b(?! (down|over|off|asleep))"), ("winter", r"\bwinter(time|s)?\b")):
+        if re.search(pat, q, re.I):
+            return s
+    return "none"
+
+
+def _when(q):
+    if re.search(r"\bthis year\b", q, re.I):
+        return "this year"
+    if re.search(r"\blast year\b|\ba year ago\b", q, re.I):
+        return "last year"
+    if re.search(r"\b(recent(ly)?|lately|latest|newest|this (month|week)|(last|past) (few |couple( of)? )?(days|weeks?|months?))\b",
+                 q, re.I):
+        return "recent"
+    if re.search(r"\b(years ago|long ago|ages ago|back in the day|old (photos?|pictures?|pics?|videos?)|"
+                 r"when (the )?(kids|someone|we|i|they) (were|was) (little|young|small|tiny|babies|a baby|kids))\b", q, re.I):
+        return "long ago"
+    return "any"
+
+
+def _no_people(q):
+    return bool(re.search(r"\b(no|without|w/o|minus|free of|zero) (any )?(people|persons?|humans?|anyone|anybody|crowds?|faces?|"
+                          r"one in (it|them))\b|\bnobody\b|\bno one\b|\bpeople-?free\b|\bempty\b|\bdeserted\b|"
+                          r"\bjust (the )?(scenery|landscapes?|views?)\b", q, re.I))
+
+
+def _no_selfies(q):
+    return bool(re.search(r"\b(no|without|not|skip|exclude|excluding|minus|except|but no|leave out|other than) "
+                          r"(the |any |my )?(selfies?|self[- ]portraits?)\b", q, re.I))
+
+
+def read_words(text):
+    """JEV_QUESTIONS answered by the keyword rules, in Jev's shape (choices are sure, yes/no is 1 or 0)."""
+    choice = lambda c: dict(choice=c, confidence=1.0)
+    return dict(kind=choice(_kind(text)), season=choice(_season(text)), when=choice(_when(text)),
+                no_people=dict(noul=float(_no_people(text))), no_selfies=dict(noul=float(_no_selfies(text))))
+
+
 def mask(con, text):
     """(the tagged people named in text, text with each of them replaced by "someone"): Jev never sees a name."""
     people = sorted({p for (j,) in con.execute("select persons from photos") for p in json.loads(j)}, key=len, reverse=True)
@@ -61,11 +116,18 @@ def mask(con, text):
 
 
 def parse_query(con, text, today=None):
-    """Turn "Sam at the beach last summer, no selfies" into search filters. Names and years are found locally;
-    the rest is asked of Jev, which only ever sees the text with tagged names replaced by "someone"."""
+    """Turn "Sam at the beach last summer, no selfies" into search filters, and who read them ("jev" or "rules").
+    Names and years are found locally; the rest is asked of Jev if there's a key, which only ever sees the text with
+    tagged names replaced by "someone", else of the keyword rules."""
     today = today or date.today()
     found, masked = mask(con, text)
-    a = ask_jev(masked)
+    a, by = None, "rules"
+    if jev_key():
+        try:
+            a, by = ask_jev(masked), "jev"
+        except Exception:  # offline, a bad key, a rate limit: the rules still read it
+            pass
+    a = a or read_words(masked)
     pick = lambda k: a[k]["choice"] if a[k].get("confidence", 1) >= CHOICE_P else None
     f = dict(person=", ".join(found), kind="", after="", before="", season="", exclude="")
     if pick("kind") in ("photo", "video"):
@@ -85,4 +147,4 @@ def parse_query(con, text, today=None):
         f["before"] = today.replace(year=today.year - 5).isoformat()
     f["exclude"] = ", ".join(x for x, q, p in (("people", "no_people", NO_PEOPLE_P), ("a selfie", "no_selfies", NO_SELFIES_P))
                              if a[q]["noul"] > p)
-    return f
+    return f, by

@@ -350,7 +350,8 @@ the numbers above are without them.
 
 ## Smart search without Jev (keyword rules and Laya)
 
-✨ smart search uses Jev in two ways, and only works with a TypeSafe key, so anyone installing from PyPI goes without:
+✨ smart search uses Jev in two ways, and until this only worked with a TypeSafe key, so anyone installing from PyPI went
+without:
 
 1. **Reading the search box** (`smartbox.py`): five questions about the words typed, each with a few fixed answers.
    Photo, video or either; which season; which time period; does it want no people; does it want no selfies. Names
@@ -405,6 +406,9 @@ The rules weren't changed after seeing them, and cut-offs stayed as picked on th
   and "selfies with someone at the concert" as photos only.
 - **Laya** missed seasons and "not the videos" too, and on one search turned every answer around.
 - Jev answered a few of the first 60 differently from the earlier run, so its tuned cut-offs moved slightly.
+
+**What's used** (`smartbox.py`): these rules, as measured, read the box without a key, or when Jev can't answer;
+with a key, Jev does. The checking of the first results stays with Jev.
 
 **So:** reading the search box needs no model. Keyword rules come within 2 of 200 of Jev on searches their author
 never saw, in under a millisecond, with nothing leaving the Mac. Laya, untrained, is behind both.

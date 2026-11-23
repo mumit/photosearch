@@ -4,9 +4,12 @@
 /* ---------- the search box: filters as chips, suggestions as you type, and what ↵ does depends on the mode ---------- */
 const FIELDS = ["person", "place", "after", "before", "season", "kind", "exclude"];
 const F = Object.fromEntries(FIELDS.map(k => [k, ""]));
-let AUTO = new Set();  // filters Jev read out of the description: dropped again on the next search
+let AUTO = new Set();  // filters read out of the description: dropped again on the next search
 const SMART = { enabled: false };
-api("/api/parse").then(r => { SMART.enabled = r.results.enabled; $("smartbox").hidden = !SMART.enabled; }).catch(() => {});
+api("/api/parse").then(r => {
+  SMART.enabled = r.results.enabled; $("smartbox").hidden = !SMART.enabled;
+  if (!r.results.jev) $("smartbox").title = "Fill in filters from your words (photos or videos, a season, when, no people, no selfies). Read on the Mac: nothing is sent anywhere";
+}).catch(() => {});
 const CHIP = { person: v => "👤 " + v, place: v => "📍 " + v, after: v => "after " + v, before: v => "before " + v,
                season: v => ({ spring:"🌱", summer:"☀️", autumn:"🍂", winter:"❄️" }[v] || "") + " " + v, kind: v => v === "video" ? "🎞 videos" : "📷 photos only",
                exclude: v => "− " + v };

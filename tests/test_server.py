@@ -36,6 +36,12 @@ def test_every_api_answers(srv, lib, path):
     assert "results" in json.loads(body) and h["content-type"] == "application/json"
 
 
+def test_the_smart_box_is_on_without_a_jev_key(srv):
+    assert srv.json("/api/parse") == dict(enabled=True, jev=False)
+    r = srv.json("/api/parse?q=snowy+hike+videos")
+    assert r["by"] == "rules" and r["filters"]["kind"] == "video"
+
+
 def test_galaxy(srv):
     g = srv.json("/api/galaxy", timeout=300)  # UMAP compiles itself on its first run in a new environment: ~30 s
     assert len(g["uuids"]) == len(g["x"]) == 73 and all(0 <= x <= 1 for x in g["x"])

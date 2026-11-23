@@ -129,15 +129,11 @@ def make_server(a):
             sh["x"], sh["y"] = ([info.get(u, dict(uuid=u, gone=True)) for u in sh[r]] for r in ("x", "y"))  # numbers stay put
         return sh
 
-    def api_parse(q):  # the smart search box: {"enabled": False} when there's no Jev key
-        if not smartbox.jev_key():
-            return dict(enabled=False)
+    def api_parse(q):  # the smart search box: Jev reads it with a key, keyword rules without (smartbox.py)
         if not q.get("q"):
-            return dict(enabled=True)
-        try:
-            return dict(enabled=True, filters=parse_query(con, q["q"]))
-        except Exception as ex:  # offline, bad key, rate limit: search still works without it
-            return dict(enabled=True, error=f"{ex.__class__.__name__}: {ex}")
+            return dict(enabled=True, jev=bool(smartbox.jev_key()))
+        filters, by = parse_query(con, q["q"])
+        return dict(enabled=True, jev=bool(smartbox.jev_key()), filters=filters, by=by)
 
     def api_open(q):  # reveal in Photos via AppleScript (on this Mac's screen, so only for this Mac)
         import subprocess
