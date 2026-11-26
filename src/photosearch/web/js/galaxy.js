@@ -18,6 +18,9 @@ async function openGalaxy() {
   try {
     G.data = (await api("/api/galaxy")).results;
   } catch (e) { $("gstatus").textContent = "couldn't map: " + e.message; G.loading = false; return; }
+  if (!G.data.uuids.length) {  // too few photos to map yet (a first index): look again next time
+    $("gstatus").textContent = "The galaxy appears once 50 photos are indexed."; G.data = null; G.loading = false; return;
+  }
   G.y0 = Math.min(...G.data.year.filter(Boolean)); G.y1 = Math.max(...G.data.year);
   $("gy0").textContent = G.y0; $("gy1").textContent = G.y1;
   $("ggrad").style.background = `linear-gradient(90deg, ${[0, .25, .5, .75, 1].map(t => yearColor(G.y0 + t * (G.y1 - G.y0))).join(",")})`;

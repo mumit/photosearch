@@ -326,3 +326,38 @@ addEventListener("keydown", e => {
     else if (dy > 90) lbOff();
   });
 }
+
+/* ---------- indexing: how far a first index has got, while `serve` runs it (watch.py) ---------- */
+const IX = { timer: 0, was: null, photos: null };
+async function indexing() {
+  clearTimeout(IX.timer);
+  let r;
+  try { r = (await api("/api/indexing")).results; } catch { IX.timer = setTimeout(indexing, 15000); return; }
+  const first = r.job === "first" || (!r.photos && (r.job || r.error)), none = !r.photos;
+  document.body.classList.toggle("noindex", none);
+  $("indexing").hidden = !first && !none;
+  $("indexing").classList.toggle("wait", first && !r.photos);
+  const of = r.library ? ` of ${r.library.toLocaleString()}` : "";
+  if (r.job === "first" && !r.photos)
+    [$("ixhead").textContent, $("ixsub").textContent] = ["Getting ready to index your library.",
+      "The first time, the search model downloads (about 1.5 GB). Then photos appear here as they're read, newest first."];
+  else if (r.job === "first")
+    [$("ixhead").textContent, $("ixsub").textContent] = [`Indexing your library: ${r.photos.toLocaleString()}${of} photos so far, newest first.`,
+      "Search works on those already, and the rest join as they're read. Later, they're redone at full quality, in the background."];
+  else if (none && r.error) {
+    $("ixhead").textContent = "Couldn't index your library.";
+    $("ixsub").innerHTML = (r.hint === "access" ? "photosearch can't read the Photos library yet. Give the app you run it from (Terminal, say) "
+      + "Full Disk Access, in System Settings → Privacy &amp; Security → Full Disk Access. It tries again within a minute. " : "")
+      + `It said: <code>${esc(r.error)}</code>`;
+  } else if (none)
+    [$("ixhead").textContent, $("ixsub").innerHTML] = ["Nothing is indexed yet.",
+      "Run <code>photosearch index</code> in a terminal, or start <code>photosearch serve</code> without <code>--no-index</code>, and it indexes the library itself."];
+  $("ixfill").style.width = r.library ? `${Math.min(100, 100 * r.photos / r.library)}%` : "0";
+  // the first photos arrived, or the first index is done: show the library (views cache what they load, so reload),
+  // unless someone's using the page
+  const grew = (IX.was === "first" && r.job !== "first") || (IX.photos === 0 && r.photos > 0);
+  if (grew && tab === "home" && !/INPUT|TEXTAREA/.test(document.activeElement?.tagName)) location.reload();
+  [IX.was, IX.photos] = [r.job, r.photos];
+  if (first || none) IX.timer = setTimeout(indexing, 5000);
+}
+indexing();

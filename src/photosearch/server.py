@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import embed, evals, photos_app, smartbox
+from . import embed, evals, photos_app, smartbox, watch
 from .config import DATA, LIBRARY, ROOT, THUMBS, WEB
 from .store import ThreadCon, index_library, photo_info
 from .images import photo_jpeg
@@ -93,7 +93,6 @@ class Checked(list):
 def cmd_serve(a):
     httpd = make_server(a)
     if not a.demo and not getattr(a, "no_index", False):  # new photos join searches by themselves (watch.py)
-        from . import watch
         watch.start(lambda m: print(f"new photos: {m}", flush=True))
     httpd.serve_forever()
 
@@ -151,7 +150,7 @@ def make_server(a):
             raise LookupError(q["uuid"])
         return info[q["uuid"]]
 
-    api = {"/api/today": lambda q: on_this_day(con, q.get("day")), "/api/stories": lambda q: stories(con), "/api/story": lambda q: story_for_editor(con, q.get("id", "")),
+    api = {"/api/indexing": lambda q: watch.progress(con), "/api/today": lambda q: on_this_day(con, q.get("day")), "/api/stories": lambda q: stories(con), "/api/story": lambda q: story_for_editor(con, q.get("id", "")),
            "/api/sharp": lambda q: {u: fetcher.status(u) for u in q.get("uuids", "").split(",") if u},
            "/api/story_photos": lambda q: story_candidates(con, q.get("id", ""), q.get("q"), q.get("like")),
            "/api/evals": lambda q: evals.runs(), "/api/eval_sheet": api_eval_sheet,

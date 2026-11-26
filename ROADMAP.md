@@ -19,6 +19,8 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 
 ## Done
 
+- A first run without waiting: on a fresh install, `serve` starts the first index itself (quick, newest first), the page shows how far it has got and searches what's read so far, and says why if it can't read Photos. Quick photos are then redone at full quality while serving. An `index` that `serve` started now stops when `serve` does, even if `serve` is killed.
+
 - Gifts an AI agent makes: a story of any photos from any years (`story-grandma-at-80`, under Your stories), printed as a photo book by the agent (`make_book`, into `~/Downloads`), and wall calendars of a photo a month (`photosearch calendar`, 📅 on a year, `make_calendar`), each month's photo from that month a year earlier unless the agent picks.
 
 - Photo book: 📖 on a story, or `photosearch book`, makes a print-ready PDF (`book.py`): 300 dpi, A4 or Letter landscape, a cover, chapters opening on their first photo and the rest two to a page, photos fitted not cropped, soft photos listed, an optional bleed.

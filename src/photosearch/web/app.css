@@ -26,6 +26,15 @@ button.ghost:hover:not(:disabled) { border-color:var(--mut); }
 .ibtn:hover { background:var(--bg2); }
 .tiny { padding:4px 10px; font-size:13px; }
 .status { color:var(--mut); font-size:13px; min-height:1.2em; }
+#indexing { padding:12px clamp(16px, 3vw, 32px); background:var(--bg2); border-bottom:1px solid var(--line); font-size:14px; }
+#indexing .ixtext { max-width:1100px; }
+#indexing #ixsub { color:var(--mut); }
+#indexing code { font-size:13px; }
+#indexing .ixbar { height:4px; margin-top:9px; max-width:1100px; border-radius:2px; background:var(--line); overflow:hidden; }
+#indexing .ixbar i { display:block; height:100%; width:0; background:var(--acc); transition:width .6s; }
+#indexing.wait .ixbar i { width:30% !important; animation:ixwait 1.6s ease-in-out infinite alternate; }
+@keyframes ixwait { from { margin-left:0 } to { margin-left:70% } }
+body.noindex #hero { display:none; }
 .sp { flex:1; }
 .pad { padding:24px clamp(16px, 4vw, 48px); }
 .kick { font:600 12px/1 var(--sans); letter-spacing:.18em; text-transform:uppercase; color:var(--acc); }

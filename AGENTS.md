@@ -83,7 +83,8 @@ Update this section when something finishes or starts.
 - **Photo book:** built (📖 on a story, `photosearch book`, `book.py`). Not printed yet: worth one real print before trusting the layout and the 150 dpi cut-off.
 - **Gifts an agent makes:** built. Stories of any photos (`story-…`), `make_book` and `make_calendar` for agents, and
   calendars (`photosearch calendar`, 📅 on a year). Not tried with an agent on my library or printed yet.
-- **New photos while serving:** done (`watch.py`): `serve` indexes them by itself.
+- **New photos while serving:** done (`watch.py`): `serve` indexes them by itself, and on a fresh install starts the
+  first index itself, with progress on the page. Tried end to end on the demo library, not yet on a fresh Mac.
 - **Smart search without a key:** done. Keyword rules read the search box on the Mac when there's no Jev key, close
   to Jev (FINDINGS.md, Smart search without Jev); Jev still reads it with a key, and checking the results still
   needs Jev. Never train a model on Jev's answers (TypeSafe's terms). The `box` and `box-jev` evals in `data/eval/`

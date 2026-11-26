@@ -271,3 +271,8 @@ def test_a_year_as_a_calendar(srv):
 
 def test_a_story_nobody_made_isnt_found(srv):
     assert srv.get("/book/story-nobody.pdf")[0] == 404 and srv.get("/review/story-nobody")[0] == 404
+
+
+def test_indexing_progress(srv):
+    r = srv.json("/api/indexing")
+    assert r["job"] is None and r["photos"] == 73 and r["error"] is None

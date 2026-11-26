@@ -14,10 +14,16 @@ from .stories import highlights
 from .shared import write_json
 
 
+GALAXY_MIN = 50
+
+
 def galaxy(con):
     """2-D map of the library (UMAP over the vectors) with named regions. Cached; redone once the index grows 10%, and
-    as soon as any photo in it has left the library (it mustn't keep showing what was deleted)."""
+    as soon as any photo in it has left the library (it mustn't keep showing what was deleted). Empty until there are
+    GALAXY_MIN photos (early in a first index): too few to map."""
     uuids, M, _ = vectors(con)
+    if len(uuids) < GALAXY_MIN:
+        return dict(uuids=[], x=[], y=[], year=[], regions=[])
     f = DATA / "galaxy.json"
     if f.exists():
         g = json.loads(f.read_text())

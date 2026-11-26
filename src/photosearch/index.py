@@ -1,5 +1,5 @@
 """`photosearch index`: read the Photos library and embed what's new."""
-import json, sys, time
+import json, os, sys, threading, time
 from datetime import datetime
 from pathlib import Path
 
@@ -86,7 +86,17 @@ def faces(p):
 N_META = len(META_COLS.split(","))
 
 
+def stop_with(pid, every=2):
+    """Stop when process pid is no longer this one's parent: `serve` (watch.py) started it and has gone, however it
+    went (even kill -9), so it doesn't index on by itself. What's indexed so far is kept."""
+    while os.getppid() == pid:
+        time.sleep(every)
+    os._exit(1)
+
+
 def cmd_index(a):
+    if pid := os.environ.get("PHOTOSEARCH_STOP_WITH"):
+        threading.Thread(target=stop_with, args=(int(pid),), daemon=True).start()
     try:
         with held("index", wait=False):  # two at once would write the same rows
             index(a)

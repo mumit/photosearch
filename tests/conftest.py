@@ -45,6 +45,7 @@ def reset_caches():
     thennow._pairs = thennow._people = recreate._ideas = (None, None)
     videos._clips = (None,)
     text._texts = (None, {})
+    watch.state.update(job=None, since=None, error=None)
     for c in (dupes._dupes, dupes._sharp, dupes._hash, dupes._px, store._ar):
         c.clear()
 
