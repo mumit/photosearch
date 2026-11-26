@@ -111,8 +111,9 @@ def library_overview() -> dict:
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True))
 def make_album(name: str, uuids: list[str]) -> str:
-    """Add photos to an album in the Photos app, creating it if needed. Only adds; never removes or deletes.
-    Check the photos with view_photos first."""
+    """Add photos to an album in the Photos app, creating it if needed (for an index of a folder of photos, a folder
+    of links in ~/Pictures/Photosearch albums). Only adds; never removes or deletes. Check the photos with view_photos
+    first."""
     # in its own process, as the page's adds are: AppleScript from this server's worker threads can hang for minutes
     return f"added {photos_app.add_to_photos_album(name, uuids)} of {len(uuids)} photos to album '{name}'"
 

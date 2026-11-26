@@ -12,17 +12,12 @@ from .shared import held
 from .stories import STORY_ID, load_review, story_uuids
 
 
-def photos_only():
-    """Refuse what only a Photos library can do, for an index of a folder of photos (folders.py)."""
-    if folders.in_use():
-        raise LookupError("this index is of a folder of photos, not a Photos library, so there's no album in Photos to "
-                          "add to; albums here (＋ Album) work as usual")
-
-
 def add_now(name, uuids):
     """Add photos (uuids from this index) to an album in the Photos app, made if needed, in this process; only ever
     adds. Returns how many were added. Refuses before touching anything unless Photos has this index's library open:
     otherwise the album would be made in whichever library is open, e.g. your own while a demo's photos are added."""
+    if folders.in_use():
+        return folders.link_album(name, uuids)
     import photoscript
     from osxphotos.photosalbum import PhotosAlbum
     uuids = list(dict.fromkeys(uuids))
@@ -49,7 +44,8 @@ def add_to_photos_album(name, uuids):
     uuids = list(dict.fromkeys(uuids))
     if not uuids:
         return 0
-    photos_only()
+    if folders.in_use():  # no Photos app: a folder of links (folders.link_album)
+        return folders.link_album(name, uuids)
     # one process at a time drives Photos (two can stall it); waiting for the turn isn't part of the time limit
     with held("photos-app"):
         try:

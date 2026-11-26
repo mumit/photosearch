@@ -63,7 +63,7 @@
       <div class="shelf" id="rediscover"></div></div>
     <div class="hsec" id="pickbox" hidden><div class="shead"><h2>Family picks</h2><p id="pickp"></p><span class="sp"></span><a href="#frame/?picks=1">▶ In the photo frame</a></div>
       <div class="shelf" id="pickshelf"></div></div>
-    <div class="hsec"><div class="shead"><h2>People</h2><p>everyone you've tagged in Photos</p></div><div class="shelf people" id="peopleshelf"></div></div>
+    <div class="hsec"><div class="shead"><h2>People</h2><p data-folder="no names in a folder of photos">everyone you've tagged in Photos</p></div><div class="shelf people" id="peopleshelf"></div></div>
     <div class="hsec"><div class="shead"><h2>Trips</h2><p>found from where the photos were taken</p><span class="sp"></span><a href="#stories">All stories →</a></div>
       <div class="shelf" id="tripshelf"></div></div>
     <div class="hsec"><div class="shead"><h2>Ask your library</h2><p>describe a moment in your own words</p></div><div class="asks" id="asks"></div></div>
@@ -155,18 +155,18 @@
     <div class="kick">Albums</div>
     <h1>Albums that fill themselves</h1>
     <p class="lede">Save any search as an album, and new photos that match join it on their own. Take a wrong one out and it learns
-      what you meant. Copy one into the Photos app whenever you like; only Photosearch's own albums are touched, and only by adding.</p>
+      what you meant. <span data-folder="Copy one to a folder of links, in ~/Pictures/Photosearch albums, whenever you like; only by adding, and your photo folder isn't touched.">Copy one into the Photos app whenever you like; only Photosearch's own albums are touched, and only by adding.</span></p>
     <div class="pgrid" id="albumgrid" style="margin-top:22px"></div>
     <h2 class="sec">Tidy up</h2>
     <a class="tidy" href="#cleanup"><div class="tart" id="tidyart"></div><div><b>Near-duplicates</b><span id="tidyn">bursts and copies of the same moment</span>
-      <small>Keep the sharpest of each; the rest go to an album in Photos for you to look through. Nothing is deleted here.</small></div></a>
+      <small data-folder="Keep the sharpest of each; the rest go to a folder of links to look through in Finder. Nothing is deleted here.">Keep the sharpest of each; the rest go to an album in Photos for you to look through. Nothing is deleted here.</small></div></a>
     <a class="tidy" href="#clutter"><div class="tart" id="clutart"></div><div><b>Clutter and private photos</b><span id="clutn">screenshots, IDs, receipts, accidental shots</span>
-      <small>Each kind can go to its own album in Photos, to look through, delete or lock away there. Nothing is deleted here.</small></div></a>
+      <small data-folder="Each kind can go to its own folder of links, to look through in Finder. Nothing is deleted here.">Each kind can go to its own album in Photos, to look through, delete or lock away there. Nothing is deleted here.</small></div></a>
   </div></section>
 
   <section id="album"><div class="pad" id="alb">
     <div class="edtop"><a href="#albums">← Albums</a><span class="status" id="albstatus"></span><span class="sp"></span>
-      <button class="ghost" id="albshow">▶ Slideshow</button><button class="ghost" id="albphotos" hidden>Copy to Photos</button>
+      <button class="ghost" id="albshow">▶ Slideshow</button><button class="ghost" id="albphotos" hidden data-folder="Copy to a folder">Copy to Photos</button>
       <button id="albsave">Create album</button></div>
     <input id="albname" placeholder="Album name" maxlength="80">
     <div class="albdef"><input id="albq" placeholder="What's in it… e.g. kids at the beach"><span id="albchips"></span></div>
@@ -183,11 +183,11 @@
     <div class="kick">Tidy up</div>
     <h1>Near-duplicates</h1>
     <p class="lede">Bursts and copies of the same moment. Photosearch suggests keeping the sharpest of each group; tap another photo to keep
-      that one instead. The rest can go to an album in Photos, <b>Photosearch · maybe delete</b>, to look through and delete there.
+      that one instead. <span data-folder="The rest can go to a folder of links, &lt;b&gt;Photosearch · maybe delete&lt;/b&gt; in ~/Pictures/Photosearch albums, to look through in Finder.">The rest can go to an album in Photos, <b>Photosearch · maybe delete</b>, to look through and delete there.</span>
       Nothing is ever deleted from here.</p>
     <div class="cltop"><div class="seg" id="cllevel"><button data-l="same">Near-identical</button><button data-l="similar">Also similar shots</button></div>
       <span class="status" id="clstats"></span><span class="sp"></span><button id="clsend" hidden></button></div>
-    <p class="status" id="clphone" hidden>Sending to Photos works from the Mac.</p>
+    <p class="status" id="clphone" hidden data-folder="Sending to a folder works from the Mac.">Sending to Photos works from the Mac.</p>
     <div id="clgroups"></div><div id="clmore" class="morebar"></div>
   </div></section>
 
@@ -196,10 +196,10 @@
     <div class="kick">Tidy up</div>
     <h1>Clutter and private photos</h1>
     <p class="lede">Photos that are probably not memories: screenshots, IDs and cards, receipts and papers, and shots taken by accident.
-      Tap ✕ on any that don't belong. Each kind can go to its own album in Photos, to look through there; IDs are worth moving
-      to Photos' locked Hidden album. Nothing is ever deleted from here.</p>
+      Tap ✕ on any that don't belong. <span data-folder="Each kind can go to its own folder of links, to look through in Finder. Nothing is ever deleted from here.">Each kind can go to its own album in Photos, to look through there; IDs are worth moving
+      to Photos' locked Hidden album. Nothing is ever deleted from here.</span></p>
     <div class="cltop"><div class="seg" id="clukinds"></div><span class="status" id="clustats"></span><span class="sp"></span><button id="clusend" hidden></button></div>
-    <p class="status" id="cluphone" hidden>Sending to Photos works from the Mac.</p>
+    <p class="status" id="cluphone" hidden data-folder="Sending to a folder works from the Mac.">Sending to Photos works from the Mac.</p>
     <div id="clugrid" class="clugrid"></div><div id="clumore" class="morebar"></div>
   </div></section>
 
@@ -272,7 +272,7 @@
       <button id="lbday" title="this day in other years">📅 This day</button>
       <button id="lbmath" title="use in Photo Math">∑ Math</button>
       <button id="lbportrait" title="use this photo as their portrait everywhere" hidden>👤 Portrait</button>
-      <button id="lbopen" title="show it in the Photos app">Open in Photos</button>
+      <button id="lbopen" title="show it in the Photos app" data-folder="Show in Finder">Open in Photos</button>
     </div>
     <form id="lbwho" hidden></form>
   </div>

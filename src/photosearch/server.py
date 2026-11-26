@@ -5,9 +5,9 @@ from pathlib import Path
 
 import numpy as np
 
-from . import embed, evals, photos_app, smartbox, watch
+from . import embed, evals, folders, photos_app, smartbox, watch
 from .config import DATA, LIBRARY, ROOT, THUMBS, WEB
-from .store import ThreadCon, index_library, photo_info
+from .store import ThreadCon, index_library, photo_info, photos_db
 from .images import photo_jpeg
 from .search import SEASONS, best_of, search, similar
 from .checks import CHECK_N, check
@@ -138,9 +138,13 @@ def make_server(a):
         filters, by = parse_query(con, q["q"])
         return dict(enabled=True, jev=bool(smartbox.jev_key()), filters=filters, by=by)
 
-    def api_open(q):  # reveal in Photos via AppleScript (on this Mac's screen, so only for this Mac)
+    def api_open(q):  # reveal in Photos via AppleScript, or a folder's file in Finder (on this Mac's screen, so only for this Mac)
         import subprocess
         uuid = "".join(c for c in q["uuid"] if c.isalnum() or c in "-/")
+        if folders.in_use():
+            if p := photos_db().get_photo(uuid):
+                subprocess.run(["open", "-R", p.path])
+            return {}
         subprocess.run(["osascript", "-e", f'tell application "Photos" to spotlight media item id "{uuid}"'])
         return {}
 
@@ -216,7 +220,7 @@ def make_server(a):
             if u.path == "/":
                 # re-read, so edits show on reload; tell the page whether it's on this Mac, and (only then) how phones get in
                 server = dict(local=self.local(), lan=lan and self.local() and dict(url=lan.url, code=lan.st["passcode"]),
-                              demo=bool(demo))
+                              demo=bool(demo), folder=folders.in_use())
                 page = (WEB / "index.html").read_text().replace("/*SERVER*/{}", json.dumps(server).replace("</", "<\\/"), 1)
                 return self.send(page.encode(), "text/html; charset=utf-8")
             if u.path in STATIC:

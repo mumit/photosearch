@@ -44,7 +44,7 @@ The page hides what a library can't do.
 1. **Done.** The folder kind: finding files, ids, EXIF dates and GPS, previews, videos, albums from subfolders.
    `photosearch index --library FOLDER` records it as this data folder's library, as for a Photos library.
 2. **Done.** Places named offline, labels from Vision, screenshots and selfies (FINDINGS.md, Folders of photos).
-3. Albums and clutter as folders of links; the page hides Photos-only features.
+3. **Done.** Albums and clutter as folders of links; the page hides Photos-only features.
 4. Measured: search on a folder copy of the demo library against the Photos index of it, judged blind
    (`photosearch eval`), and Vision's labels against Photos' on the same photos.
 

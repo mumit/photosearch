@@ -3,6 +3,9 @@
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+// an index of a folder of photos (folders.py) has no Photos app: albums are folders of links, shown in Finder
+const inPhotos = (photos, folder) => SERVER.folder ? folder : photos;
+if (SERVER.folder) document.querySelectorAll("[data-folder]").forEach(el => { el.innerHTML = el.dataset.folder; });
 const api = async (path, params = {}) => {
   const res = await fetch(path + "?" + new URLSearchParams(params));
   if (res.status === 401) { location.replace("/login"); throw new Error("sign in first"); }

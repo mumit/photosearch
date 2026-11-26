@@ -10,7 +10,7 @@ views.albums = async () => {
     const r = (await api("/api/albums")).results;
     $("albumgrid").innerHTML = r.map(x => `<a class="poster" href="#album/${x.id}">
         ${x.cover ? `<img loading="lazy" src="/thumb/${x.cover}.jpg" alt="">` : ""}
-        ${x.new ? `<span class="by">+${x.new} new since copied to Photos</span>` : ""}
+        ${x.new ? `<span class="by">+${x.new} new since copied to ${inPhotos("Photos", "a folder")}</span>` : ""}
         <div class="pt"><h3>${esc(x.name)}</h3><small>${x.n.toLocaleString()} photos · ${albumSummary(x)}</small></div></a>`).join("")
       + `<a class="poster newalb" href="#album/new"><span>＋</span><div class="pt"><h3>New album</h3><small>from any search, person or place</small></div></a>`;
   } catch (e) { $("albumgrid").innerHTML = `<p class="status">${esc(e.message)}</p>`; }
@@ -113,14 +113,14 @@ $("albq").onchange = () => { AL.a.q = $("albq").value.trim(); AL.a.threshold = n
 $("albsave").onclick = () => { if (!$("albname").value.trim()) { $("albname").focus(); $("albstatus").textContent = "give it a name first"; return; } albumSave(); };
 $("albshow").onclick = () => openFrame({ list: albumMembers(), title: AL.a.name });
 $("albphotos").onclick = async () => {
-  $("albphotos").disabled = true; $("albstatus").textContent = "copying into Photos…";
+  $("albphotos").disabled = true; $("albstatus").textContent = inPhotos("copying into Photos…", "making links…");
   try { await albumSave(); const r = await post("/api/album_photos", { id: AL.a.id });
-        $("albstatus").textContent = `Photos now has “${AL.a.name}”: ${r.added ? `${r.added} added` : "already up to date"} (${r.total} in all)`; }
+        $("albstatus").textContent = `${inPhotos("Photos now has", "Photosearch albums has")} “${AL.a.name}”: ${r.added ? `${r.added} added` : "already up to date"} (${r.total} in all)`; }
   catch (e) { $("albstatus").textContent = e.message; }
   $("albphotos").disabled = false;
 };
 $("albdel").onclick = async () => {  // two taps, no browser dialog
-  if (!AL.del) { AL.del = true; $("albdel").textContent = "Tap again to delete (Photos keeps any copy)"; return; }
+  if (!AL.del) { AL.del = true; $("albdel").textContent = `Tap again to delete (${inPhotos("Photos", "the folder of links")} keeps any copy)`; return; }
   try { await post("/api/album_delete", { id: AL.a.id }); go("albums"); } catch (e) { $("albstatus").textContent = e.message; }
 };
 leave.album = () => { if (AL.timer && !AL.isNew) albumSave(); };  // a new album is saved only by its Save button
@@ -145,7 +145,7 @@ async function cleanupLoad() {
 function cleanupStats(sent) {
   $("clstats").textContent = CL.total ? `${CL.total.toLocaleString()} groups · ${CL.extra.toLocaleString()} extra photos${sent ? ` · ${sent.toLocaleString()} already in “${CL.album}”` : ""}` : "no near-duplicates found";
   $("clsend").hidden = !SERVER.local || !CL.total;
-  $("clsend").textContent = `Send the extras to “${CL.album}” in Photos`; CL.sending = false;
+  $("clsend").textContent = `Send the extras to “${CL.album}”${inPhotos(" in Photos", ", a folder of links")}`; CL.sending = false;
   $("clphone").hidden = SERVER.local;
 }
 function cleanupGroup(g) {
@@ -156,7 +156,7 @@ function cleanupGroup(g) {
       <button class="ghost tiny" data-a="nope" title="they're different: stop suggesting this group">Not duplicates</button></div>
     <div class="clrow">${g.photos.map((p, i) => `<figure data-i="${i}" class="${p.uuid === g.keep ? "keep" : ""} ${p.sent ? "sent" : ""}" style="--ar:${clampAr(p.ar)}">
       <img loading="lazy" src="/thumb/${p.uuid}.jpg" alt=""><button class="zoom" data-a="zoom" title="see it big">⤢</button>
-      <figcaption>${p.uuid === g.keep ? (p.sent ? "✓ keep · it's in maybe delete: take it out in Photos" : `✓ keep · ${g.why}`) : p.sent ? "in maybe delete" : "tap to keep this one"}</figcaption></figure>`).join("")}</div></div>`;
+      <figcaption>${p.uuid === g.keep ? (p.sent ? `✓ keep · it's in maybe delete: take it out ${inPhotos("in Photos", "of that folder")}` : `✓ keep · ${g.why}`) : p.sent ? "in maybe delete" : "tap to keep this one"}</figcaption></figure>`).join("")}</div></div>`;
 }
 $("clgroups").onclick = async e => {
   const card = e.target.closest(".clg"); if (!card) return;
@@ -200,7 +200,7 @@ function clutterStats() {
   const todo = CU.total - k.sent;
   $("clustats").textContent = `${CU.total.toLocaleString()} photos${k.sent ? ` · ${k.sent.toLocaleString()} already in “${k.album}”` : ""}`;
   $("clusend").hidden = !SERVER.local || !todo; CU.sending = false;
-  $("clusend").textContent = `Send ${todo.toLocaleString()} to “${k.album}” in Photos`;
+  $("clusend").textContent = `Send ${todo.toLocaleString()} to “${k.album}”${inPhotos(" in Photos", ", a folder of links")}`;
   $("cluphone").hidden = SERVER.local;
 }
 $("clukinds").onclick = e => { const b = e.target.closest("[data-k]"); if (!b || b.dataset.k === CU.kind) return; CU.kind = b.dataset.k; store.set("clukind", CU.kind); views.clutter(); };
@@ -217,9 +217,9 @@ $("clugrid").onclick = async e => {
 $("clusend").onclick = async () => {  // two taps, no browser dialog
   const k = CU.kinds.find(x => x.kind === CU.kind);
   if (!CU.sending) { CU.sending = true; $("clusend").textContent = `Tap again: add them to “${k.album}” (nothing gets deleted)`; return; }
-  CU.sending = false; $("clusend").disabled = true; $("clustats").textContent = "adding them in Photos…";
+  CU.sending = false; $("clusend").disabled = true; $("clustats").textContent = inPhotos("adding them in Photos…", "making links…");
   try { const r = await post("/api/clutter_send", { kind: CU.kind });
-        $("clustats").textContent = `Done: ${r.added.toLocaleString()} photos are in “${r.album}”. Look through it in Photos.`;
+        $("clustats").textContent = `Done: ${r.added.toLocaleString()} photos are in “${r.album}”. Look through it in ${inPhotos("Photos", "Finder, in ~/Pictures/Photosearch albums")}.`;
         $("clusend").hidden = true; }
   catch (err) { $("clustats").textContent = err.message; }
   $("clusend").disabled = false;
@@ -227,9 +227,9 @@ $("clusend").onclick = async () => {  // two taps, no browser dialog
 
 $("clsend").onclick = async () => {  // two taps, no browser dialog
   if (!CL.sending) { CL.sending = true; $("clsend").textContent = `Tap again: add ${CL.extra.toLocaleString()} extras to “${CL.album}” (nothing gets deleted)`; return; }
-  CL.sending = false; $("clsend").disabled = true; $("clstats").textContent = "adding them in Photos… (a minute or two for thousands)";
+  CL.sending = false; $("clsend").disabled = true; $("clstats").textContent = inPhotos("adding them in Photos… (a minute or two for thousands)", "making links…");
   try { const r = await post("/api/dupes_send", { level: CL.level });
-        $("clstats").textContent = `Done: ${r.added.toLocaleString()} photos are in “${r.album}”. Look through it in Photos and delete what you don't want there.`
+        $("clstats").textContent = `Done: ${r.added.toLocaleString()} photos are in “${r.album}”. ${inPhotos("Look through it in Photos and delete what you don't want there.", "Look through it in Finder, in ~/Pictures/Photosearch albums: deleting a link there leaves the photo.")}`
           + (r.kept_but_sent ? ` ${r.kept_but_sent.toLocaleString()} groups were left out, so every copy can't end up there: the one you keep is already in “${r.album}”.` : ""); }
   catch (err) { $("clstats").textContent = err.message; }
   $("clsend").disabled = false;

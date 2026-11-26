@@ -147,8 +147,10 @@ PHOTOSEARCH_DATA=~/photosearch-scans uv run photosearch index --library ~/Pictur
 Dates and time zones come from each file's EXIF (a video's from its own tags), places from its GPS, named on the
 Mac from GeoNames' list of towns (downloaded once, 11 MB; [CC BY](https://www.geonames.org)), albums from the
 folder a photo is in, and what's in it from Apple's Vision. RAW files are read through Apple's ImageIO. Moving or
-renaming a file keeps it in the index. People's names aren't in a folder, so the people features stay empty, and
-there's no Photos app to send albums to (albums in photosearch work as usual). Nothing in the folder is changed.
+renaming a file keeps it in the index. People's names aren't in a folder, so the people features stay empty (and
+Recreate This is hidden). Where the page would send photos to an album in Photos (Copy to Photos, Tidy up, an agent's
+`make_album`), it makes a folder of links in `~/Pictures/Photosearch albums` instead, and **Open in Photos** shows the
+file in Finder. Nothing in the photo folder is changed.
 
 **In a hurry?** `--quick` indexes about 4× faster (around half an hour for 17,000 photos on an M3, not two and a
 half hours) at slightly lower quality, so you can start searching sooner:

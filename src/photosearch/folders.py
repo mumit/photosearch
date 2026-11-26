@@ -18,6 +18,7 @@ from pathlib import Path
 
 from .config import DATA
 
+LINKS = Path.home() / "Pictures" / "Photosearch albums"  # albums, as folders of links: the photo folder isn't touched
 PREVIEWS = DATA / "previews"  # for files Pillow can't read: RAW photos, and videos' first frames
 FILES = DATA / "folder.sqlite"  # what's been read from each file, and Vision's labels
 PILLOW = {".jpg", ".jpeg", ".heic", ".heif", ".png", ".tif", ".tiff", ".webp", ".gif", ".bmp"}
@@ -172,6 +173,27 @@ def preview(path, uid, video):
     except (OSError, subprocess.SubprocessError):
         part.unlink(missing_ok=True)
         return None
+
+
+def link_album(name, uuids):
+    """An album of a folder's photos, as a folder of links to them in LINKS (made if needed). Only adds, as an album
+    in Photos does: a photo already linked isn't linked again. Returns how many were added."""
+    name = re.sub(r"[/:]", "-", str(name)).strip().lstrip(".") or "Album"
+    d = LINKS / name
+    d.mkdir(parents=True, exist_ok=True)
+    have = {str(f.resolve()) for f in d.iterdir() if f.is_symlink()}
+    from .store import index_library
+    lib = Folder(index_library())
+    n = 0
+    for p in lib.photos(uuid=list(dict.fromkeys(uuids))):
+        target = str(Path(p.path).resolve())
+        if target in have:
+            continue
+        f, k = d / Path(p.path).name, 1
+        while f.exists() or f.is_symlink():
+            k += 1; f = d / f"{Path(p.path).stem} ({k}){Path(p.path).suffix}"
+        f.symlink_to(target); have.add(target); n += 1
+    return n
 
 
 def files_db():

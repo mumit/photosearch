@@ -103,12 +103,14 @@ def test_a_folder_indexes_end_to_end(lib, folder, monkeypatch):
     assert set(rows) == {"2024-07-10", "2025-03-11", "1998-06-01"} and rows["2025-03-11"][2] == '["Lisbon 2025"]'
     assert rows["2024-07-10"][3] == 49.0
     assert store.index_library() == str(folder.resolve())
-    # no Photos app or iCloud for a folder: its photos are their own full size, and albums stay in this app
+    # no Photos app or iCloud for a folder: its photos are their own full size, and an album is a folder of links
     folders._in_use.clear()
-    u = con.execute("select uuid from photos limit 1").fetchone()[0]
-    assert not photos_app.needs_fetch(con, u)
-    with pytest.raises(LookupError, match="folder"):
-        photos_app.photos_only()
+    monkeypatch.setattr(folders, "LINKS", folder.parent / "Photosearch albums")
+    uuids = [u for (u,) in con.execute("select uuid from photos order by date")]
+    assert not photos_app.needs_fetch(con, uuids[0])
+    assert photos_app.add_now("Best of: 2025", uuids[:2]) == 2 and photos_app.add_now("Best of: 2025", uuids) == 1  # only adds
+    links = sorted((folder.parent / "Photosearch albums" / "Best of- 2025").iterdir())
+    assert [f.name for f in links] == ["beach.jpg", "scan.jpg", "tram.jpg"] and all(f.is_symlink() and f.resolve().parent.is_relative_to(folder.resolve()) for f in links)
     folders._in_use.clear()
 
 

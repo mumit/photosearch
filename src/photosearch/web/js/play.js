@@ -28,9 +28,9 @@ function playMenu() {
       <div class="card" id="detcard" style="--art:linear-gradient(180deg, transparent 10%, rgba(40,70,40,.55) 45%, #142414 82%)"><div class="collage"></div><span class="glyph">🕵️</span><h3>Date Detective</h3>
         <p>Photos without a real date. Your answer becomes the date.</p></div>
       <div class="card" id="tncard" style="--art:linear-gradient(180deg, transparent 10%, rgba(30,60,110,.55) 45%, #0d1a30 82%)"><div class="collage"></div><span class="glyph">⏳</span><h3>Then and Now</h3>
-        <p>The same spot or the same person, years apart.</p></div>
-      <div class="card" id="rccard" style="--art:linear-gradient(180deg, transparent 10%, rgba(120,90,20,.55) 45%, #2e230a 82%)"><div class="collage"></div><span class="glyph">📸</span><h3>Recreate This</h3>
-        <p>Pick an old photo, take it again today, see them side by side.</p></div>
+        <p>${inPhotos("The same spot or the same person, years apart.", "The same spot, years apart.")}</p></div>
+      ${SERVER.folder ? "" : `<div class="card" id="rccard" style="--art:linear-gradient(180deg, transparent 10%, rgba(120,90,20,.55) 45%, #2e230a 82%)"><div class="collage"></div><span class="glyph">📸</span><h3>Recreate This</h3>
+        <p>Pick an old photo, take it again today, see them side by side.</p></div>`}
       <a class="card" href="#math" style="--art:linear-gradient(180deg, transparent 10%, rgba(110,25,70,.55) 45%, #2c0d1f 82%)"><div class="collage"></div><span class="glyph">∑</span><h3>Photo Math</h3>
         <p>This photo + snow − summer = ?</p></a>
       <a class="card" href="#judge" style="--art:linear-gradient(180deg, transparent 10%, rgba(60,60,60,.55) 45%, #1a1a1a 82%)"><div class="collage"></div><span class="glyph">⚖︎</span><h3>Judge a Test</h3>
@@ -39,7 +39,7 @@ function playMenu() {
   $("playroot").querySelectorAll(".card[data-mode]").forEach(c => c.onclick = () => startGame(c.dataset.mode));
   $("detcard").onclick = () => detective();
   $("tncard").onclick = () => thenNow();
-  $("rccard").onclick = () => recreate();
+  if ($("rccard")) $("rccard").onclick = () => recreate();  // not for a folder of photos: it needs names
   $("playroot").querySelector(".players").onclick = e => {
     const k = e.target.dataset.k; if (k == null) return;
     const ps = players(); ps.splice(+k, 1); store.set("players", ps); playMenu();
@@ -248,7 +248,7 @@ async function thenNow(at = 0) {
   const L = TN.lists[by], n = L.length;
   TN.at = at = n ? (at + n) % n : 0;
   const head = `<div class="ghead tnhead"><span class="tntitle">Then and Now</span>
-    <span class="seg" id="tnby"><button data-by="place"${by === "place" ? ' class="on"' : ""}>📍 Same spot</button><button data-by="person"${by === "person" ? ' class="on"' : ""}>👤 Same person</button></span>
+    <span class="seg" id="tnby" ${SERVER.folder ? "hidden" : ""}><button data-by="place"${by === "place" ? ' class="on"' : ""}>📍 Same spot</button><button data-by="person"${by === "person" ? ' class="on"' : ""}>👤 Same person</button></span>
     <span class="sp"></span><span>${n ? `${at + 1} of ${n}` : ""}</span><a href="#play" id="quit">done</a></div>`;
   if (!n) {
     $("playroot").innerHTML = head + `<h2 class="ask">No pairs yet.</h2><p class="status">${by === "person"
