@@ -6,9 +6,11 @@ PhotosDB and PhotoInfo the app uses (store.photos_db picks the kind), so little 
 Every image and video under the folder counts, but not inside a Photos library or a hidden folder. A file's id comes
 from its content (its size and its first and last 64 KB), so moving or renaming one keeps it in the index, and two
 copies of a file count once. The date comes from EXIF (with its time zone), a video's from its own tags, else the
-file's date; the place from EXIF GPS; its albums are the folder it's in. Mac only: Apple's ImageIO reads each file's
-metadata and makes previews of what Pillow can't open (RAW). What's been read is kept in the index (folder_files),
-by path, size and time, so a later scan only reads new and changed files."""
+file's date; the place from EXIF GPS, named by geonames.py; its albums are the folder it's in; what's in it from
+Apple's Vision (LABEL_AT); screenshots are PNGs no camera made, selfies those from a front camera. Mac only: Apple's
+ImageIO reads each file's metadata and makes previews of what Pillow can't open (RAW). What's been read is kept in
+FILES (by path, size and time, so a later scan only reads new and changed files), a database of its own so it never
+waits on `index` writing the index."""
 import json, os, re, subprocess, uuid as uuidlib
 from datetime import datetime, timedelta, timezone
 from hashlib import sha1
@@ -17,10 +19,12 @@ from pathlib import Path
 from .config import DATA
 
 PREVIEWS = DATA / "previews"  # for files Pillow can't read: RAW photos, and videos' first frames
+FILES = DATA / "folder.sqlite"  # what's been read from each file, and Vision's labels
 PILLOW = {".jpg", ".jpeg", ".heic", ".heif", ".png", ".tif", ".tiff", ".webp", ".gif", ".bmp"}
 RAW = {".dng", ".cr2", ".cr3", ".nef", ".arw", ".raf", ".orf", ".rw2", ".pef", ".srw"}
 VIDEOS = {".mov", ".mp4", ".m4v", ".3gp", ".3g2", ".avi", ".mpg", ".mts", ".mkv"}
 CHUNK = 64 * 1024
+LABEL_AT = 0.3  # Vision's confidence for a label: about as many a photo as Photos gives, and most the same (FINDINGS.md)
 
 
 def is_folder(library):
@@ -76,14 +80,15 @@ def file_id(path, size):
 
 
 def image_meta(path):
-    """(date, (lat, lon) or None, width, height) from a photo's metadata, read by ImageIO (any format, RAW too)."""
+    """(date, (lat, lon) or None, width, height, flags) from a photo's metadata, read by ImageIO (any format, RAW too).
+    flags: "screenshot" for a PNG with no camera's make, "selfie" for a front camera's."""
     import Quartz
     from Foundation import NSURL
     src = Quartz.CGImageSourceCreateWithURL(NSURL.fileURLWithPath_(str(path)), None)
     props = src and Quartz.CGImageSourceCopyPropertiesAtIndex(src, 0, None)
     if not props:
-        return None, None, 0, 0
-    exif, tiff, gps = (props.get(k) or {} for k in ("{Exif}", "{TIFF}", "{GPS}"))
+        return None, None, 0, 0, []
+    exif, tiff, gps, aux = (props.get(k) or {} for k in ("{Exif}", "{TIFF}", "{GPS}", "{ExifAux}"))
     date = exif_date(exif.get("DateTimeOriginal") or exif.get("DateTimeDigitized") or tiff.get("DateTime"),
                      exif.get("OffsetTimeOriginal") or exif.get("OffsetTime"))
     where = None
@@ -93,7 +98,10 @@ def image_meta(path):
     w, h = int(props.get("PixelWidth") or 0), int(props.get("PixelHeight") or 0)
     if int(props.get("Orientation") or 1) in (5, 6, 7, 8):
         w, h = h, w
-    return date, where, w, h
+    lens = str(exif.get("LensModel") or aux.get("LensModel") or "").lower()
+    flags = (["screenshot"] if Path(path).suffix.lower() == ".png" and not tiff.get("Make") else []) + \
+            (["selfie"] if "front" in lens else [])
+    return date, where, w, h, flags
 
 
 def exif_date(text, offset=None):
@@ -166,16 +174,57 @@ def preview(path, uid, video):
         return None
 
 
+def files_db():
+    import sqlite3
+    con = sqlite3.connect(FILES, timeout=30)
+    con.execute("pragma journal_mode=wal")
+    con.execute("create table if not exists files(path text primary key, size int, mtime int, uuid text, meta text)")
+    con.execute("create table if not exists labels(uuid text primary key, labels text)")
+    return con
+
+
+def classify(path):
+    """What Apple's Vision sees in a photo, as Photos' labels look ("Blue Sky"), at LABEL_AT or more; [] if it can't."""
+    import Vision
+    from Foundation import NSURL
+    h = Vision.VNImageRequestHandler.alloc().initWithURL_options_(NSURL.fileURLWithPath_(str(path)), None)
+    req = Vision.VNClassifyImageRequest.alloc().init()
+    ok, _ = h.performRequests_error_([req], None)
+    return [o.identifier().replace("_", " ").title() for o in (req.results() or []) if o.confidence() >= LABEL_AT] if ok else []
+
+
+def place_info(p):
+    """A place from geonames.name as osxphotos' PlaceInfo looks to index.geo and index.meta."""
+    from types import SimpleNamespace
+    one = lambda x: [x] if x else []
+    return SimpleNamespace(name=p["name"], names=SimpleNamespace(
+        city=one(p["city"]), sub_administrative_area=[], state_province=one(p["state"]), country=one(p["country"]),
+        body_of_water=[], ocean=[], inland_water=[]))
+
+
 class File:
     """One photo or video in a folder, with the fields of osxphotos' PhotoInfo the app reads."""
-    title, place, persons, labels, face_info, screenshot, selfie, hasadjustments, path_edited = "", None, [], [], [], False, False, False, None
+    title, persons, face_info, hasadjustments, path_edited = "", [], [], False, None
 
-    def __init__(self, path, uid, date, where, root):
+    def __init__(self, path, uid, date, where, root, flags=(), labels=None):
         self.path, self.uuid, self.date, self.location = str(path), uid, date, where
         self.ismovie = Path(path).suffix.lower() in VIDEOS
         self.isphoto = not self.ismovie
         rel = Path(path).relative_to(root).parent
         self.albums = [rel.name] if rel.parts else []
+        self.screenshot, self.selfie = "screenshot" in flags, "selfie" in flags
+        self.place, self._labels = None, labels
+
+    @property
+    def labels(self):
+        """What's in it, from Vision: read once, then kept in FILES."""
+        if self._labels is None:
+            src = (self.path_derivatives or [None])[0]
+            self._labels = classify(src) if src else []
+            con = files_db()
+            con.execute("insert or replace into labels values(?,?)", (self.uuid, json.dumps(self._labels)))
+            con.commit(); con.close()
+        return self._labels
 
     @property
     def path_derivatives(self):
@@ -194,10 +243,9 @@ class Folder:
 
     def _read(self):
         """{uuid: File}, reading only files that are new or changed since the last scan."""
-        from .store import db
-        con = db()
-        con.execute("create table if not exists folder_files(path text primary key, size int, mtime int, uuid text, meta text)")
-        known = {p: (s, m, u, meta) for p, s, m, u, meta in con.execute("select * from folder_files")}
+        con = files_db()
+        known = {p: (s, m, u, meta) for p, s, m, u, meta in con.execute("select * from files")}
+        labels = {u: json.loads(ls) for u, ls in con.execute("select * from labels")}
         out, seen, new = {}, set(), []
         for f in files(self.library_path):
             try:
@@ -213,16 +261,20 @@ class Folder:
                 except OSError:
                     continue
                 video = f.suffix.lower() in VIDEOS
-                date, where = video_meta(f) if video else image_meta(f)[:2]
+                date, where, *_, flags = (*video_meta(f), []) if video else image_meta(f)
                 date = date or datetime.fromtimestamp(st.st_mtime).astimezone()
-                meta = dict(date=date.isoformat(), where=where)
+                meta = dict(date=date.isoformat(), where=where, flags=flags)
                 new.append((k, st.st_size, st.st_mtime_ns, uid, json.dumps(meta)))
             if uid not in out:  # a copy of a file already found counts once
                 out[uid] = File(f, uid, datetime.fromisoformat(meta["date"]), tuple(meta["where"]) if meta["where"] else None,
-                                self.library_path)
-        con.executemany("insert or replace into folder_files values(?,?,?,?,?)", new)
-        con.executemany("delete from folder_files where path=?", [(p,) for p in known if p not in seen])
+                                self.library_path, meta.get("flags", []), labels.get(uid))
+        con.executemany("insert or replace into files values(?,?,?,?,?)", new)
+        con.executemany("delete from files where path=?", [(p,) for p in known if p not in seen])
         con.commit(); con.close()
+        from . import geonames
+        located = [x for x in out.values() if x.location]
+        for x, p in zip(located, geonames.name([x.location for x in located])):
+            x.place = p and place_info(p)
         self._files = out
         return out
 

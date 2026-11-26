@@ -1,5 +1,5 @@
 """A folder of photos as a library (folders.py): read through the same fields as Photos, by store.photos_db."""
-import os, shutil, subprocess
+import json, os, shutil, subprocess
 from argparse import Namespace
 from datetime import datetime, timedelta, timezone
 
@@ -110,3 +110,48 @@ def test_a_folder_indexes_end_to_end(lib, folder, monkeypatch):
     with pytest.raises(LookupError, match="folder"):
         photos_app.photos_only()
     folders._in_use.clear()
+
+
+@pytest.fixture
+def towns(tmp_path, monkeypatch):
+    """A made-up list of towns in place of GeoNames' (no download)."""
+    from photosearch import geonames
+    monkeypatch.setattr(geonames, "CACHE", tmp_path / "geonames")
+    monkeypatch.setattr(geonames, "_places", None)
+    geonames.save([("Canmore", 51.089, -115.359, "Alberta", "Canada", 15990), ("Harvie Heights", 51.105, -115.395, "Alberta", "Canada", 1000),
+                   ("Mexico City", 19.43, -99.13, "Mexico City", "Mexico", 12294193)])
+    return geonames
+
+
+def test_places_are_named_from_the_list_of_towns(towns):
+    canmore, sea, mexico = towns.name([(51.100, -115.385), (40.0, -40.0), (19.43, -99.14)])
+    # beside a village, but the town is about as near and much bigger: the town, as Photos would say
+    assert canmore == dict(city="Canmore", state="Alberta", country="Canada", name="Canmore, Alberta, Canada")
+    assert sea["city"] == "" and mexico["name"] == "Mexico City, Mexico"
+
+
+def test_without_the_list_places_stay_unnamed(tmp_path, monkeypatch):
+    from photosearch import geonames
+    monkeypatch.setattr(geonames, "CACHE", tmp_path / "none")
+    monkeypatch.setattr(geonames, "_places", None)
+    monkeypatch.setattr(geonames, "download", lambda: (_ for _ in ()).throw(OSError("offline")))
+    assert geonames.name([(51.1, -115.4)]) == [None]
+
+
+def test_a_folders_places_labels_and_screenshots(folder, towns, monkeypatch):
+    photo(folder / "canmore.jpg", "2024:08:01 10:00:00", gps=((51.100, "N"), (115.385, "W")), color=(0, 140, 0))
+    Image.new("RGB", (60, 120), (255, 255, 255)).save(folder / "IMG_0001.PNG")  # no camera made it
+    seen = []
+    monkeypatch.setattr(folders, "classify", lambda path: seen.append(path) or ["Outdoor", "Grass"])
+    ps = {os.path.basename(p.path): p for p in store.photos_db(str(folder)).photos()}
+    assert ps["canmore.jpg"].place.name == "Canmore, Alberta, Canada" and ps["canmore.jpg"].place.names.city == ["Canmore"]
+    assert ps["IMG_0001.PNG"].screenshot and not ps["canmore.jpg"].screenshot
+    assert ps["canmore.jpg"].labels == ["Outdoor", "Grass"] and len(seen) == 1
+    again = {os.path.basename(p.path): p for p in store.photos_db(str(folder)).photos()}
+    assert again["canmore.jpg"].labels == ["Outdoor", "Grass"] and len(seen) == 1  # read once, then kept
+    assert json.loads(index.geo(again["canmore.jpg"])) == dict(city="Canmore", state="Alberta", country="Canada")
+
+
+def test_vision_reads_whats_in_a_photo(tmp_path):
+    f = photo(tmp_path / "sky.jpg", color=(90, 160, 235), size=(400, 300))
+    assert all(isinstance(x, str) and x == x.title() for x in folders.classify(f))  # what it sees in plain blue, if anything

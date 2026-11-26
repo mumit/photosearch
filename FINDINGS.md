@@ -497,3 +497,25 @@ fit in a circle.
 
 UMAP with `min_dist=0.6`, so near-duplicates spread out instead of piling up, and k-means regions named by the Apple
 labels most distinctive for each region.
+
+## Folders of photos: place names and labels
+
+A folder of photos (`folders.py`) has no Photos to name its places or say what's in it. Both were measured against
+what Photos says about the same photos: the demo library's 401 photos, indexed from their files and from Photos, and
+my own index's GPS positions (no photo opened, totals only).
+
+**Place names** (`geonames.py`) come from GeoNames' towns of 1,000 people or more. The nearest town alone named the
+same town as Photos for 21% of the demo's 202 photos with GPS: the list has neighbourhoods ("Coal Harbour",
+"ByWard Market") and villages beside towns, and Photos names the town. Leaving out neighbourhoods (feature code PPLX)
+raised it to 56%. Then taking the most populous town within 3 times the nearest one's distance, plus 2 km, raised
+it to 87% (175 of 202); 2 times was 78%, 5 times the same as 3. Those numbers were tuned on the demo, so the rule was
+checked on my own index, which it was never tuned on: of 8,611 photos Photos has named, 87% get the same town (the
+nearest alone: 28%), 93% the same state or province, and 100% the same country. 3,342 more photos have GPS but no name
+in Photos at all (older photos it never named), so a folder can name more than Photos does. Trips are named the
+same as from Photos (the demo's trip is "Alberta" both ways).
+
+**Labels** come from Apple's Vision (`VNClassifyImageRequest`), 17 ms a photo. Photos gives 8.8 labels a demo photo.
+At Vision's confidence of 0.3 (`LABEL_AT`), Vision gives 8.0, finds 64% of Photos' labels, and 71% of its own are ones
+Photos gives too; at 0.2, 9.4 labels, 69% and 65%; at 0.5, 5.9 labels, 51% and 76%. 0.3 gives about as many as Photos,
+mostly the same, for the galaxy's region names, ? Why's "what it sees", and the tidy-up checks that read labels.
+Not measured yet: whether search ranks the same on a folder as on Photos (judged blind with `photosearch eval`).

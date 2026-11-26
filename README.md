@@ -137,6 +137,19 @@ It prints progress, photos per second and an estimated time remaining. Then inde
 uv run photosearch index
 ```
 
+**Photos not in Apple Photos?** Index a folder instead (and the folders in it): a drive of scans, Lightroom's
+folders, a Google Photos export. Give it its own data folder, so it doesn't mix with your Photos index:
+
+```bash
+PHOTOSEARCH_DATA=~/photosearch-scans uv run photosearch index --library ~/Pictures/Scans
+```
+
+Dates and time zones come from each file's EXIF (a video's from its own tags), places from its GPS, named on the
+Mac from GeoNames' list of towns (downloaded once, 11 MB; [CC BY](https://www.geonames.org)), albums from the
+folder a photo is in, and what's in it from Apple's Vision. RAW files are read through Apple's ImageIO. Moving or
+renaming a file keeps it in the index. People's names aren't in a folder, so the people features stay empty, and
+there's no Photos app to send albums to (albums in photosearch work as usual). Nothing in the folder is changed.
+
 **In a hurry?** `--quick` indexes about 4× faster (around half an hour for 17,000 photos on an M3, not two and a
 half hours) at slightly lower quality, so you can start searching sooner:
 
@@ -601,6 +614,7 @@ thing, and they only import downwards in this list:
 | `embed.py` | The search model |
 | `images.py` | Reading photos, writing JPEGs, contact sheets |
 | `index.py` | `photosearch index` (and its `--quick` first pass) and `thumbs` |
+| `folders.py`, `geonames.py` | A folder of photos as a library, read like Photos; places named offline |
 | `watch.py` | While `serve` runs, the library is indexed by itself: the first index, new photos, quick ones redone |
 | `book.py` | A story as a print-ready photo book, and a wall calendar (PDFs) |
 | `videos.py` | `photosearch videos`: each video's sound and frames, and its best moment for a search |

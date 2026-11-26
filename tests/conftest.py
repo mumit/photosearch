@@ -23,7 +23,7 @@ class NoPhotosOrModel:
 
 sys.meta_path.insert(0, NoPhotosOrModel())
 
-from photosearch import clutter, config, dupes, embed, people, recreate, search, smartbox, store, text, thennow, videos, watch  # noqa: E402
+from photosearch import clutter, config, dupes, embed, geonames, people, recreate, search, smartbox, store, text, thennow, videos, watch  # noqa: E402
 from photosearch import photos_app as photos  # noqa: E402  (the fixture below is called photos_app)
 import library  # noqa: E402
 
@@ -46,6 +46,7 @@ def reset_caches():
     videos._clips = (None,)
     text._texts = (None, {})
     watch.state.update(job=None, since=None, error=None)
+    geonames._places = None
     for c in (dupes._dupes, dupes._sharp, dupes._hash, dupes._px, store._ar):
         c.clear()
 
@@ -76,6 +77,8 @@ def offline():
         mp.setattr(smartbox, "jev_key", lambda: None)
         mp.setattr(text, "read", lambda path: [])  # Apple's Vision: tests say what's written instead
         mp.setattr(watch, "start", lambda log=print: None)  # it would start `photosearch index` on the real library
+        mp.setattr(geonames, "CACHE", WORK / "geonames")  # no list of towns, and no downloading one
+        mp.setattr(geonames, "download", lambda: (_ for _ in ()).throw(OSError("no downloads in tests")))
         mp.setattr(text, "readings", lambda jobs: ((u, text.read(f)) for u, f in jobs))  # in this process
         yield
 
