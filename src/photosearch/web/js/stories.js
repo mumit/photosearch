@@ -13,15 +13,21 @@ function dateRange(a, b) {
 }
 function poster(x, acts = false) {
   const by = { agent: `✨ by ${esc(x.agent || "an AI agent")}`, claude: "✨ by Claude", you: "✏️ by you" }[x.made_by];
-  return `<a class="poster ${x.kind === "year" ? "year" : ""}" href="/review/${x.id}" target="_blank" title="${x.made_by ? "play" : "make & play"}">
+  const year = x.kind === "year", next = +x.id + 1;
+  const days = x.kind === "trip" ? dateRange(x.start, x.end) + " · "
+    : x.kind === "own" ? (x.start.slice(0, 4) === x.end.slice(0, 4) ? dateRange(x.start, x.end) : `${x.start.slice(0, 4)}–${x.end.slice(0, 4)}`) + " · " : "";
+  return `<a class="poster ${year ? "year" : ""}" href="/review/${x.id}" target="_blank" title="${x.made_by ? "play" : "make & play"}">
     ${x.cover ? `<img loading="lazy" src="/thumb/${x.cover}.jpg" alt="">` : ""}
-    ${by && x.kind === "trip" ? `<span class="by">${by}${x.edited ? ", edited" : ""}</span>` : ""}
-    ${acts ? `<span class="pacts">${x.made_by ? `<span data-go="/review/${x.id}?download=1" title="download, to send to family">⤓</span><span data-go="/book/${x.id}.pdf" title="a photo book to print (PDF)">📖</span>` : ""}<span data-go="#edit/${x.id}" title="edit">✎</span></span>` : ""}
-    <div class="pt"><h3>${esc(x.title)}</h3><small>${x.kind === "trip" ? dateRange(x.start, x.end) + " · " : ""}${x.photos.toLocaleString()} photos${by && x.kind === "year" ? " · " + by : ""}</small></div>
+    ${by && !year ? `<span class="by">${by}${x.edited ? ", edited" : ""}</span>` : ""}
+    ${acts ? `<span class="pacts">${x.made_by ? `<span data-go="/review/${x.id}?download=1" title="download, to send to family">⤓</span><span data-go="/book/${x.id}.pdf" title="a photo book to print (PDF)">📖</span>` : ""}${year ? `<span data-go="/calendar/${next}.pdf?from=${x.id}" title="a ${next} wall calendar to print (PDF): each month a photo from that month of ${x.id}">📅</span>` : ""}<span data-go="#edit/${x.id}" title="edit">✎</span></span>` : ""}
+    <div class="pt"><h3>${esc(x.title)}</h3><small>${days}${x.photos.toLocaleString()} photos${by && year ? " · " + by : ""}</small></div>
   </a>`;
 }
 views.stories = async () => {
   const r = await loadStories.fresh();
+  const own = r.filter(x => x.kind === "own");
+  $("ownsec").hidden = !own.length;
+  $("own").innerHTML = own.map(x => poster(x, true)).join("");
   $("trips").innerHTML = r.filter(x => x.kind === "trip").map(x => poster(x, true)).join("") || `<p class="status">No trips found yet: they need photos with locations.</p>`;
   $("years").innerHTML = r.filter(x => x.kind === "year").map(x => poster(x, true)).join("");
 };
@@ -222,7 +228,7 @@ $("pickf").onsubmit = e => {
 };
 async function loadPick(params) {
   const what = params.q ? `matches for “${params.q}”` : params.like ? "look-alikes" : "photos";
-  $("pickstatus").textContent = `finding ${what} from these days…`; $("pickgrid").innerHTML = "";
+  $("pickstatus").textContent = `finding ${what} ${E.story.kind === "own" ? "in the library" : "from these days"}…`; $("pickgrid").innerHTML = "";
   try { E.found = (await api("/api/story_photos", { id: E.story.id, ...params })).results; }
   catch (e) { $("pickstatus").textContent = e.message; return; }
   renderPick(what);

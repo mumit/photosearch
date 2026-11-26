@@ -4,9 +4,11 @@ Any MCP client that starts local (stdio) servers and passes images to its model 
   claude mcp add photosearch -- uv run --directory /path/to/photosearch photosearch-mcp
 
 Reads the index built by `photosearch index`; only make_album changes anything in Photos (and it never removes).
+make_book and make_calendar write a PDF to print, by default in ~/Downloads.
 """
 import json
 from collections import Counter
+from pathlib import Path
 from typing import Literal, TypedDict
 
 from mcp.server.mcpserver import Context, Image, MCPServer
@@ -146,9 +148,10 @@ def on_this_day(day: str | None = None) -> list:
 
 @mcp.tool(annotations=READ)
 def list_stories() -> list[dict]:
-    """The trips (found from where photos were taken) and years that can be made into a slideshow, newest first,
-    with their ids, days, photo counts, and who made the saved story: none (an automatic one is made when played),
-    "you" (the user) or "agent" (with its name, and edited=true if the user changed it since)."""
+    """The stories: first those of any photos that the user or an agent made (kind "own", ids like
+    "story-grandma-at-80"), then the trips (found from where photos were taken) and years, newest first, with their
+    ids, days, photo counts, and who made the saved story: none (an automatic one is made when played), "you" (the
+    user) or "agent" (with its name, and edited=true if the user changed it since)."""
     return [{k: v for k, v in s.items() if k != "cover" and v is not None} for s in stories.stories(con)]
 
 
@@ -170,21 +173,30 @@ def story_highlights(story: str, count: int = 40) -> list:
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True))
 def save_story(story: str, title: str, intro: str, chapters: list[Chapter], outro: str = "", replace: bool = False,
                ctx: Context | None = None) -> str:
-    """Save a story (a year or a trip) and get the link to its slideshow. Pick ~20-30 photos from story_highlights,
-    plus any you found with search_photos (look at them first: skip blurry shots, near-repeats, receipts and too
+    """Save a story and get the link to its slideshow. `story` is a year ("2025"), a trip id from list_stories, or, for
+    a story of any photos from any days (a person over the years, a first year, a birthday book), "story-" and a
+    short name in lowercase words with hyphens ("story-grandma-at-80"); its days come from its photos. For a year or
+    trip, pick ~20-30 photos from story_highlights, plus any you found with search_photos; for a story of any photos,
+    from search_photos, best_per_year and similar_photos (look at them first: skip blurry shots, near-repeats, receipts and too
     many selfies), group them into 4-8 chapters in date order with short titles (for a trip, usually by day or
     place), and give each photo a one-line caption. Captions should describe what's in the photo, using only names
     from the photo's tagged people; don't invent events or feelings. Replaces an earlier automatic or agent's story;
     one the user made or edited only with replace=True, after asking them."""
-    _, _, fields = stories.story_span(con, story)
+    uuids = [p["uuid"] for c in chapters for p in c.get("photos", [])]
+    own = story.startswith(stories.OWN)
+    if own and not stories.STORY_ID.fullmatch(story):
+        raise ValueError(f"a story of any photos needs an id like story-grandma-at-80, not {story!r}")
+    fields = None if own else stories.story_span(con, story)[2]
     old = stories.saved_review(story)
     if old and (old.get("made_by") == "you" or old.get("edited")) and not replace:
         raise ValueError(f"the user {'made' if old.get('made_by') == 'you' else 'edited'} the story {story!r} "
                          f"(\"{old.get('title')}\"); ask them before replacing it, then call again with replace=true")
-    known = store.photo_info(con, [p["uuid"] for c in chapters for p in c.get("photos", [])])
-    bad = [p["uuid"] for c in chapters for p in c.get("photos", []) if p["uuid"] not in known]
+    known = store.photo_info(con, uuids)
+    bad = [u for u in uuids if u not in known]
     if bad:
         raise ValueError(f"not in the index: {bad}")
+    if own:
+        fields = stories.own_fields(con, story, uuids)
     stories.save_review(dict(fields, title=title, intro=intro, outro=outro, made_by="agent", agent=agent(ctx), chapters=chapters))
     # full-size copies from iCloud for photos whose local preview is tiny (~1 s each), so the slideshow is sharp
     photos_app.fetch_in_subprocess(con, [p["uuid"] for c in chapters for p in c.get("photos", [])], wait=False)
@@ -192,6 +204,62 @@ def save_story(story: str, title: str, intro: str, chapters: list[Chapter], outr
     return (f"saved {n} photos in {len(chapters)} chapters. Slideshow: http://localhost:8765/review/{story} "
             f"(needs `photosearch serve`; also listed under Stories). One-file copy to share: "
             f"`uv run photosearch review {story} --export {story}.html`")
+
+
+def print_to(folder, name):
+    """A path for a new file in folder (default ~/Downloads), "name (2).pdf" if name is taken."""
+    d = Path(folder).expanduser() if folder else Path.home() / "Downloads"
+    d.mkdir(parents=True, exist_ok=True)
+    f, n = d / name, 1
+    while f.exists():
+        n += 1; f = d / f"{Path(name).stem} ({n}){Path(name).suffix}"
+    return f
+
+
+def soft(low):
+    """Photos that print soft, worst first, as the agent can find them again: by date and place."""
+    info = store.photo_info(con, list(low))
+    return [dict(uuid=u, dpi=dpi, date=info[u]["date"], place=info[u]["place"]) for u, dpi in sorted(low.items(), key=lambda x: x[1])]
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False))
+def make_book(story: str, size: Literal["a4", "letter"] = "a4", bleed: bool = False, folder: str | None = None) -> str:
+    """Print a saved story (save_story first) as a photo book: a PDF of 300 dpi landscape pages, a cover, then each
+    chapter opening on its title and first photo, the rest two to a page with captions, dates and places. Photos are
+    fitted, never cropped. Writes a new file to folder (default ~/Downloads) and returns its path, and the photos
+    that would print soft (under 150 dpi). Swap those for sharper look-alikes (similar_photos) and save the story
+    again if there are better ones, then make the book again. Fetches full-size copies from iCloud first (~1 s a
+    photo)."""
+    from . import book
+    r = stories.load_review(con, story)
+    photos_app.fetch_in_subprocess(con, stories.story_uuids(r))
+    data, low = book.book(con, r, size, bleed)
+    f = print_to(folder, book.book_name(r))
+    f.write_bytes(data)
+    return json.dumps(dict(file=str(f), mb=round(len(data) / 1e6, 1), soft=soft(low)), ensure_ascii=False)
+
+
+class Month(TypedDict, total=False):
+    uuid: str
+    caption: str
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False))
+def make_calendar(year: int, months: list[Month] | None = None, title: str | None = None, photos_from: int | None = None,
+                  size: Literal["a4", "letter"] = "a4", bleed: bool = False, folder: str | None = None) -> str:
+    """A wall calendar for year, to print: a PDF of 300 dpi portrait pages, a cover, then each month's photo above
+    its days (weeks start on Monday on A4, Sunday on Letter). months: twelve {uuid, caption}, January first; pick
+    photos that suit each month (snow in January, not in July), mostly landscape, and look at them first. Captions,
+    if any, say what's in the photo, with names only from its tagged people. Without months, it picks the best photo
+    of each month of photos_from (default: the year before). Writes a new file to folder (default ~/Downloads) and
+    returns its path, and the photos that would print soft (under 150 dpi)."""
+    from . import book
+    months = months or book.month_picks(con, photos_from or year - 1)
+    photos_app.fetch_in_subprocess(con, [m["uuid"] for m in months])
+    data, low = book.wall_calendar(con, year, months, title, size, bleed)
+    f = print_to(folder, f"calendar-{year}.pdf")
+    f.write_bytes(data)
+    return json.dumps(dict(file=str(f), mb=round(len(data) / 1e6, 1), soft=soft(low)), ensure_ascii=False)
 
 
 @mcp.tool(annotations=READ)

@@ -19,6 +19,8 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 
 ## Done
 
+- Gifts an AI agent makes: a story of any photos from any years (`story-grandma-at-80`, under Your stories), printed as a photo book by the agent (`make_book`, into `~/Downloads`), and wall calendars of a photo a month (`photosearch calendar`, 📅 on a year, `make_calendar`), each month's photo from that month a year earlier unless the agent picks.
+
 - Photo book: 📖 on a story, or `photosearch book`, makes a print-ready PDF (`book.py`): 300 dpi, A4 or Letter landscape, a cover, chapters opening on their first photo and the rest two to a page, photos fitted not cropped, soft photos listed, an optional bleed.
 - ✨ smart search without a key: keyword rules read the search box on the Mac when there's no Jev key, close to Jev on searches they never saw (FINDINGS.md); `photosearch eval` compares them (`search=rules`, `search=jev`).
 - `serve` indexes new photos while it runs (`watch.py`): it looks a minute after starting and every 15 minutes, and indexes what's new in its own low-priority process, so new photos are in searches without running `index`.

@@ -39,7 +39,7 @@ from .evals import cmd_eval
 from .videos import cmd_download_videos, cmd_videos
 from .dates import cmd_dates
 from .why import cmd_why
-from .book import cmd_book
+from .book import cmd_book, cmd_calendar
 from .text import cmd_read_text, cmd_text
 from .update import cmd_update, version
 
@@ -164,12 +164,22 @@ def main():
     p = sub.add_parser("today", help="photos from this day in earlier years")
     p.add_argument("--day", help="MM-DD instead of today"); p.set_defaults(fn=cmd_today)
     p = sub.add_parser("trips", help="trips, found from where photos were taken"); p.set_defaults(fn=cmd_trips)
-    p = sub.add_parser("book", help="a year or trip as a photo book to print: a PDF of 300 dpi pages")
-    p.add_argument("story", help="a year (2025) or a trip id from `photosearch trips` (trip-2024-05-02)")
+    p = sub.add_parser("book", help="a story as a photo book to print: a PDF of 300 dpi pages")
+    p.add_argument("story", help="a year (2025), a trip id from `photosearch trips` (trip-2024-05-02), or a story an agent "
+                                 "or you made (story-grandma-at-80)")
     p.add_argument("--out", help="where to write it (default: named after the story)")
     p.add_argument("--size", choices=["a4", "letter"], default="a4", help="landscape A4 (default) or US Letter")
     p.add_argument("--bleed", action="store_true", help="3 mm extra around each page, for a print shop to trim")
     p.set_defaults(fn=cmd_book)
+    p = sub.add_parser("calendar", help="a wall calendar to print, a photo a month: a PDF of 300 dpi pages")
+    p.add_argument("year", type=int, nargs="?", help="the calendar's year (default: next year)")
+    p.add_argument("--photos-from", type=int, help="the year whose months it shows (default: the year before)")
+    p.add_argument("--title", help="for the cover (default: the year)")
+    p.add_argument("--out", help="where to write it (default: calendar-YEAR.pdf)")
+    p.add_argument("--size", choices=["a4", "letter"], default="a4", help="portrait A4 (default; weeks start on Monday) "
+                                                                          "or US Letter (on Sunday)")
+    p.add_argument("--bleed", action="store_true", help="3 mm extra around each page, for a print shop to trim")
+    p.set_defaults(fn=cmd_calendar)
     p = sub.add_parser("review", help="a year or trip as a slideshow: build (if needed), optionally export as one file")
     p.add_argument("story", help="a year (2025) or a trip id from `photosearch trips` (trip-2024-05-02)")
     p.add_argument("--auto", action="store_true", help="rebuild the automatic version")

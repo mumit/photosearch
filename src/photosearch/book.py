@@ -1,4 +1,5 @@
-"""A story (a trip or a year) as a print-ready photo book: `photosearch book STORY`, or 📖 on a story.
+"""A story as a print-ready photo book (`photosearch book STORY`, or 📖 on a story), and a wall calendar of a photo
+a month (`photosearch calendar YEAR`, or 📅 on a year).
 
 A PDF of 300 dpi pages, landscape A4 or US Letter: a cover (the first photo across the page, with the title and
 dates), then each chapter opening on its title, words and first photo, and the rest two to a page, each with its
@@ -7,16 +8,20 @@ caption, date and place under it. Photos are fitted, never cropped, except on th
 Full-size copies are fetched from iCloud first where the local preview is small, and any photo that still prints under
 LOW_DPI is listed, so it can be swapped out (✎) before printing. bleed=True adds the 3 mm a print shop trims off, and
 marks the page's trimmed size (TrimBox). Each page goes in as one JPEG, written by a small PDF writer here, so a long
-book never needs every page in memory at once."""
-import io
+book never needs every page in memory at once.
+
+The calendar is portrait: a cover, then each month's photo above its days, the week starting on Monday on A4 and on
+Sunday on Letter. Made automatically, each month's photo is the best of that month a year earlier, so the seasons
+match."""
+import calendar, io
 from datetime import date
 from pathlib import Path
 
 from .config import LARGE
 from .images import open_image
 from .places import short_place
-from .store import photo_info
-from .stories import date_range, story_uuids
+from .store import DATED, aspect, photo_info, vectors
+from .stories import MONTHS, kicker, story_uuids
 
 DPI = 300
 SIZES = {"a4": (297, 210), "letter": (279.4, 215.9)}  # mm, landscape: most photos are
@@ -56,12 +61,12 @@ def wrap(draw, text, f, width):
 
 
 class Book:
-    def __init__(self, con, size="a4", bleed=False):
+    def __init__(self, con, size="a4", bleed=False, portrait=False):
         from PIL import Image
         if size not in SIZES:
             raise ValueError(f"size is {' or '.join(SIZES)}")
         self.con, self.bleed = con, px(BLEED_MM) if bleed else 0
-        self.trim = tuple(px(mm) for mm in SIZES[size])
+        self.trim = tuple(px(mm) for mm in SIZES[size])[::-1 if portrait else 1]
         self.W, self.H = (t + 2 * self.bleed for t in self.trim)
         self.margin = self.bleed + px(MARGIN_MM)
         self.pages, self.low, self.Image = [], {}, Image
@@ -137,6 +142,34 @@ class Book:
                 self.cell(im, draw, p["uuid"], p, (self.margin + j * (w + gap), self.margin, w, self.H - 2 * self.margin))
             self.done(im)
 
+    def month(self, year, month, photo, sunday=False):
+        """A calendar page: the month's photo above its name and its days."""
+        top, inner_w = self.margin, self.W - 2 * self.margin
+        im, draw = self.page()
+        photo_h = round((self.H - 2 * self.margin) * 0.56)
+        self.cell(im, draw, photo["uuid"], photo, (self.margin, top, inner_w, photo_h))
+        y = top + photo_h + px(6)
+        draw.text((self.margin, y), MONTHS[month - 1], font=font(px(11)), fill=INK)
+        f = font(px(5))
+        draw.text((self.W - self.margin - draw.textlength(str(year), font=f), y + px(4.5)), str(year), font=f, fill=MUTED)
+        y += px(18)
+        cal = calendar.Calendar(6 if sunday else 0)
+        names = [calendar.day_abbr[(d + (6 if sunday else 0)) % 7] for d in range(7)]
+        col, small, line = inner_w / 7, font(px(3.4)), (222, 216, 207)
+        for i, n in enumerate(names):
+            draw.text((self.margin + i * col + px(1.5), y), n.upper(), font=small, fill=MUTED)
+        y += px(6.5)
+        row = (self.H - self.margin - y) / 6  # six rows every month, so the pages match
+        num = font(px(4.6))
+        for r, week in enumerate(cal.monthdayscalendar(year, month)):
+            ry = y + r * row
+            draw.line((self.margin, ry, self.W - self.margin, ry), fill=line, width=px(0.25))
+            for i, d in enumerate(week):
+                if d:
+                    weekend = (i in (0, 6)) if sunday else (i >= 5)
+                    draw.text((self.margin + i * col + px(1.5), ry + px(1.5)), str(d), font=num, fill=MUTED if weekend else INK)
+        self.done(im)
+
     def pdf(self):
         """The pages as a PDF: each one JPEG, at its printed size, with the trimmed size marked if there's a bleed."""
         pt = lambda v: round(v * 72 / DPI, 2)
@@ -176,10 +209,9 @@ def book(con, review, size="a4", bleed=False):
     chapters = [c for c in chapters if c[2]]
     if not chapters:
         raise LookupError("this story has no photos to print")
-    kicker = date_range(review["start"], review["end"]) if review.get("kind") == "trip" else "A year in photos"
     # the cover: the first photo of the first chapter with one to spare, so it isn't printed twice
     i = next((i for i, c in enumerate(chapters) if len(c[2]) > 1), None)
-    b.cover(chapters[i or 0][2][0]["uuid"], review["title"], kicker)
+    b.cover(chapters[i or 0][2][0]["uuid"], review["title"], kicker(review, "A year in photos"))
     if i is not None:
         chapters[i] = (chapters[i][0], chapters[i][1], chapters[i][2][1:])
     for title, text, photos in chapters:
@@ -198,8 +230,12 @@ def cmd_book(a):
     from .store import db
     con = db()
     if not STORY_ID.fullmatch(a.story):
-        raise SystemExit("a story is a year (2025) or a trip id from `photosearch trips` (trip-2024-05-02)")
-    r = load_review(con, a.story, make=True)
+        raise SystemExit("a story is a year (2025), a trip id from `photosearch trips` (trip-2024-05-02), or a story an "
+                         "agent or you made (story-grandma-at-80)")
+    try:
+        r = load_review(con, a.story, make=True)
+    except LookupError as ex:
+        raise SystemExit(ex)
     if need := [u for u in story_uuids(r) if needs_fetch(con, u)]:
         print(f"fetching full-size copies of {len(need)} photos from iCloud…")
         fetch_large(con, need, log=print)
@@ -210,3 +246,64 @@ def cmd_book(a):
           + (", with a 3 mm bleed" if a.bleed else ""))
     for u, dpi in sorted(low.items(), key=lambda x: x[1]):
         print(f"  soft in print ({dpi} dpi): {u}; swap it in the story editor (✎) if it matters")
+
+
+def month_picks(con, year):
+    """A photo for each month: the most interesting from that month of year, landscape ones first (they fill the
+    page's photo space), else from that month of any year, else (a month with no photos ever) the best one left from
+    year, then from any time. Captioned with who's in it, as automatic stories are."""
+    from .search import interest
+    uuids, _, pos = vectors(con)
+    score = interest(con)
+    picks = []
+    for m in range(1, 13):
+        for where in (f"substr(date,1,7) = '{year}-{m:02}'", f"substr(date,6,2) = '{m:02}'", f"substr(date,1,4) = '{year}'", "1"):
+            rows = [u for (u,) in con.execute(f"select uuid from photos where kind='photo' and {DATED} and {where}")
+                    if u in pos and u not in picks]
+            if rows:
+                break
+        else:
+            raise LookupError("too few photos for a calendar: it needs 12")
+        picks.append(max(rows, key=lambda u: score[pos[u]] + (0.05 if aspect(u) >= 1.2 else 0)))
+    info = photo_info(con, picks)
+    return [dict(uuid=u, caption=" & ".join(p.split()[0] for p in info[u]["persons"][:3])) for u in picks]
+
+
+def wall_calendar(con, year, months, title=None, size="a4", bleed=False, sunday=None):
+    """(the PDF's bytes, {uuid: dpi} of photos that print under LOW_DPI) for a calendar of year: a cover, then a page
+    a month. months: twelve {uuid, caption}, January first. sunday: whether weeks start on Sunday (default: on
+    Letter)."""
+    if len(months) != 12:
+        raise ValueError(f"a calendar needs 12 photos, January to December, not {len(months)}")
+    from .search import interest
+    info = photo_info(con, [m["uuid"] for m in months])
+    if bad := [m["uuid"] for m in months if m["uuid"] not in info]:
+        raise ValueError(f"not in the index: {bad}")
+    b = Book(con, size, bleed, portrait=True)
+    _, _, pos = vectors(con)
+    score = interest(con)
+    best = max(months, key=lambda m: score[pos[m["uuid"]]] if m["uuid"] in pos else -1)
+    b.cover(best["uuid"], title or str(year), str(year) if title else "A year in photos")
+    for i, m in enumerate(months):
+        p = info[m["uuid"]]
+        b.month(year, i + 1, dict(uuid=m["uuid"], caption=m.get("caption", ""), date=p["date"], place=short_place(p["place"])),
+                size == "letter" if sunday is None else sunday)
+    return b.pdf(), b.low
+
+
+def cmd_calendar(a):
+    from .photos_app import fetch_large, needs_fetch
+    from .store import db
+    con = db()
+    year = a.year or date.today().year + 1
+    months = month_picks(con, a.photos_from or year - 1)
+    if need := [m["uuid"] for m in months if needs_fetch(con, m["uuid"])]:
+        print(f"fetching full-size copies of {len(need)} photos from iCloud…")
+        fetch_large(con, need, log=print)
+    data, low = wall_calendar(con, year, months, a.title, a.size, a.bleed)
+    out = Path(a.out or f"calendar-{year}.pdf")
+    out.write_bytes(data)
+    print(f"wrote {out} ({len(data) / 1e6:.1f} MB): {year}, with photos from {a.photos_from or year - 1}, {a.size.upper()} portrait"
+          + (", with a 3 mm bleed" if a.bleed else ""))
+    for u, dpi in sorted(low.items(), key=lambda x: x[1]):
+        print(f"  soft in print ({dpi} dpi): {u}")

@@ -261,3 +261,13 @@ def test_a_story_as_a_photo_book(srv):
     status, h, body = srv.get("/book/2025.pdf")
     assert status == 200 and h["content-type"] == "application/pdf" and body.startswith(b"%PDF")
     assert 'filename="photo-book-2025.pdf"' in h["content-disposition"]
+
+
+def test_a_year_as_a_calendar(srv):
+    status, h, body = srv.get("/calendar/2026.pdf?from=2025")
+    assert status == 200 and h["content-type"] == "application/pdf" and body.startswith(b"%PDF")
+    assert 'filename="calendar-2026.pdf"' in h["content-disposition"]
+
+
+def test_a_story_nobody_made_isnt_found(srv):
+    assert srv.get("/book/story-nobody.pdf")[0] == 404 and srv.get("/review/story-nobody")[0] == 404

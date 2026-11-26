@@ -38,3 +38,38 @@ def test_letter_with_a_bleed(con):
     assert box == b"0 0 808.8 628.8" and trim == b" /TrimBox [8.4 8.4 800.4 620.4]"  # 11 x 8.5 in, and 3 mm all round
     with pytest.raises(ValueError):
         book.book(con, stories.load_review(con, "2025", make=True), size="a3")
+
+
+def test_a_story_of_any_photos_as_a_book(con, lib):
+    from photosearch import mcp_server
+    mcp_server.save_story("story-the-dogs", "The dogs", "", [dict(title="Dogs", photos=[dict(uuid=lib[f"dog{i}"]) for i in range(4)])])
+    data, _ = book.book(con, stories.load_review(con, "story-the-dogs"))
+    assert len(check_pdf(data)) == 1 + 1 + 1  # a cover, the chapter's first photo, then the other two on a page
+    assert book.book_name(stories.load_review(con, "story-the-dogs")) == "the-dogs.pdf"
+
+
+def test_a_calendar_shows_each_month_of_the_year_before(con, lib):
+    months = book.month_picks(con, 2025)
+    dates = {u: d for u, d in con.execute("select uuid, date from photos")}
+    month = [int(dates[m["uuid"]][5:7]) for m in months]
+    assert month[:9] == list(range(1, 10)) and month[10] == 11  # from any year when 2025 has none
+    assert dates[months[2]["uuid"]].startswith("2025-03")  # March 2025 had the Lisbon trip
+    # no October or December in any year: the best of 2025 not on another month
+    assert all(dates[months[i]["uuid"]].startswith("2025") for i in (9, 11)) and len({m["uuid"] for m in months}) == 12
+    data, _ = book.wall_calendar(con, 2026, months)
+    pages = check_pdf(data)
+    assert len(pages) == 13 and pages[0][0] == b"0 0 595.2 841.92"  # a cover and 12 months, portrait A4
+    with pytest.raises(ValueError, match="12 photos"):
+        book.wall_calendar(con, 2026, months[:11])
+
+
+def test_an_agent_prints_to_a_new_file(con, lib, tmp_path):
+    import json
+    from photosearch import mcp_server
+    mcp_server.save_story("story-the-dogs", "The dogs", "", [dict(title="Dogs", photos=[dict(uuid=lib["dog0"])])])
+    first = json.loads(mcp_server.make_book("story-the-dogs", folder=str(tmp_path)))
+    again = json.loads(mcp_server.make_book("story-the-dogs", folder=str(tmp_path)))
+    assert first["file"].endswith("the-dogs.pdf") and again["file"].endswith("the-dogs (2).pdf")
+    assert first["soft"] and first["soft"][0]["date"]  # the made-up photos are small; listed as the agent can find them
+    cal = json.loads(mcp_server.make_calendar(2026, folder=str(tmp_path)))
+    assert cal["file"].endswith("calendar-2026.pdf") and len(check_pdf(open(cal["file"], "rb").read())) == 13

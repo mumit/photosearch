@@ -81,6 +81,8 @@ Update this section when something finishes or starts.
 - **Quick first index:** done (`index --quick`, about 4× faster; the next `index` redoes those photos at full quality, newest first).
 - **Jev checks results:** done (`checks.py`, part of ✨ smart search). Judged by Claude alone; worth a second judge.
 - **Photo book:** built (📖 on a story, `photosearch book`, `book.py`). Not printed yet: worth one real print before trusting the layout and the 150 dpi cut-off.
+- **Gifts an agent makes:** built. Stories of any photos (`story-…`), `make_book` and `make_calendar` for agents, and
+  calendars (`photosearch calendar`, 📅 on a year). Not tried with an agent on my library or printed yet.
 - **New photos while serving:** done (`watch.py`): `serve` indexes them by itself.
 - **Smart search without a key:** done. Keyword rules read the search box on the Mac when there's no Jev key, close
   to Jev (FINDINGS.md, Smart search without Jev); Jev still reads it with a key, and checking the results still

@@ -247,6 +247,16 @@ def make_server(a):
                     self.send_header("content-disposition", f'attachment; filename="{book_name(r)}"')
                     self.send_header("content-length", str(len(pdf))); self.end_headers()
                     return self.wfile.write(pdf)
+                if u.path.startswith("/calendar/") and re.fullmatch(r"\d{4}\.pdf", name):  # 📅 on a year (book.py)
+                    from .book import SIZES, month_picks, wall_calendar
+                    year = int(name[:4])
+                    months = month_picks(con, int(q["from"]) if q.get("from", "").isdigit() else year - 1)
+                    photos_app.fetch_in_subprocess(con, [m["uuid"] for m in months])
+                    pdf, _ = wall_calendar(con, year, months, size=q.get("size") if q.get("size") in SIZES else "a4")
+                    self.send_response(200); self.send_header("content-type", "application/pdf")
+                    self.send_header("content-disposition", f'attachment; filename="calendar-{year}.pdf"')
+                    self.send_header("content-length", str(len(pdf))); self.end_headers()
+                    return self.wfile.write(pdf)
                 if u.path.startswith("/review/") and STORY_ID.fullmatch(name):
                     r = load_review(con, name, make=True)
                     if "download" in q:  # the file goes to family: wait for full-size copies (~1 s per missing one)

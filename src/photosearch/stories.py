@@ -1,4 +1,5 @@
-"""Stories: a year or a trip as a slideshow, made automatically, by an AI agent (MCP), or edited by hand."""
+"""Stories: a year or a trip as a slideshow, made automatically, by an AI agent (MCP), or edited by hand. A story
+of any photos from any days ("story-grandma-at-80") is made by an agent or by you, never automatically."""
 import json, re, unicodedata
 from collections import Counter
 from datetime import date, datetime, timedelta
@@ -14,7 +15,9 @@ from .shared import write_json
 
 REVIEWS = DATA / "reviews"
 MONTHS = "January February March April May June July August September October November December".split()
-STORY_ID = re.compile(r"\d{4}|trip-\d{4}-\d{2}-\d{2}")  # "2025", or a trip by its first day
+# "2025", a trip by its first day, or a story of any photos by its name
+STORY_ID = re.compile(r"\d{4}|trip-\d{4}-\d{2}-\d{2}|story-[a-z0-9]+(-[a-z0-9]+)*")
+OWN = "story-"  # the start of a story of any photos' id
 AGENT = ("agent", "claude")  # made_by for a story an AI agent made; "claude" from before any other agent could
 
 
@@ -33,6 +36,13 @@ def date_range(start, end):
     if a.year == b.year:
         return f"{ma} {a.day} – {mb} {b.day}, {a.year}"
     return f"{ma} {a.day}, {a.year} – {mb} {b.day}, {b.year}"
+
+
+def kicker(review, year="Year in review"):
+    """The line under a story's title: its dates for a trip, its years for a story of any photos spanning several."""
+    if review.get("kind") == "own" and review["start"][:4] != review["end"][:4]:
+        return f"{review['start'][:4]} – {review['end'][:4]}"
+    return date_range(review["start"], review["end"]) if review.get("kind") in ("trip", "own") else year
 
 
 def span_photos(con, start, end, home=None, exact=False):
@@ -84,14 +94,33 @@ def cover(con, start, end):
 
 
 def story_span(con, rid):
-    """(first day, last day, fields every review of it carries) for a year or a trip. A trip with a review you or
-    an agent made keeps the days it was made with, even if new photos would now shift where the trip is detected."""
+    """(first day, last day, fields every review of it carries) for a year, a trip or a story of any photos. A trip
+    with a review you or an agent made keeps the days it was made with, even if new photos would now shift where the
+    trip is detected."""
     if not STORY_ID.fullmatch(rid):
-        raise LookupError(f"not a story id: {rid!r} (a year like 2025, or a trip like trip-2024-05-02)")
+        raise LookupError(f"not a story id: {rid!r} (a year like 2025, a trip like trip-2024-05-02, or story-a-name)")
+    if rid.startswith(OWN):
+        if not (r := saved_review(rid)):
+            raise LookupError(f"there's no story {rid!r} yet: an AI agent, or you, makes one of any photos")
+        return r["start"], r["end"], dict(id=rid, kind="own", start=r["start"], end=r["end"])
     if rid.isdigit():
         return f"{rid}-01-01", f"{rid}-12-31", dict(id=rid, kind="year", year=int(rid))
     t = saved_review(rid) or find_trip(con, rid)
     return t["start"], t["end"], dict(id=rid, kind="trip", start=t["start"], end=t["end"])
+
+
+def own_fields(con, rid, uuids):
+    """The fields of a story of any photos, its days running from its first photo to its last."""
+    if not STORY_ID.fullmatch(rid) or not rid.startswith(OWN):
+        raise ValueError(f"a story of any photos needs an id like story-grandma-at-80, not {rid!r}")
+    marks = ",".join("?" * len(uuids))
+    days = con.execute(f"select min(substr(date,1,10)), max(substr(date,1,10)) from photos where uuid in ({marks}) and {DATED}",
+                       list(uuids)).fetchone()
+    if not days[0]:  # only undated photos: their placeholder dates are all there is
+        days = con.execute(f"select min(substr(date,1,10)), max(substr(date,1,10)) from photos where uuid in ({marks})", list(uuids)).fetchone()
+    if not days[0]:
+        raise ValueError("a story needs at least one photo from the index")
+    return dict(id=rid, kind="own", start=days[0], end=days[1])
 
 
 def story_home(con, fields):
@@ -156,6 +185,7 @@ def load_review(con, rid, make=False):
 def stories(con):
     """Every trip and year, newest first: its saved review's title and author if it has one, else what was detected."""
     made = {f.stem: r for f in REVIEWS.glob("*.json") if (r := saved_review(f.stem))} if REVIEWS.exists() else {}
+    own = sorted((r for r in made.values() if r.get("kind") == "own"), key=lambda r: r["end"], reverse=True)
     def story(rid, start, end, **x):
         r = made.get(rid, {})
         first = next((p["uuid"] for c in r.get("chapters", []) for p in c["photos"]), None)
@@ -169,7 +199,8 @@ def stories(con):
     out = [story(t["id"], t["start"], t["end"], kind="trip", title=t["name"], photos=t["photos"])
            for t in sorted(found.values(), key=lambda t: t["start"], reverse=True)]
     years = con.execute(f"select substr(date,1,4) y, count(*) from photos where {DATED} group by y order by y desc")
-    return out + [story(y, f"{y}-01-01", f"{y}-12-31", kind="year", title=y, photos=n) for y, n in years.fetchall()]
+    return ([story(r["id"], r["start"], r["end"], kind="own", title=r["title"], photos=len(story_uuids(r))) for r in own] + out +
+            [story(y, f"{y}-01-01", f"{y}-12-31", kind="year", title=y, photos=n) for y, n in years.fetchall()])
 
 
 def story_photos(con, uuids):
@@ -191,9 +222,12 @@ def story_for_editor(con, rid):
 
 def story_candidates(con, rid, q=None, like=None, k=48):
     """Photos from a story's days to add or swap in: matches for q, look-alikes of like, else its highlights, topped
-    up with the rest of its photos in time order when there are few (a short trip has only a handful of highlights)."""
+    up with the rest of its photos in time order when there are few (a short trip has only a handful of highlights).
+    A story of any photos takes them from the whole library."""
     start, end, fields = story_span(con, rid)
-    f = dict(after=start, before=day_after(end), kind="photo")
+    if fields["kind"] == "own":
+        start, end = "0001-01-01", "9999-12-30"
+    f = dict(kind="photo") if fields["kind"] == "own" else dict(after=start, before=day_after(end), kind="photo")
     if q or like:
         res = search(con, q, k, **f) if q else similar(con, like, k, **f)
     else:
@@ -219,6 +253,8 @@ def edit_review(con, body):
     bad = set(uuids) - photo_info(con, uuids).keys() if uuids else set()
     if bad:
         raise ValueError(f"not in the index: {sorted(bad)}")
+    if fields["kind"] == "own" and uuids:  # its days follow its photos
+        fields = own_fields(con, rid, uuids)
     made_by = "you" if old["made_by"] == "auto" else old["made_by"]
     save_review(dict(fields, title=text(body.get("title"), 120) or old["title"], intro=text(body.get("intro"), 300),
                      outro=text(body.get("outro"), 300), made_by=made_by, **({"agent": old.get("agent"), "edited": True} if made_by in AGENT else {}),
@@ -233,6 +269,8 @@ def slug(text):
 def export_name(review):
     if review["kind"] == "year":
         return f"year-in-review-{review['id']}.html"
+    if review["kind"] == "own":
+        return f"{slug(review['title']) or 'story'}.html"
     return f"{slug(review['title']) or 'trip'}-{review['start'][:4]}.html"
 
 
@@ -243,8 +281,7 @@ def render_review(con, review, embed=False):
     def src(u):
         # 1600 px: sharp on a laptop or TV, and a 27-photo story is ~13 MB, under email attachment limits
         return "data:image/jpeg;base64," + base64.b64encode(photo_jpeg(con, u, 1600, 80)).decode() if embed else f"/photo/{u}.jpg"
-    kicker = date_range(review["start"], review["end"]) if review.get("kind") == "trip" else "Year in review"
-    data = dict(review, kicker=kicker,
+    data = dict(review, kicker=kicker(review),
                 chapters=[dict(title=c["title"], text=c.get("text", ""),
                                photos=[dict(src=src(p["uuid"]), caption=p.get("caption", ""),
                                             date=info[p["uuid"]]["date"], place=short_place(info[p["uuid"]]["place"]))

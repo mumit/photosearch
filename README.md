@@ -225,13 +225,19 @@ and show as chips you can remove. On a phone, the modes move to a dock at the bo
 | **Tidy up** | Under Albums: near-duplicates, as groups of bursts and copies of the same picture. Each group has a suggested keeper (the sharpest, judged from the detail in its thumbnail); tap another to keep that instead, or **Not duplicates** to stop suggesting the group. **Send the extras** adds every non-keeper to an album in Photos called *Photosearch · maybe delete*, so you can look through it and delete there. Nothing is ever deleted by Photosearch. *Near-identical* is the default; *Also similar shots* includes shots of the same moment that differ a little more. Receipts, ID cards and screenshots only count when they're practically the same pixels, so two different receipts are never paired. |
 | **Clutter** | Also under Tidy up: photos that are probably not memories, in four kinds: *IDs and cards*, *Screenshots*, *Receipts and papers* and *Accidental shots* (floors, black frames). Tap ✕ on any that don't belong. **Send** adds a kind to its own album in Photos (*Photosearch · screenshots* and so on) to look through there. IDs are worth moving to Photos' locked Hidden album. Nothing is deleted. Screenshots are the ones Photos marks as screenshots; run `photosearch index` once to read those marks (until then, they're found by their phone-screen shape). The other kinds come from the search model, with cut-offs set by eye on a 17,000-photo library (`clutter.py` says how). |
 | **Photo frame** | `#frame`, or from Home: a slow, endless full-screen slideshow of your best photos with the time and date, for a spare iPad or TV. It keeps the screen awake. **⚙ What to show** picks everything, on this day, one person, or any search (`#frame/?person=…`, `#frame/?q=…`). **▶ Slideshow** on any search, place or open photo plays just those. |
-| **Stories** | Every trip (found automatically from where photos were taken) and every year as a slideshow of its best, most varied moments, with chapters and captions. **⤓** saves one as a single HTML file (photos included) you can send to family; **📖** makes it a photo book to print (a PDF, or `photosearch book 2025`; see below); **✎** edits it. |
+| **Stories** | Every trip (found automatically from where photos were taken) and every year as a slideshow of its best, most varied moments, with chapters and captions, and stories of any photos an AI agent made for you. **⤓** saves one as a single HTML file (photos included) you can send to family; **📖** makes it a photo book to print (a PDF, or `photosearch book 2025`; see below); **📅** on a year makes a calendar for the next; **✎** edits it. |
 
 **📖 Photo books.** Any story becomes a PDF to print: landscape A4 (or `--size letter`), 300 dpi, a cover from its
 first photos, then each chapter opening on its title and words, and the rest two to a page with their captions, dates
 and places. Photos are fitted, never cropped, except on the cover; videos are left out. Full-size copies are fetched
 from iCloud first, and any photo that would still print soft (under 150 dpi) is listed, so you can swap it in the
 editor. `photosearch book trip-2024-05-02 --bleed` adds the 3 mm margin a print shop trims off.
+
+**📅 Calendars.** `photosearch calendar` makes next year's wall calendar to print: portrait A4 (weeks from Monday) or
+`--size letter` (from Sunday), a cover, then each month's photo above its days. Each month shows the best photo from
+that month a year earlier, so the seasons match (`--photos-from 2019` for another year). 📅 on a year's card does the
+same, and an AI agent can pick the twelve photos itself (*"make a 2027 calendar of the kids, one photo a month that
+suits the season"*).
 
 **✨ Smart search.** The search box fills in the filters from your description: *"videos of Sam in the snow last
 year, no people"* becomes person Sam, videos only, last year, without people. The chips it adds are amber, so you
@@ -341,7 +347,8 @@ Then, in a new Claude Code session, ask things like *"find photos of Sam at the 
 album"*. The agent searches, **looks at the results** on a numbered contact sheet, drops the wrong ones, and only then
 answers or builds the album. Tools: `search_photos` (with `exclude`, people, place, date and kind filters),
 `similar_photos`, `best_per_year`, `view_photos`, `library_overview`, `on_this_day`, `list_stories`, `story_highlights`, `save_story`,
-`make_album` (adds only, never removes), and `eval_sheet` and `score_eval_sheet` for judging experiments.
+`make_album` (adds only, never removes), `make_book` and `make_calendar` (a PDF to print, written to `~/Downloads`),
+and `eval_sheet` and `score_eval_sheet` for judging experiments.
 
 **Another agent** can use it if it:
 
@@ -365,7 +372,7 @@ Stories it saves are marked with the name the agent gives, and its verdicts in a
 An agent with a model in the cloud sends the contact sheets it looks at to that company. A local vision model (in
 LM Studio, for example) keeps them on the Mac.
 
-### Stories: trips and years
+### Stories: trips, years and anything else
 
 A **trip** is a run of days when most photos were taken 75+ km from home (home is worked out per year, from where
 you take photos on the most days). Trips are named from Photos' place data (*Lisbon*, *Minneapolis & Saint Paul*) and
@@ -377,6 +384,12 @@ Lisbon trip"* or *"make a year in review for 2025"*. It looks through the highli
 missing (food, streets), keeps the best ~24 (skipping repeats, blurry shots and too many selfies), and writes
 chapters and captions. Captions stick to what's in the photo and the names tagged in Photos. Trip stories leave out
 photos taken near home (the morning you left).
+
+**Stories of any photos.** An agent can also make a story from any photos, from any years: *"make a photo book of
+Grandma for her 80th, a chapter a decade"*, *"Lily's first year"*, *"every time we went to the cabin"*. It searches the
+whole library, looks at what it finds, saves the story (under **Your stories**, with an id like
+`story-grandma-at-80`) and can print it as a photo book (`make_book`), into `~/Downloads`. Its days run from its first
+photo to its last, and **+ Add photos** in the editor searches the whole library.
 
 **✎** on a story's card opens the editor: drag photos to reorder them or move them between chapters (on a phone or
 iPad, press and hold a photo first), ↻ swap one
@@ -583,7 +596,7 @@ thing, and they only import downwards in this list:
 | `images.py` | Reading photos, writing JPEGs, contact sheets |
 | `index.py` | `photosearch index` (and its `--quick` first pass) and `thumbs` |
 | `watch.py` | While `serve` runs, new photos in Photos are indexed by themselves |
-| `book.py` | A story as a print-ready photo book (PDF) |
+| `book.py` | A story as a print-ready photo book, and a wall calendar (PDFs) |
 | `videos.py` | `photosearch videos`: each video's sound and frames, and its best moment for a search |
 | `text.py` | `photosearch text`: the words in photos, read by Apple's Vision, for searches in "quotes" |
 | `search.py` | Search, look-alikes, filters, how interesting a photo looks |

@@ -127,3 +127,44 @@ def test_an_agent_asks_before_replacing_your_story(con):
     mcp_server.save_story("2024", "The agent's", "", r["chapters"], replace=True)
     assert stories.load_review(con, "2024")["title"] == "The agent's"
     mcp_server.save_story("2024", "Again", "", r["chapters"])  # its own story: no need to ask
+
+
+def own_story(lib, name="story-sam-over-the-years"):
+    from photosearch import mcp_server
+    chapters = [dict(title="Early on", photos=[dict(uuid=lib["dog1"], caption="Alex and the dog")]),
+                dict(title="Lately", photos=[dict(uuid=lib["portrait"], caption="Sam")])]
+    return mcp_server.save_story(name, "Sam over the years", "", chapters)
+
+
+def test_a_story_of_any_photos_spans_its_photos(con, lib):
+    own_story(lib)
+    s = stories.stories(con)[0]
+    assert (s["id"], s["kind"], s["start"], s["end"], s["photos"]) == ("story-sam-over-the-years", "own", "2020-02-05", "2025-05-05", 2)
+    r = stories.load_review(con, "story-sam-over-the-years")
+    assert stories.kicker(r) == "2020 – 2025" and stories.export_name(r) == "sam-over-the-years.html"
+    assert stories.kicker(dict(r, start="2025-03-01", end="2025-05-05")) == "March 1 – May 5, 2025"
+
+
+def test_editing_a_story_of_any_photos_moves_its_days(con, lib):
+    own_story(lib)
+    stories.edit_review(con, dict(id="story-sam-over-the-years", chapters=[dict(title="x", photos=[dict(uuid=lib["beach0"])])]))
+    r = stories.load_review(con, "story-sam-over-the-years")
+    assert (r["start"], r["end"], r["made_by"], r["edited"]) == ("2018-07-10", "2018-07-10", "agent", True)
+
+
+def test_photos_for_a_story_of_any_photos_come_from_the_whole_library(con, lib):
+    own_story(lib)
+    days = {p["date"][:4] for p in stories.story_candidates(con, "story-sam-over-the-years")}
+    assert "2018" in days and "2025" in days  # not just its own 2020 to 2025
+
+
+@pytest.mark.parametrize("rid", ["story-Sam", "story-../reviews/2024", "story-", "story-a--b"])
+def test_bad_names_for_a_story_of_any_photos(con, lib, rid):
+    with pytest.raises(ValueError):
+        own_story(lib, rid)
+    assert not any(stories.REVIEWS.glob("story-*"))
+
+
+def test_a_story_of_any_photos_is_never_made_automatically(con):
+    with pytest.raises(LookupError, match="no story"):
+        stories.load_review(con, "story-nobody", make=True)

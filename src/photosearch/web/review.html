@@ -53,7 +53,7 @@ for (const c of R.chapters) {
 }
 slides.push({ type:"card", html:`<h2>${esc(R.title)}</h2><p>${esc(R.outro || "That's a wrap.")}</p><button id="again">↺ Watch again</button>` });
 
-document.title = R.kind === "trip" ? R.title : R.title + " · Year in Review";
+document.title = R.kind === "year" ? R.title + " · Year in Review" : R.title;
 const stage = document.getElementById("stage"), bars = document.getElementById("bars");
 bars.innerHTML = slides.slice(1).map(() => "<i><b></b></i>").join("");
 const els = slides.map(s => {
