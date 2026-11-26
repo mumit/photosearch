@@ -109,7 +109,7 @@ def index(a):
     check_settings(con)
     THUMBS.mkdir(parents=True, exist_ok=True)
     done = {r[0] for r in con.execute("select uuid from photos")}
-    print("opening Photos library…", flush=True)
+    print("opening the library…", flush=True)
     pdb = photos_db(a.library)
     print(f"library: {pdb.library_path}")
     # one index, one library: indexing another into it would drop every photo the other one doesn't have

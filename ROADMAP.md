@@ -12,6 +12,44 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 
 **Done when:** a photo I took again is found and shown with the old one.
 
+### 2. Folders of photos, not just Apple Photos
+
+**Why:** the biggest reach. Photos on a drive, in Lightroom's folders, old scans, a Google Photos export. Mac only for
+now: Apple's frameworks do the parts Photos does today.
+
+**How:** a folder becomes a second kind of library behind `store.photos_db()` (`folders.py`). The app already reads
+Photos through a few of osxphotos' fields (a photo's uuid, date, place, people, labels, preview), and the tests stand
+in for Photos the same way, so a folder that answers with those fields needs few changes elsewhere. Only writing
+(albums, iCloud fetches, video downloads) asks which kind it is.
+
+| | Apple Photos (as now) | A folder |
+|---|---|---|
+| Which photos | Photos' database, not in the trash | every image and video under the folder |
+| Id | Photos' uuid | from the file's content (first 64 KB and size), so moving or renaming a file keeps it |
+| Date | Photos | EXIF DateTimeOriginal; videos from ffprobe; else the file's date |
+| Place | Photos' place names | EXIF GPS, named offline from GeoNames' cities (CC BY) |
+| People | Photos' names and faces | names in XMP face regions (Lightroom, digiKam), else none |
+| Labels | Photos' labels | Apple's Vision classifier, the same kind of labels |
+| Albums | Photos' albums | the subfolders a photo is in |
+| Screenshots, selfies | Photos' marks | PNGs at a screen's size; EXIF front-camera lens |
+| Preview to index | Photos' derivatives | ImageIO's thumbnail (reads HEIC, RAW and the JPEG inside a RAW) |
+| Full size | fetched from iCloud | the file itself |
+| Make an album | an album in Photos | a folder of links (`Photosearch albums/NAME`) |
+
+**What stays Photos-only:** portraits cropped around a named face (unless XMP regions have them), Recreate This and
+Then and Now's same person (they need names), and sending to Photos (clutter and albums go to a folder of links).
+The page hides what a library can't do.
+
+**Steps, each its own commit:**
+1. **Done.** The folder kind: finding files, ids, EXIF dates and GPS, previews, videos, albums from subfolders.
+   `photosearch index --library FOLDER` records it as this data folder's library, as for a Photos library.
+2. Places named offline, labels from Vision, screenshots and selfies.
+3. Albums and clutter as folders of links; the page hides Photos-only features.
+4. Measured: search on a folder copy of the demo library against the Photos index of it, judged blind
+   (`photosearch eval`), and Vision's labels against Photos' on the same photos.
+
+**Done when:** a folder of photos, never seen by Photos, can be indexed, searched, mapped, storied and printed.
+
 ## Later
 
 **Experiments with the model** (measure each with `photosearch eval`):

@@ -129,7 +129,8 @@ def main():
         p.add_argument("--person"); p.add_argument("--after"); p.add_argument("--before"); p.add_argument("--place")
         p.add_argument("--kind", choices=["photo", "video"])
 
-    p = sub.add_parser("index"); p.add_argument("--limit", type=int); p.add_argument("--library")
+    p = sub.add_parser("index"); p.add_argument("--limit", type=int)
+    p.add_argument("--library", help="a Photos library, or a folder of photos (and the folders in it), instead of the system library")
     p.add_argument("--only-new", action="store_true", help="only photos new to the index, not quick ones to redo "
                    "(what `serve` runs)")
     p.add_argument("--here", action="store_true", help="start an index in this data folder even if this Mac has another "

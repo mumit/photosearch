@@ -114,12 +114,13 @@ def library_uuids():
     (no index yet, or no access to Photos). Reading the library takes ~2 s, so it's remembered until Photos'
     database changes."""
     global _lib
+    from . import folders
     lib = index_library()
     if not lib:
         return None
     try:
-        stamp = tuple(f.stat().st_mtime_ns for f in sorted((Path(lib) / "database").glob("Photos.sqlite*"))
-                      if not f.name.endswith("-shm"))
+        stamp = folders.stamp(lib) if folders.is_folder(lib) else \
+            tuple(f.stat().st_mtime_ns for f in sorted((Path(lib) / "database").glob("Photos.sqlite*")) if not f.name.endswith("-shm"))
         if _lib[0] != stamp:
             _lib = (stamp, {p.uuid for p in photos_db(lib).photos(intrash=False)} or None)  # never empty: a bad read
         return _lib[1]
@@ -156,9 +157,13 @@ def index_library():
 
 def photos_db(library=None):
     """The Photos library: the one given, else the one this index was built from, else the system library. So a
-    second data folder (PHOTOSEARCH_DATA, e.g. a demo) always reads its own library."""
-    import osxphotos
+    second data folder (PHOTOSEARCH_DATA, e.g. a demo) always reads its own library. A folder of photos instead of a
+    Photos library is read by folders.py, with the same fields."""
+    from . import folders
     library = library or index_library()
+    if library and folders.is_folder(library):
+        return folders.Folder(library)
+    import osxphotos
     if library:
         return osxphotos.PhotosDB(dbfile=library)
     try:

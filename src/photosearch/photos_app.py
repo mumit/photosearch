@@ -5,10 +5,18 @@ import re, sys, threading
 from pathlib import Path
 
 from .config import DISPLAY_PX, LARGE, SHARP_PX, THUMBS, THUMB_PX
+from . import folders
 from .store import db, photos_db
 from .images import open_image
 from .shared import held
 from .stories import STORY_ID, load_review, story_uuids
+
+
+def photos_only():
+    """Refuse what only a Photos library can do, for an index of a folder of photos (folders.py)."""
+    if folders.in_use():
+        raise LookupError("this index is of a folder of photos, not a Photos library, so there's no album in Photos to "
+                          "add to; albums here (＋ Album) work as usual")
 
 
 def add_now(name, uuids):
@@ -41,6 +49,7 @@ def add_to_photos_album(name, uuids):
     uuids = list(dict.fromkeys(uuids))
     if not uuids:
         return 0
+    photos_only()
     # one process at a time drives Photos (two can stall it); waiting for the turn isn't part of the time limit
     with held("photos-app"):
         try:
@@ -66,7 +75,7 @@ def needs_fetch(con, uuid):
     from PIL import Image
     import pillow_heif
     pillow_heif.register_heif_opener()
-    if (LARGE / f"{uuid}.jpg").exists():
+    if (LARGE / f"{uuid}.jpg").exists() or folders.in_use():  # a folder's photo is its own full size
         return False
     row = con.execute("select src, kind from photos where uuid=?", (uuid,)).fetchone()
     if not row or row[1] != "photo":
