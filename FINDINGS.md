@@ -518,4 +518,11 @@ same as from Photos (the demo's trip is "Alberta" both ways).
 At Vision's confidence of 0.3 (`LABEL_AT`), Vision gives 8.0, finds 64% of Photos' labels, and 71% of its own are ones
 Photos gives too; at 0.2, 9.4 labels, 69% and 65%; at 0.5, 5.9 labels, 51% and 76%. 0.3 gives about as many as Photos,
 mostly the same, for the galaxy's region names, ? Why's "what it sees", and the tidy-up checks that read labels.
-Not measured yet: whether search ranks the same on a folder as on Photos (judged blind with `photosearch eval`).
+**Search** on a folder is as good as on Photos. The demo's 401 photos were indexed from their files and from Photos'
+previews, at full quality both ways, and paired by when they were taken. The same photo's two vectors have a cosine
+of 0.99 on average (lowest 0.92): the files are bigger than Photos' previews, so the model sees slightly different
+pixels. Over the 50 built-in searches (`photosearch eval run folder index=…`), the same photo came first in 31, and
+7.7 of the first 10 were the same. Judged blind (by Claude alone), the top 5s held 66 photos that fit of 250 from the
+folder and 67 from Photos; where the first photo differed (19 searches), Photos' was better in 4, the folder's in
+none, and they were about as good in 15. Within what a second judging would move. A book and a calendar print from
+the folder with no photo soft, since its files are full size.

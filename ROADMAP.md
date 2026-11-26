@@ -12,50 +12,14 @@ offered as the new shot to confirm. The 0.80 is a guess until a real recreation 
 
 **Done when:** a photo I took again is found and shown with the old one.
 
-### 2. Folders of photos, not just Apple Photos
-
-**Why:** the biggest reach. Photos on a drive, in Lightroom's folders, old scans, a Google Photos export. Mac only for
-now: Apple's frameworks do the parts Photos does today.
-
-**How:** a folder becomes a second kind of library behind `store.photos_db()` (`folders.py`). The app already reads
-Photos through a few of osxphotos' fields (a photo's uuid, date, place, people, labels, preview), and the tests stand
-in for Photos the same way, so a folder that answers with those fields needs few changes elsewhere. Only writing
-(albums, iCloud fetches, video downloads) asks which kind it is.
-
-| | Apple Photos (as now) | A folder |
-|---|---|---|
-| Which photos | Photos' database, not in the trash | every image and video under the folder |
-| Id | Photos' uuid | from the file's content (first 64 KB and size), so moving or renaming a file keeps it |
-| Date | Photos | EXIF DateTimeOriginal; videos from ffprobe; else the file's date |
-| Place | Photos' place names | EXIF GPS, named offline from GeoNames' cities (CC BY) |
-| People | Photos' names and faces | names in XMP face regions (Lightroom, digiKam), else none |
-| Labels | Photos' labels | Apple's Vision classifier, the same kind of labels |
-| Albums | Photos' albums | the subfolders a photo is in |
-| Screenshots, selfies | Photos' marks | PNGs at a screen's size; EXIF front-camera lens |
-| Preview to index | Photos' derivatives | ImageIO's thumbnail (reads HEIC, RAW and the JPEG inside a RAW) |
-| Full size | fetched from iCloud | the file itself |
-| Make an album | an album in Photos | a folder of links (`Photosearch albums/NAME`) |
-
-**What stays Photos-only:** portraits cropped around a named face (unless XMP regions have them), Recreate This and
-Then and Now's same person (they need names), and sending to Photos (clutter and albums go to a folder of links).
-The page hides what a library can't do.
-
-**Steps, each its own commit:**
-1. **Done.** The folder kind: finding files, ids, EXIF dates and GPS, previews, videos, albums from subfolders.
-   `photosearch index --library FOLDER` records it as this data folder's library, as for a Photos library.
-2. **Done.** Places named offline, labels from Vision, screenshots and selfies (FINDINGS.md, Folders of photos).
-3. **Done.** Albums and clutter as folders of links; the page hides Photos-only features.
-4. Measured: search on a folder copy of the demo library against the Photos index of it, judged blind
-   (`photosearch eval`), and Vision's labels against Photos' on the same photos.
-
-**Done when:** a folder of photos, never seen by Photos, can be indexed, searched, mapped, storied and printed.
-
 ## Later
 
 **Experiments with the model** (measure each with `photosearch eval`):
 - **Learn from ✕ and ☆:** train a small adjustment applied to every search from smart-album feedback.
 
 ## Done
+
+- Folders of photos, not just Apple Photos: `photosearch index --library FOLDER` indexes every photo and video under a folder, read like Photos (`folders.py`): EXIF dates, time zones and GPS, places named on the Mac from GeoNames (`geonames.py`), labels from Apple's Vision, albums from subfolders, RAW through ImageIO. Albums and Tidy up make folders of links, and the page hides what needs names. Measured against Photos on the demo: the same town for 87% of photos, about as many labels, and search as good, judged blind (FINDINGS.md, Folders of photos).
 
 - A first run without waiting: on a fresh install, `serve` starts the first index itself (quick, newest first), the page shows how far it has got and searches what's read so far, and says why if it can't read Photos. Quick photos are then redone at full quality while serving. An `index` that `serve` started now stops when `serve` does, even if `serve` is killed.
 
